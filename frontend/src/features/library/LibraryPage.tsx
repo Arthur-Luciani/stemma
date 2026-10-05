@@ -38,7 +38,7 @@ function ActionsSheet({
   open: (act: SessionAct, session: Session) => void;
   onClose: () => void;
 }) {
-  const items = useMenuItems(session, open);
+  const items = useMenuItems(session, open, onClose);
   return (
     <BottomSheet open onClose={onClose} label={session.title}>
       <div className={styles.sheetTitle}>
@@ -93,10 +93,11 @@ export function LibraryPage() {
 
   const [draft, setDraft] = useState(q);
   const [syncedQ, setSyncedQ] = useState(q);
-  // A URL mudou por fora (back/forward): o campo acompanha.
+  // A URL mudou por fora (back/forward): o campo acompanha. Se a mudança veio do próprio
+  // campo (debounce grava o texto aparado), não mexe, senão some o espaço que se digita.
   if (syncedQ !== q) {
     setSyncedQ(q);
-    setDraft(q);
+    if (draft.trim() !== q) setDraft(q);
   }
   const searchRef = useRef<HTMLInputElement>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

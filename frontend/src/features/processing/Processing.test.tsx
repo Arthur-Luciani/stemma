@@ -123,6 +123,33 @@ describe('Processamento', () => {
     expect(within(expanded).getByText('Separando 90%')).toBeInTheDocument();
   });
 
+  it('regressão: descartar o último job fecha o sheet e limpa a URL', async () => {
+    let items: Job[] = [failed];
+    server.use(
+      http.get('*/api/jobs', () => HttpResponse.json({ items })),
+      http.post('*/api/jobs/:id/discard', () => {
+        items = [];
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const { router } = renderApp('/sessions');
+    await userEvent.click(await screen.findByRole('button', { name: 'Abrir processamento' }));
+    const sheet = screen.getByRole('dialog', { name: 'Processamento' });
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Descartar' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toBe('');
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // Um job novo chegando não abre o sheet sozinho.
+    act(() => {
+      FakeWebSocket.latest().open();
+      FakeWebSocket.latest().receive({ type: 'job.updated', data: { job: running } });
+    });
+    expect(await screen.findByRole('button', { name: 'Abrir processamento' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('sem jobs, nada aparece', async () => {
     renderApp('/', { desktop: true });
     await screen.findByRole('heading', { name: 'O que vamos separar hoje?' });

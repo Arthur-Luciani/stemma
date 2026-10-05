@@ -16,8 +16,10 @@ export function useReprocessWithToast() {
   const toast = useToast();
   return {
     isPending: reprocess.isPending,
-    run: (session: Session) => {
+    /** `after` roda quando a chamada termina (dá certo ou não). */
+    run: (session: Session, after?: () => void) => {
       reprocess.mutate(session.id, {
+        onSettled: after,
         onSuccess: () => {
           toast.show({
             tone: 'good',
@@ -34,6 +36,8 @@ export function useReprocessWithToast() {
 export function useMenuItems(
   session: Session,
   open: (act: SessionAct, session: Session) => void,
+  /** Ações que não abrem outro overlay (Reprocessar) fecham o sheet do celular. */
+  onDone?: () => void,
 ): MenuItem[] {
   const reprocess = useReprocessWithToast();
   const items: MenuItem[] = [
@@ -50,7 +54,8 @@ export function useMenuItems(
       label: strings.library.actions.reprocess,
       icon: 'refresh',
       onSelect: () => {
-        reprocess.run(session);
+        // Fecha o sheet só no fim: desmontado antes, o toast de sucesso não apareceria.
+        reprocess.run(session, onDone);
       },
     });
   items.push({

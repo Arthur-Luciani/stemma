@@ -125,6 +125,42 @@ describe('Descobrir', () => {
     expect(await screen.findByText('Passo 2 de 2')).toBeInTheDocument();
   });
 
+  it('regressão: link colado no celular — fechar o sheet não reabre sozinho', async () => {
+    searchReturns([makeResult()]);
+    const { router } = renderApp('/?q=https%3A%2F%2Fyoutu.be%2Fabc');
+    expect(
+      await screen.findByRole('dialog', { name: 'Confirme artista e título' }),
+    ).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => {
+      expect(router.state.location.search).not.toContain('pick');
+    });
+    // Dá tempo para um efeito reabrir, se houvesse.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('regressão: depois de Separar um link, o card não volta (sem sessão duplicada)', async () => {
+    searchReturns([makeResult()]);
+    let created = 0;
+    const session = makeSession({ state: 'draft', code: 'ST-060' });
+    server.use(
+      http.post('*/api/sessions', () => {
+        created += 1;
+        return HttpResponse.json(session, { status: 201 });
+      }),
+      http.post('*/api/sessions/:id/process', () =>
+        HttpResponse.json(makeJob({ state: 'queued', position: 1 }, session), { status: 201 }),
+      ),
+    );
+    renderApp('/?q=https%3A%2F%2Fyoutu.be%2Fabc', { desktop: true });
+    await userEvent.click(await screen.findByRole('button', { name: 'Separar' }));
+    expect(await screen.findByText('ST-060 entrou na fila')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByText('Passo 2 de 2')).not.toBeInTheDocument();
+    expect(created).toBe(1);
+  });
+
   it('se o process falhar, a sessão fica como rascunho com "Continuar"', async () => {
     searchReturns();
     const session = makeSession({ state: 'draft', code: 'ST-050' });

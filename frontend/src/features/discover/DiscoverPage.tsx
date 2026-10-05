@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 
 import { isApiError } from '../../api/client';
@@ -118,10 +118,14 @@ export function DiscoverPage() {
     pickIndex !== null && Number.isInteger(pickIndex) ? (results?.[pickIndex] ?? null) : null;
 
   // Link colado: o único resultado já vem escolhido.
-  const autoPick = isLink(q) && results?.length === 1 && pick === null;
+  // Só uma vez por busca: depois de fechar (ou separar), a escolha não pode voltar sozinha.
+  const autoPickedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (autoPick) setPick('0', { replace: isDesktop });
-  }, [autoPick, isDesktop, setPick]);
+    if (!isLink(q) || results?.length !== 1 || pick !== null) return;
+    if (autoPickedFor.current === q) return;
+    autoPickedFor.current = q;
+    setPick('0', { replace: isDesktop });
+  }, [q, results, pick, isDesktop, setPick]);
 
   const onSearch = (next: string) => {
     if (next === q) {

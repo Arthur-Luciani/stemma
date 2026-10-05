@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
+
 import { useUrlParam } from '../../app/useUrlParam';
 import { strings } from '../../strings';
 import { BottomSheet } from '../../ui/BottomSheet';
 import { ProgressBar } from '../../ui/ProgressBar';
-import { useProcessingJobs } from './hooks';
+import { useJobs, useProcessingJobs } from './hooks';
 import { SummaryIcon } from './ProcessingDock';
 import styles from './ProcessingPill.module.css';
 import { ProcessingList } from './ProcessingList';
@@ -14,6 +16,14 @@ export function ProcessingPill() {
   const [sheet, openSheet, closeSheet] = useUrlParam('jobs');
   const summary = summarize(jobs);
   const open = sheet === '1' && summary !== null;
+  const loaded = useJobs().isSuccess;
+
+  // Descartou o último job com o sheet aberto: fecha de verdade (tira o `?jobs=1`), senão o
+  // sheet reabriria sozinho no próximo job e o back ficaria "sem efeito".
+  const empty = loaded && summary === null;
+  useEffect(() => {
+    if (sheet === '1' && empty) closeSheet();
+  }, [sheet, empty, closeSheet]);
 
   return (
     <>

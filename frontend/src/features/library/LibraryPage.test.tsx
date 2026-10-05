@@ -103,6 +103,41 @@ describe('Biblioteca', () => {
     expect(seen.at(-1)).toBe('queen');
   });
 
+  it('regressão: pausar depois de um espaço não come o espaço do campo', async () => {
+    libraryReturns();
+    const { router } = renderApp('/sessions', { desktop: true });
+    await screen.findByRole('table');
+    const input = screen.getByRole('searchbox', { name: 'Buscar na biblioteca' });
+    await userEvent.type(input, 'the ');
+    await waitFor(
+      () => {
+        expect(router.state.location.search).toBe('?q=the');
+      },
+      { timeout: 3000 },
+    );
+    expect(input).toHaveValue('the ');
+    await userEvent.type(input, 'b');
+    expect(input).toHaveValue('the b');
+  });
+
+  it('regressão: Reprocessar pelo sheet do celular fecha o sheet', async () => {
+    libraryReturns();
+    server.use(
+      http.post('*/api/sessions/:id/reprocess', () =>
+        HttpResponse.json(makeJob({ state: 'queued', position: 1 }, ready), { status: 201 }),
+      ),
+    );
+    const { router } = renderApp('/sessions');
+    await userEvent.click(await screen.findByRole('button', { name: 'Mais ações: Do It' }));
+    const sheet = screen.getByRole('dialog', { name: 'Do It' });
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Reprocessar' }));
+    expect(await screen.findByText('ST-042 voltou para a fila')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(router.state.location.search).toBe('');
+  });
+
   it('ordenação pelo menu', async () => {
     const seen: (string | null)[] = [];
     libraryReturns((url) => seen.push(url.searchParams.get('sort')));

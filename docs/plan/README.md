@@ -7,8 +7,8 @@ Reescrita do `music-analyzer` sem o inspetor de bateria ([ADR 0001](../decisions
 | Fase | Arquivo | Depende de | Status |
 |---|---|---|---|
 | F-1 Design | [docs/design](../design/README.md) | — | ✅ concluída (pendente: variação do mixer no celular, decidir até F4) |
-| F0 Fundação | [F0-fundacao.md](F0-fundacao.md) | — | ⬜ próxima |
-| F1 Backend core | [F1-backend-core.md](F1-backend-core.md) | F0 | ⬜ |
+| F0 Fundação | [F0-fundacao.md](F0-fundacao.md) | — | ✅ concluída — release v1.0.0 (pendente: teste no celular via Tailscale) |
+| F1 Backend core | [F1-backend-core.md](F1-backend-core.md) | F0 | ⬜ próxima |
 | F2a Fila e eventos | [F2a-fila-e-eventos.md](F2a-fila-e-eventos.md) | F1 | ⬜ |
 | F2b Pipeline de áudio | [F2b-pipeline-audio.md](F2b-pipeline-audio.md) | F2a | ⬜ |
 | F3 Frontend: Descobrir, Processamento, Biblioteca | [F3-frontend-fluxos.md](F3-frontend-fluxos.md) | F0 (+ contrato da F1) | ⬜ |

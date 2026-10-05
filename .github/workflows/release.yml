@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # Fica neste workflow porque eventos criados com GITHUB_TOKEN não disparam outros workflows.
+  package:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.release-please.outputs.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build do frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Montar pacote
+        run: |
+          set -euo pipefail
+          name="stemma-${TAG}"
+          stage="$RUNNER_TEMP/$name"
+          mkdir -p "$stage/frontend"
+          # Backend: código, migrations (quando existirem), pyproject e uv.lock; sem testes nem caches.
+          rsync -a --exclude '__pycache__' --exclude '.venv' --exclude 'tests' \
+            --exclude '.pytest_cache' --exclude '.mypy_cache' --exclude '.ruff_cache' \
+            backend/ "$stage/backend/"
+          cp -r frontend/dist "$stage/frontend/dist"
+          if [ -d deploy ]; then cp -r deploy "$stage/deploy"; fi
+          cp .env.example README.md CHANGELOG.md "$stage/"
+          (cd "$RUNNER_TEMP" && zip -qr "$GITHUB_WORKSPACE/$name.zip" "$name")
+          sha256sum "$name.zip" > "$name.zip.sha256"
+          cat "$name.zip.sha256"
+      - name: Anexar à release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "stemma-${TAG}.zip" "stemma-${TAG}.zip.sha256" --clobber

@@ -3,7 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -23,12 +23,22 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     cors_origins: list[str] = []
     storage_root: Path = Path("storage")
+    # Vazio = SQLite em <STORAGE_ROOT>/stemma.db.
+    database_url: str = ""
+    ffmpeg_bin: str = "ffmpeg"
+    ytdlp_js_runtime: str = "deno"
 
     @field_validator("storage_root")
     @classmethod
     def _resolve_storage_root(cls, value: Path) -> Path:
         # Relativo à raiz do repo, não ao diretório de trabalho do processo.
         return value if value.is_absolute() else (REPO_DIR / value).resolve()
+
+    @model_validator(mode="after")
+    def _default_database_url(self) -> "Settings":
+        if not self.database_url:
+            self.database_url = f"sqlite:///{(self.storage_root / 'stemma.db').as_posix()}"
+        return self
 
 
 @lru_cache

@@ -30,6 +30,14 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy app
       - run: uv run pytest
+      - name: Smoke das migrations
+        run: uv run alembic upgrade head
+        env:
+          STORAGE_ROOT: ${{ runner.temp }}/stemma-data
+      - name: Drift do OpenAPI (rode `npm run gen:api` no frontend)
+        run: |
+          uv run python -m app.openapi ../frontend/src/api/openapi.json
+          git diff --exit-code -- ../frontend/src/api/openapi.json
 
   frontend:
     runs-on: ubuntu-latest
@@ -47,6 +55,10 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
+      - name: Drift dos tipos da API (rode `npm run gen:api`)
+        run: |
+          npm run gen:api:types
+          git diff --exit-code -- src/api/schema.d.ts
       - run: npm test
       - run: npm run build
 

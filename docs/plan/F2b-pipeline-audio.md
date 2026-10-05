@@ -34,7 +34,7 @@ Qualquer UI (F3/F4).
 No PC: buscar uma faixa, processar de ponta a ponta (stems MP3, peaks, métricas no banco), exportar WAV e MP3 e baixar; cancelar um job em separação libera a GPU; CI verde.
 
 ## Handoff
-**Status:** concluída em 2026-10-05, PR #8 (`feat: pipeline de áudio real (F2b)`).
+**Status:** concluída em 2026-10-05, PR #8 (`feat: pipeline de áudio real (F2b)`) mergeado com CI verde; saiu no release v1.1.0. A pegadinha do mypy por plataforma entrou depois, num PR `docs:` à parte.
 
 ### Feito
 - **`pipeline/proc.py`**: base de subprocess com timeout, stderr em linhas (`

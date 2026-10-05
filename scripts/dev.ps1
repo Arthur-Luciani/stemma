@@ -38,6 +38,10 @@ if (-not $SkipInstall) {
     }
 }
 
+Write-Host '==> alembic upgrade head' -ForegroundColor Cyan
+uv run --project $backendDir --directory $backendDir alembic upgrade head
+if ($LASTEXITCODE -ne 0) { throw 'alembic upgrade head falhou.' }
+
 Write-Host '==> backend em http://127.0.0.1:8010' -ForegroundColor Cyan
 $backend = Start-Process -FilePath 'uv' -WorkingDirectory $backendDir -NoNewWindow -PassThru `
     -ArgumentList 'run', 'uvicorn', 'app.main:app', '--reload', '--host', '127.0.0.1', '--port', '8010'

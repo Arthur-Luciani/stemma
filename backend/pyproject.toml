@@ -53,6 +53,8 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "T20", "DTZ", "PTH", "N"]
+# Travessão (–) é a grafia correta em PT-BR para intervalos como "loop A–B" e "0–100".
+allowed-confusables = ["–"]
 
 [tool.mypy]
 strict = true

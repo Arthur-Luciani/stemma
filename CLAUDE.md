@@ -80,6 +80,8 @@ uv sync --group api --group dev          # o que o CI usa
 uv sync --all-groups                     # + torch cu118/demucs (só no PC com GPU)
 uv run pytest
 uv run ruff check . && uv run ruff format --check . && uv run mypy app
+uv run alembic upgrade head             # cria/atualiza o banco (o dev.ps1 já roda)
+uv run alembic revision --autogenerate -m "descrição"   # após mudar app/db/models.py
 uv run uvicorn app.main:app --reload --port 8010
 
 # frontend (Node >= 22.12)
@@ -87,10 +89,12 @@ cd frontend && npm ci
 npm run dev          # http://127.0.0.1:5183
 npm run lint && npm run format:check && npm run typecheck && npm test && npm run build
 npm run format       # aplica Prettier
+npm run gen:api      # regenera src/api/openapi.json + schema.d.ts (após mudar rotas/schemas; precisa do uv)
 ```
 
 Cuidados:
 - `uv sync` sem `--inexact` **remove** o grupo `pipeline` se ele estiver instalado; para manter torch/demucs use `uv sync --all-groups` ou `--inexact`.
+- Mudou rota ou schema da API → `npm run gen:api` e commite os dois arquivos gerados; o CI acusa drift.
 - Versão do app: `backend/pyproject.toml` e `frontend/package.json` são atualizados **só** pelo release-please (PR de release). Não edite à mão.
 
 ## Ambiente

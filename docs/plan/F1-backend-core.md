@@ -10,10 +10,10 @@ Base do backend: banco, modelo de dados, sessões e identidade com API estável 
   - `jobs` (estrutura da fila; uso na F2a), `session_events` (log append-only), `mix_states` (por sessão: volume/pan/mute/solo por stem, preset, loop A–B), `exports` (formato wav/mp3, preset/níveis usados, state, progress, path relativo, tamanho, lufs).
 - `domain/`: enums `SessionState`, `JobKind`, `JobState`, `ExportFormat`, `Stem` (vocals/drums/bass/other com rótulos PT-BR Voz/Bateria/Baixo/Outros) — **definidos uma vez**.
 - `AppError` + exception handler → `{"error": {"code", "message"}}`; validação de UUID nos path params; helper único de paths (`storage.resolve(rel)` com checagem de contenção).
-- `services/sessions.py`: criar rascunho, listar (busca texto, filtro por estado, ordenação, paginação, **contagem por estado**), obter, editar artista/título, duplicar, excluir (atômico, remove arquivos do disco, cascade).
+- `services/sessions.py`: criar rascunho, listar (busca texto, filtro por estado, ordenação, paginação, **contagem por estado**), obter, editar artista/título, excluir (atômico, remove arquivos do disco, cascade).
 - `services/identity.py`: autocomplete de artistas já usados com contagem de sessões (normalização portada da v1).
 - `services/mix.py`: obter/salvar mix state.
-- Rotas (`api/`): `GET/POST /api/sessions`, `GET/PATCH/DELETE /api/sessions/{id}`, `POST /api/sessions/{id}/duplicate`, `GET /api/artists?q=`, `GET/PUT /api/sessions/{id}/mix`.
+- Rotas (`api/`): `GET/POST /api/sessions`, `GET/PATCH/DELETE /api/sessions/{id}`, `GET /api/artists?q=`, `GET/PUT /api/sessions/{id}/mix`.
 - `GET /health` → `{status, version, db, ffmpeg, js_runtime, gpu}` (checagens baratas; gpu pode ser "unknown" até F2b).
 - Logging configurado no startup (formato com timestamp, nível via env).
 - **OpenAPI → tipos TS**: script `npm run gen:api` (no frontend) que gera `src/api/schema.d.ts` a partir do `/openapi.json`; tipos commitados; CI falha se houver drift.
@@ -23,12 +23,12 @@ Base do backend: banco, modelo de dados, sessões e identidade com API estável 
 Busca no YouTube, processamento, WebSocket, export real (F2a/F2b).
 
 ## Checklist
-- [ ] db + models + migration baseline + teste de drift de migration
-- [ ] domain (enums/erros) + handler de erro + validação de IDs + helper de paths
-- [ ] services sessions/identity/mix + rotas
-- [ ] `/health` completo + logging
-- [ ] geração de tipos OpenAPI + checagem de drift no CI
-- [ ] testes de API cobrindo sucesso e erros principais
+- [x] db + models + migration baseline + teste de drift de migration
+- [x] domain (enums/erros) + handler de erro + validação de IDs + helper de paths
+- [x] services sessions/identity/mix + rotas
+- [x] `/health` completo + logging
+- [x] geração de tipos OpenAPI + checagem de drift no CI
+- [x] testes de API cobrindo sucesso e erros principais
 
 ## Critério de pronto
 CRUD de sessões, identidade e mix state testados via TestClient; CI verde; tipos TS gerados e commitados.

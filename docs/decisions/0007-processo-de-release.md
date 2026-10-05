@@ -13,5 +13,8 @@
 ## Atualização (F0, 2026-10-05)
 A primeira release saiu **v1.0.0** (padrão do release-please quando não há tag anterior); mantida por decisão do usuário. A versão segue SemVer a partir daí.
 
+## Atualização (F1, 2026-10-05)
+Drift do OpenAPI sem subir servidor: `python -m app.openapi` grava o schema (chaves ordenadas, sem `info.version`) em `frontend/src/api/openapi.json`, e o `openapi-typescript` gera `src/api/schema.d.ts` a partir dele (`npm run gen:api` faz os dois). Ambos são commitados. No CI, o job `backend` regenera o JSON e o job `frontend` regenera os tipos; qualquer `git diff` faz o job falhar. Assim o job `frontend` não precisa de Python.
+
 ## Consequências
 A GPU nunca é exercitada no CI → smoke manual pós-update (processar faixa curta, abrir mixer no celular, exportar).

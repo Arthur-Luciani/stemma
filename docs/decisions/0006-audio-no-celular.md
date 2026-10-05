@@ -1,6 +1,6 @@
 # 0006 — Áudio: AudioEngine fora do React e waveforms por peaks
 
-- **Status:** aceita (2026-10-05) — validar com protótipo no início da F4
+- **Status:** aceita (2026-10-05); validada no protótipo da F4a e detalhada pela [ADR 0012](0012-audio-engine-sincronia.md)
 
 ## Contexto
 A v1 baixava cada stem duas vezes e decodificava tudo (≈340 MB de PCM para 4 stems de 4 min — crash provável no iOS), re-renderizava o mixer a 60 fps, nunca fechava o `AudioContext` e tocava 4 `<audio>` sem re-sincronização.

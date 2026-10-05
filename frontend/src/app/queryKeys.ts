@@ -1,4 +1,4 @@
-import type { SessionListParams } from '../api/types';
+import type { SessionListParams, Stem } from '../api/types';
 
 /** Chaves do TanStack Query. Tudo de sessão começa com `['sessions']`. */
 export const queryKeys = {
@@ -8,6 +8,7 @@ export const queryKeys = {
   sessionLibrary: (params: Omit<SessionListParams, 'offset' | 'limit'>) =>
     ['sessions', 'list', 'library', params] as const,
   session: (id: string) => ['sessions', 'detail', id] as const,
+  peaks: (id: string, stem: Stem) => ['sessions', 'peaks', id, stem] as const,
   jobs: ['jobs'] as const,
   search: (q: string) => ['search', q] as const,
   artists: (q: string) => ['artists', q] as const,

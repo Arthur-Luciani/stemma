@@ -12,6 +12,15 @@ export type JobState = Schemas['JobState'];
 export type SearchResult = Schemas['SearchResultOut'];
 export type Artist = Schemas['ArtistOut'];
 export type LiveEvent = Schemas['LiveEvent'];
+export type Stem = Schemas['Stem'];
+export type StemMix = Schemas['StemMix'];
+export type MixState = Schemas['MixStateOut'];
+
+/** `GET /peaks/{stem}.json` (o OpenAPI não tipa: é um arquivo servido como está). */
+export interface StemPeaks {
+  duration_s: number;
+  peaks: number[];
+}
 
 /** O Pydantic gera `counts` como `{[key: string]: number}`; aqui ele é tipado pelos estados. */
 export type SessionCounts = Record<SessionState, number>;

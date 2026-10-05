@@ -1,10 +1,16 @@
-import { formatAgo, formatDuration, formatEta, formatShortDate } from './format';
+import { formatAgo, formatClock, formatDuration, formatEta, formatShortDate } from './format';
 
 describe('formatadores', () => {
   it('duração', () => {
     expect(formatDuration(182)).toBe('3:02');
     expect(formatDuration(3725)).toBe('1:02:05');
     expect(formatDuration(null)).toBe('—');
+  });
+
+  it('tempo do transport', () => {
+    expect(formatClock(72.43)).toBe('1:12.4');
+    expect(formatClock(221)).toBe('3:41.0');
+    expect(formatClock(-1)).toBe('0:00.0');
   });
 
   it('ETA', () => {

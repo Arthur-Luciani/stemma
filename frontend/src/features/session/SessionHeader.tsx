@@ -16,7 +16,7 @@ export function SessionHeader({
   showChip?: boolean;
 }) {
   return (
-    <header className={styles.header}>
+    <div className={styles.header}>
       <ButtonLink
         to="/sessions"
         variant="ghost"
@@ -44,6 +44,6 @@ export function SessionHeader({
           <StatusChip state={session.state} progress={session.progress} position={position} />
         )}
       </div>
-    </header>
+    </div>
   );
 }

@@ -10,5 +10,8 @@
 - **Atualização no PC** por `deploy/update.ps1` (pull, nunca push): baixa e verifica a release, extrai lado a lado em `releases\vX.Y.Z\`, `uv sync`, para o serviço, **backup do banco**, `alembic upgrade head`, troca a junction `current`, sobe e valida `/health`; rollback automático em falha. Mantém 3 releases. `-YtDlpOnly` atualiza só o yt-dlp.
 - **Sem self-hosted runner**: num repo público, PRs de fork executariam código no PC.
 
+## Atualização (F0, 2026-10-05)
+A primeira release saiu **v1.0.0** (padrão do release-please quando não há tag anterior); mantida por decisão do usuário. A versão segue SemVer a partir daí.
+
 ## Consequências
 A GPU nunca é exercitada no CI → smoke manual pós-update (processar faixa curta, abrir mixer no celular, exportar).

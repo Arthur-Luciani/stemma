@@ -100,17 +100,23 @@ def run_process(
     on_poll: Callable[[], None] | None = None,
     env: Mapping[str, str] | None = None,
     capture_stdout: bool = False,
+    merge_output: bool = False,
 ) -> ProcessResult:
     """Roda `cmd` até o fim. Não levanta por código de saída (quem chama decide);
-    levanta `ProcessTimeoutError`, `BinaryNotFoundError` ou `JobCancelledError`."""
+    levanta `ProcessTimeoutError`, `BinaryNotFoundError` ou `JobCancelledError`.
+
+    Com `merge_output`, o stdout entra no mesmo fluxo de linhas do stderr (`on_line` e
+    `stderr_tail`), para programas que escrevem progresso no stdout."""
+    if merge_output and capture_stdout:
+        raise ValueError("merge_output e capture_stdout não combinam")
     args = [str(part) for part in cmd]
     logger.debug("Rodando: %s", " ".join(args))
     try:
         process = subprocess.Popen(
             args,
             stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE if capture_stdout else subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE if capture_stdout or merge_output else subprocess.DEVNULL,
+            stderr=subprocess.STDOUT if merge_output else subprocess.PIPE,
             env={**os.environ, **env} if env is not None else None,
             creationflags=_CREATION_FLAGS,
         )
@@ -120,7 +126,11 @@ def run_process(
     tail: collections.deque[str] = collections.deque(maxlen=STDERR_TAIL_LINES)
     stdout_chunks: list[bytes] = []
     readers = [
-        threading.Thread(target=_read_lines, args=(process.stderr, tail, on_line), daemon=True)
+        threading.Thread(
+            target=_read_lines,
+            args=(process.stdout if merge_output else process.stderr, tail, on_line),
+            daemon=True,
+        )
     ]
     if capture_stdout:
         readers.append(

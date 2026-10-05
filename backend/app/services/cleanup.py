@@ -3,10 +3,15 @@
 Remove o que nenhuma linha do banco referencia: pastas de sessões excluídas, a lixeira,
 sobras de processamento (`raw/`, `work/`) de sessões paradas, stems de sessões que não
 estão prontas e arquivos de export sem registro.
+
+A CLI pode rodar com o servidor no ar: o retrato do banco é tirado uma vez, então só sai o
+que está parado há mais de `min_age_s` (um job ou export que começou depois do retrato
+está mexendo nos arquivos agora e é poupado).
 """
 
 import logging
 import shutil
+import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,6 +26,9 @@ from app.storage import SESSIONS_DIR, Storage
 
 logger = logging.getLogger(__name__)
 
+# Idade mínima (desde a última modificação) para algo ser considerado órfão.
+DEFAULT_MIN_AGE_S = 3600.0
+
 
 @dataclass
 class CleanupReport:
@@ -33,8 +41,9 @@ class CleanupService:
         self.db = db
         self.storage = storage
 
-    def run(self, *, dry_run: bool = False) -> CleanupReport:
+    def run(self, *, dry_run: bool = False, min_age_s: float = DEFAULT_MIN_AGE_S) -> CleanupReport:
         report = CleanupReport()
+        self._cutoff = time.time() - min_age_s
         sessions = {
             s.id: s.state
             for s in self.db.execute(select(SessionModel.id, SessionModel.state)).all()
@@ -72,6 +81,9 @@ class CleanupService:
         return report
 
     def _remove(self, path: Path, report: CleanupReport, dry_run: bool) -> None:
+        if _newest_mtime(path) > self._cutoff:
+            logger.debug("Recente demais para limpar: %s", path)
+            return
         size = _size(path)
         report.removed.append(self.storage.relative(path))
         report.freed_bytes += size
@@ -89,6 +101,14 @@ def _parse_uuid(text: str) -> uuid.UUID | None:
         return uuid.UUID(text)
     except ValueError:
         return None
+
+
+def _newest_mtime(path: Path) -> float:
+    newest = path.stat().st_mtime
+    if path.is_dir():
+        for child in path.rglob("*"):
+            newest = max(newest, child.stat().st_mtime)
+    return newest
 
 
 def _size(path: Path) -> int:

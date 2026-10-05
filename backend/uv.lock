@@ -980,10 +980,10 @@ pipeline = [
 api = [
     { name = "alembic", specifier = ">=1.14" },
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "pydantic-settings", specifier = ">=2.6" },
+    { name = "pydantic-settings", specifier = ">=2.7" },
     { name = "sqlalchemy", specifier = ">=2.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
-    { name = "yt-dlp", extras = ["default"], specifier = ">=2025.1.1" },
+    { name = "yt-dlp", extras = ["default"], specifier = ">=2025.11.12" },
 ]
 dev = [
     { name = "httpx2", specifier = ">=2.13" },

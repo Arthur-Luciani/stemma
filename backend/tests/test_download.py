@@ -1,3 +1,5 @@
+import textwrap
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -8,11 +10,12 @@ from app.domain.errors import AppError
 from app.domain.text import guess_identity
 from app.pipeline.download import (
     YtDlpClient,
+    error_lines,
     find_downloaded,
     map_ytdlp_error,
     to_search_result,
 )
-from app.pipeline.queue import JobCancelledError
+from app.pipeline.queue import CancellableTask, JobCancelledError
 
 
 class FakeYdl:
@@ -164,58 +167,152 @@ def test_resultado_sem_titulo_ou_url_e_ignorado() -> None:
 # --- download ----------------------------------------------------------------
 
 
-def test_download_salva_source_e_reporta_progresso(tmp_path: Path) -> None:
-    def fake_download(ydl: FakeYdl) -> None:
-        hook = ydl.options["progress_hooks"][0]
-        hook({"status": "downloading", "downloaded_bytes": 50, "total_bytes": 100})
-        (tmp_path / "source.webm").write_bytes(b"audio")
+# `python -m yt_dlp` falso: comportamento pelo env FAKE_YTDLP (ok|login|sleep|empty).
+FAKE_YTDLP = textwrap.dedent(
+    """
+    import os, sys, time
+    from pathlib import Path
 
-    client, made = make_client(result={}, on_download=fake_download)
-    ctx = FakeProgress()
-
-    path = client.download("https://youtu.be/abc", tmp_path, ctx)
-
-    assert path == tmp_path / "source.webm"
-    assert made[0].options["format"] == "bestaudio/best"
-    assert made[0].options["outtmpl"] == str(tmp_path / "source.%(ext)s")
-    assert ctx.values == [50.0, 100]
-
-
-def test_download_cancelado_pelo_hook(tmp_path: Path) -> None:
-    def fake_download(ydl: FakeYdl) -> None:
-        try:
-            ydl.options["progress_hooks"][0]({"status": "downloading"})
-        except Exception as exc:
-            # O yt-dlp embrulha a exceção do hook.
-            raise DownloadError("interrompido", exc_info=(type(exc), exc, None)) from None
-
-    client, _ = make_client(on_download=fake_download)
-    ctx = FakeProgress()
-    ctx.cancelled = True
-
-    with pytest.raises(JobCancelledError):
-        client.download("https://youtu.be/abc", tmp_path, ctx)
+    args = sys.argv[1:]
+    Path(os.environ["FAKE_YTDLP_LOG"]).write_text("\\n".join(args))
+    mode = os.environ.get("FAKE_YTDLP", "ok")
+    if mode == "login":
+        print("ERROR: [youtube] abc: Sign in to confirm you're not a bot.", file=sys.stderr)
+        sys.exit(1)
+    if mode == "sleep":
+        time.sleep(30)
+    print("[stemma] 500/1000/NA", flush=True)
+    time.sleep(0.3)
+    if mode != "empty":
+        out = args[args.index("--output") + 1].replace("%(ext)s", "webm")
+        Path(out).write_bytes(b"audio")
+    print("[stemma] 1000/1000/NA", flush=True)
+    """
+)
 
 
-def test_download_timeout(tmp_path: Path) -> None:
-    def fake_download(ydl: FakeYdl) -> None:
-        ydl.options["progress_hooks"][0]({"status": "downloading"})
+@pytest.fixture
+def fake_ytdlp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    package = tmp_path / "fakemods" / "yt_dlp"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("")
+    (package / "__main__.py").write_text(FAKE_YTDLP)
+    log = tmp_path / "ytdlp-args.txt"
+    monkeypatch.setenv("PYTHONPATH", str(tmp_path / "fakemods"))
+    monkeypatch.setenv("FAKE_YTDLP_LOG", str(log))
+    return log
 
-    client, _ = make_client(on_download=fake_download, timeout=-1)
+
+class FakeCtx(FakeProgress):
+    def __init__(self) -> None:
+        super().__init__()
+        self.task: CancellableTask | None = None
+
+    def attach(self, task: CancellableTask | None) -> None:
+        self.task = task
+
+
+def test_comando_de_download(tmp_path: Path) -> None:
+    client, _ = make_client(js_runtimes=["node"], cookie_file=tmp_path / "c.txt")
+
+    cmd = client.download_command("https://youtu.be/abc", tmp_path)
+
+    assert cmd[1:3] == ["-m", "yt_dlp"]
+    assert cmd[cmd.index("--format") + 1] == "bestaudio/best"
+    assert cmd[cmd.index("--output") + 1] == str(tmp_path / "source.%(ext)s")
+    assert cmd.index("--no-js-runtimes") < cmd.index("--js-runtimes")
+    assert cmd[cmd.index("--js-runtimes") + 1] == "node"
+    assert cmd[cmd.index("--cookies") + 1] == str(tmp_path / "c.txt")
+    assert cmd[-2:] == ["--", "https://youtu.be/abc"]
+
+
+def test_download_salva_source_e_reporta_progresso(tmp_path: Path, fake_ytdlp: Path) -> None:
+    client, _ = make_client()
+    ctx = FakeCtx()
+
+    path = client.download("https://youtu.be/abc", tmp_path / "raw", ctx)
+
+    assert path == tmp_path / "raw" / "source.webm"
+    assert 50.0 in ctx.values
+    assert ctx.values[-1] == 100
+    assert "https://youtu.be/abc" in fake_ytdlp.read_text()
+
+
+def test_download_com_erro_de_login(
+    tmp_path: Path, fake_ytdlp: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_YTDLP", "login")
+    client, _ = make_client()
 
     with pytest.raises(AppError) as exc:
-        client.download("https://youtu.be/abc", tmp_path, FakeProgress())
+        client.download("https://youtu.be/abc", tmp_path, FakeCtx())
+
+    assert exc.value.code == "youtube_login_required"
+
+
+def test_download_cancelado_mata_o_processo(
+    tmp_path: Path, fake_ytdlp: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_YTDLP", "sleep")
+    client, _ = make_client()
+    ctx = FakeCtx()
+
+    def cancel() -> None:
+        ctx.cancelled = True
+        if ctx.task is not None:
+            ctx.task.cancel()
+
+    timer = threading.Timer(1.0, cancel)
+    timer.start()
+    try:
+        with pytest.raises(JobCancelledError):
+            client.download("https://youtu.be/abc", tmp_path, ctx)
+    finally:
+        timer.cancel()
+
+
+def test_download_timeout(
+    tmp_path: Path, fake_ytdlp: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Trava antes do primeiro byte: o timeout total ainda vale.
+    monkeypatch.setenv("FAKE_YTDLP", "sleep")
+    client, _ = make_client(timeout=1)
+
+    with pytest.raises(AppError) as exc:
+        client.download("https://youtu.be/abc", tmp_path, FakeCtx())
 
     assert exc.value.code == "download_timeout"
 
 
-def test_download_sem_arquivo(tmp_path: Path) -> None:
-    client, _ = make_client(result={})
+def test_download_sem_arquivo(
+    tmp_path: Path, fake_ytdlp: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_YTDLP", "empty")
+    client, _ = make_client()
 
     with pytest.raises(AppError) as exc:
-        client.download("https://youtu.be/abc", tmp_path, FakeProgress())
+        client.download("https://youtu.be/abc", tmp_path, FakeCtx())
 
     assert exc.value.code == "download_failed"
+
+
+def test_busca_com_timeout_total() -> None:
+    hold = threading.Event()
+    client, _ = make_client(on_download=lambda _ydl: hold.wait(5), search_timeout=0.2)
+    try:
+        with pytest.raises(AppError) as exc:
+            client.search("queen")
+    finally:
+        hold.set()
+
+    assert exc.value.code == "youtube_unavailable"
+
+
+def test_erro_do_subprocess_usa_so_as_linhas_de_erro() -> None:
+    output = "[youtube] abc: Downloading webpage\nERROR: [youtube] abc: Private video"
+
+    assert error_lines(output) == "ERROR: [youtube] abc: Private video"
+    assert error_lines("sem erro marcado") == "sem erro marcado"
 
 
 @pytest.mark.parametrize(
@@ -234,7 +331,8 @@ def test_download_sem_arquivo(tmp_path: Path) -> None:
             "Unable to download webpage: <urlopen error [Errno 11001] getaddrinfo failed>",
             "youtube_unavailable",
         ),
-        ("Requested format is not available", "video_unavailable"),
+        ("Requested format is not available. Use --list-formats", "youtube_format_unavailable"),
+        ("Service is unavailable", "download_failed"),
         ("algo estranho", "download_failed"),
     ],
 )

@@ -88,6 +88,10 @@ class ProcessHandler:
                     "duration_s": duration or ctx.session.duration_s,
                 }
             )
+        except BaseException:
+            # Falhou ou foi cancelado: stems pela metade não ficam no disco.
+            _remove(stems_dir)
+            raise
         finally:
             _remove(raw_dir)
             _remove(work_dir)

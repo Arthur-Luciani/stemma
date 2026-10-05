@@ -18,6 +18,12 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     cleanup = commands.add_parser("cleanup", help="remove arquivos órfãos do STORAGE_ROOT")
     cleanup.add_argument("--dry-run", action="store_true", help="só lista o que seria removido")
+    cleanup.add_argument(
+        "--min-age-minutes",
+        type=float,
+        default=60,
+        help="só remove o que está parado há pelo menos isso (padrão 60; seguro com o app no ar)",
+    )
     args = parser.parse_args(argv)
 
     settings = get_settings()
@@ -25,7 +31,9 @@ def main(argv: list[str] | None = None) -> int:
     engine = make_engine(settings.database_url)
     try:
         with make_sessionmaker(engine)() as db:
-            report = CleanupService(db, Storage(settings.storage_root)).run(dry_run=args.dry_run)
+            report = CleanupService(db, Storage(settings.storage_root)).run(
+                dry_run=args.dry_run, min_age_s=args.min_age_minutes * 60
+            )
     finally:
         engine.dispose()
 

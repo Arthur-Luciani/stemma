@@ -1,11 +1,17 @@
-"""Busca e download via yt-dlp (in-process, ADR 0004).
+"""Busca e download via yt-dlp (ADR 0004 e 0010).
+
+- Busca: in-process (rápida, sem gravar nada), com timeout total numa thread à parte.
+- Download: subprocess `python -m yt_dlp`, como o Demucs: timeout total de verdade e
+  cancelamento matando o processo, mesmo se o yt-dlp travar antes do primeiro byte.
 
 Erros do yt-dlp viram `AppError` com código estável e mensagem amigável; nunca são
 engolidos como "nenhum resultado".
 """
 
+import concurrent.futures
 import logging
-import time
+import re
+import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,22 +21,28 @@ from yt_dlp import YoutubeDL
 
 from app.domain.errors import AppError
 from app.domain.text import guess_identity
-from app.pipeline.queue import JobCancelledError
+from app.pipeline.proc import Attachable, BinaryNotFoundError, ProcessTimeoutError, run_process
 
 logger = logging.getLogger(__name__)
 
 SEARCH_LIMIT = 10
+SEARCH_TIMEOUT_S = 45
 SOCKET_TIMEOUT_S = 30
+# Linha de progresso pedida ao yt-dlp: "[stemma] baixados/total/total_estimado".
+_PROGRESS_TEMPLATE = (
+    "download:[stemma] %(progress.downloaded_bytes)s/%(progress.total_bytes)s"
+    "/%(progress.total_bytes_estimate)s"
+)
+_PROGRESS_RE = re.compile(r"\[stemma\] (\d+)/(\S+)/(\S+)")
+# Buscas que estouram o timeout continuam nesta pool até o yt-dlp desistir sozinho.
+_SEARCH_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="search")
 SOURCE_STEM = "source"
 # Preferência entre os arquivos baixados, se sobrar mais de um.
 _AUDIO_EXTENSIONS = (".m4a", ".webm", ".opus", ".mp3", ".ogg", ".aac", ".wav", ".flac")
 
 
-class Progress(Protocol):
+class Progress(Attachable, Protocol):
     """O pedaço do `JobContext` que o download usa."""
-
-    @property
-    def cancelled(self) -> bool: ...
 
     def progress(self, percent: float) -> None: ...
 
@@ -57,10 +69,14 @@ class YtDlpClient:
         cookie_file: Path | None,
         timeout: float,
         ydl_factory: YdlFactory = YoutubeDL,
+        python: str = sys.executable,
+        search_timeout: float = SEARCH_TIMEOUT_S,
     ) -> None:
         self.js_runtimes = list(js_runtimes)
         self.cookie_file = cookie_file
         self.timeout = timeout
+        self.search_timeout = search_timeout
+        self.python = python
         self._ydl_factory = ydl_factory
 
     # --- busca ---------------------------------------------------------------
@@ -69,9 +85,17 @@ class YtDlpClient:
         query = query.strip()
         target = query if looks_like_url(query) else f"ytsearch{limit}:{query}"
         options = {**self._base_options(), "skip_download": True, "extract_flat": "in_playlist"}
-        try:
+
+        def extract() -> Any:
             with self._ydl_factory(options) as ydl:
-                info = ydl.extract_info(target, download=False)
+                return ydl.extract_info(target, download=False)
+
+        future = _SEARCH_POOL.submit(extract)
+        try:
+            info = future.result(timeout=self.search_timeout)
+        except concurrent.futures.TimeoutError as exc:
+            logger.warning("Busca no YouTube passou de %.0f s", self.search_timeout)
+            raise _youtube_unavailable() from exc
         except Exception as exc:
             raise map_ytdlp_error(exc, searching=True) from exc
         if not isinstance(info, dict):
@@ -86,43 +110,58 @@ class YtDlpClient:
     def download(self, url: str, dest_dir: Path, ctx: Progress) -> Path:
         """Baixa o melhor áudio em `dest_dir/source.<ext>` e devolve o arquivo."""
         dest_dir.mkdir(parents=True, exist_ok=True)
-        deadline = time.monotonic() + self.timeout
-
-        def hook(status: dict[str, Any]) -> None:
-            if ctx.cancelled:
-                raise JobCancelledError
-            if time.monotonic() > deadline:
-                raise _DownloadTimeoutError
-            if status.get("status") == "downloading":
-                total = status.get("total_bytes") or status.get("total_bytes_estimate")
-                done = status.get("downloaded_bytes") or 0
-                if total:
-                    ctx.progress(min(99.0, 100 * done / total))
-
-        options = {
-            **self._base_options(),
-            "format": "bestaudio/best",
-            "outtmpl": str(dest_dir / f"{SOURCE_STEM}.%(ext)s"),
-            "overwrites": True,
-            "noprogress": True,
-            "progress_hooks": [hook],
-        }
+        progress = _DownloadProgress()
         try:
-            with self._ydl_factory(options) as ydl:
-                ydl.extract_info(url, download=True)
-        except Exception as exc:
-            if ctx.cancelled or _caused_by(exc, JobCancelledError):
-                raise JobCancelledError from exc
-            if _caused_by(exc, _DownloadTimeoutError):
-                raise AppError(
-                    "download_timeout", "O download demorou demais e foi interrompido."
-                ) from exc
-            raise map_ytdlp_error(exc) from exc
+            result = run_process(
+                self.download_command(url, dest_dir),
+                timeout=self.timeout,
+                ctx=ctx,
+                on_line=progress.feed,
+                on_poll=lambda: ctx.progress(progress.percent),
+                env={"PYTHONIOENCODING": "utf-8"},
+                merge_output=True,
+            )
+        except ProcessTimeoutError as exc:
+            raise AppError(
+                "download_timeout", "O download demorou demais e foi interrompido."
+            ) from exc
+        except BinaryNotFoundError as exc:  # pragma: no cover - o Python do app sempre existe
+            raise AppError("download_failed", "Não foi possível rodar o yt-dlp.", 500) from exc
+        if not result.ok:
+            raise map_ytdlp_error(error_lines(result.stderr_tail))
         found = find_downloaded(dest_dir)
         if found is None:
             raise AppError("download_failed", "O download terminou, mas nenhum áudio foi salvo.")
         ctx.progress(100)
         return found
+
+    def download_command(self, url: str, dest_dir: Path) -> list[str]:
+        cmd = [
+            self.python,
+            "-m",
+            "yt_dlp",
+            "--format",
+            "bestaudio/best",
+            "--output",
+            str(dest_dir / f"{SOURCE_STEM}.%(ext)s"),
+            "--no-playlist",
+            "--force-overwrites",
+            "--quiet",
+            "--no-warnings",
+            "--progress",
+            "--newline",
+            "--progress-template",
+            _PROGRESS_TEMPLATE,
+            "--socket-timeout",
+            str(SOCKET_TIMEOUT_S),
+            # Só os runtimes da config, na ordem dela.
+            "--no-js-runtimes",
+        ]
+        for runtime in self.js_runtimes:
+            cmd += ["--js-runtimes", runtime]
+        if self.cookie_file is not None:
+            cmd += ["--cookies", str(self.cookie_file)]
+        return [*cmd, "--", url]
 
     # --- interno -------------------------------------------------------------
 
@@ -140,8 +179,20 @@ class YtDlpClient:
         return options
 
 
-class _DownloadTimeoutError(Exception):
-    pass
+class _DownloadProgress:
+    """Lê as linhas de progresso do template (na thread leitora do subprocess)."""
+
+    def __init__(self) -> None:
+        self.percent = 0.0
+
+    def feed(self, line: str) -> None:
+        match = _PROGRESS_RE.search(line)
+        if match is None:
+            return
+        done = int(match.group(1))
+        total = _int_or_none(match.group(2)) or _int_or_none(match.group(3))
+        if total:
+            self.percent = max(self.percent, min(99.0, 100 * done / total))
 
 
 class _YdlLogger:
@@ -209,10 +260,13 @@ def find_downloaded(dest_dir: Path) -> Path | None:
 
 
 _AGE_KEYS = ("confirm your age", "age-restricted", "age restricted", "inappropriate for some users")
+# Formato recusado costuma ser o desafio JS do YouTube falhando (runtime ausente ou
+# yt-dlp desatualizado), não o vídeo indisponível.
+_FORMAT_KEYS = ("requested format is not available", "no video formats found")
 _UNAVAILABLE_KEYS = (
     "private video",
     "video unavailable",
-    "not available",
+    "video is not available",
     "has been removed",
     "unsupported url",
     "is not a valid url",
@@ -222,9 +276,15 @@ _LOGIN_KEYS = ("sign in", "cookies", "login required")
 _NETWORK_KEYS = ("unable to download", "timed out", "connection", "getaddrinfo", "http error 5")
 
 
-def map_ytdlp_error(exc: BaseException, *, searching: bool = False) -> AppError:
-    message = str(exc).lower()
-    logger.warning("yt-dlp falhou: %s", exc)
+def map_ytdlp_error(error: BaseException | str, *, searching: bool = False) -> AppError:
+    message = str(error).lower()
+    logger.warning("yt-dlp falhou: %s", error)
+    if any(key in message for key in _FORMAT_KEYS):
+        return AppError(
+            "youtube_format_unavailable",
+            "O YouTube não liberou o áudio. Atualize o yt-dlp e confira o runtime JS no /health.",
+            502,
+        )
     if any(key in message for key in _AGE_KEYS):
         return AppError(
             "age_restricted",
@@ -240,10 +300,27 @@ def map_ytdlp_error(exc: BaseException, *, searching: bool = False) -> AppError:
     if any(key in message for key in _LOGIN_KEYS):
         return AppError("youtube_login_required", "YouTube pediu login. Atualize os cookies.", 503)
     if searching or any(key in message for key in _NETWORK_KEYS):
-        return AppError(
-            "youtube_unavailable", "Não deu para falar com o YouTube agora. Tente de novo.", 502
-        )
+        return _youtube_unavailable()
     return AppError("download_failed", "Não foi possível baixar o áudio deste vídeo.", 502)
+
+
+def error_lines(output: str) -> str:
+    """As linhas `ERROR:` da saída do yt-dlp (ou a saída toda, se não houver)."""
+    errors = [line for line in output.splitlines() if line.startswith("ERROR:")]
+    return "\n".join(errors) or output
+
+
+def _youtube_unavailable() -> AppError:
+    return AppError(
+        "youtube_unavailable", "Não deu para falar com o YouTube agora. Tente de novo.", 502
+    )
+
+
+def _int_or_none(text: str) -> int | None:
+    try:
+        return int(float(text))
+    except ValueError:
+        return None
 
 
 def _thumbnail(entry: dict[str, Any], video_id: str) -> str | None:
@@ -261,25 +338,3 @@ def _thumbnail(entry: dict[str, Any], video_id: str) -> str | None:
     ):
         return f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
     return None
-
-
-def _caused_by(exc: BaseException, kind: type[BaseException]) -> bool:
-    """O yt-dlp embrulha a exceção do hook num `DownloadError` (em `exc_info`)."""
-    pending: list[BaseException] = [exc]
-    seen: set[int] = set()
-    while pending:
-        current = pending.pop()
-        if id(current) in seen:
-            continue
-        seen.add(id(current))
-        if isinstance(current, kind):
-            return True
-        exc_info = getattr(current, "exc_info", None)
-        if (
-            isinstance(exc_info, tuple)
-            and len(exc_info) > 1
-            and isinstance(exc_info[1], BaseException)
-        ):
-            pending.append(exc_info[1])
-        pending += [e for e in (current.__cause__, current.__context__) if e is not None]
-    return False

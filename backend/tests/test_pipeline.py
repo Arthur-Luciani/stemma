@@ -121,3 +121,4 @@ def test_cancelar_na_separacao(pipeline_client: TestClient, fakes: PipelineFakes
     storage = storage_of(pipeline_client)
     # O `finally` do handler apaga as sobras logo depois do cancelamento.
     wait_until(lambda: not storage.resolve(Storage.raw_dir(session.id)).exists())
+    assert not storage.resolve(Storage.stems_dir(session.id)).exists()

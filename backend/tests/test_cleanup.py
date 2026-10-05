@@ -62,7 +62,7 @@ def cli_env(monkeypatch: pytest.MonkeyPatch, migrated: Settings) -> Iterator[Non
 
 
 def test_cleanup_remove_so_os_orfaos(layout: dict[str, Path], cli_env: None) -> None:
-    assert main(["cleanup"]) == 0
+    assert main(["cleanup", "--min-age-minutes", "0"]) == 0
 
     for kept in ("stem", "kept_export"):
         assert layout[kept].exists(), kept
@@ -71,7 +71,7 @@ def test_cleanup_remove_so_os_orfaos(layout: dict[str, Path], cli_env: None) -> 
 
 
 def test_cleanup_dry_run_nao_apaga(layout: dict[str, Path], cli_env: None) -> None:
-    assert main(["cleanup", "--dry-run"]) == 0
+    assert main(["cleanup", "--dry-run", "--min-age-minutes", "0"]) == 0
 
     assert all(path.exists() for path in layout.values())
 
@@ -91,6 +91,13 @@ def test_cleanup_poupa_sessao_com_job_ativo(
         db.commit()
     raw = touch(migrated.storage_root / Storage.raw_dir(session_id) / "source.webm")
 
-    main(["cleanup"])
+    main(["cleanup", "--min-age-minutes", "0"])
 
     assert raw.exists()
+
+
+def test_cleanup_poupa_o_que_e_recente(layout: dict[str, Path], cli_env: None) -> None:
+    # Com o padrão (60 min), nada recém-criado sai: pode ser de um job que começou agora.
+    assert main(["cleanup"]) == 0
+
+    assert all(path.exists() for path in layout.values())

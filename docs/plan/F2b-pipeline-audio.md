@@ -112,6 +112,7 @@ No PC: buscar uma faixa, processar de ponta a ponta (stems MP3, peaks, métricas
 - **Demucs e yt-dlp falsos nos testes**: um pacote `demucs` (ou `yt_dlp`) num diretório temporário no `PYTHONPATH` substitui o real no subprocess.
 - **Progresso gravado só na thread do job**: o `on_line` do `run_process` roda na thread leitora; grave no banco só no `on_poll`.
 - **Matar o servidor no Windows**: `taskkill /F /T` no PID que escuta a porta (como na F2a).
+- **mypy no Linux (CI)**: atributos só do Windows (ex.: `subprocess.CREATE_NO_WINDOW`) precisam ficar sob `if sys.platform == "win32":` em forma de bloco, e não num ternário. Confira localmente com `uv run mypy app --platform linux`.
 
 ### Pendências descobertas
 - Nenhuma fora do escopo das próximas fases.

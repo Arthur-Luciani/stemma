@@ -55,7 +55,7 @@ export interface ResyncConfig {
   settle: number;
   /** Até aqui (s), corrige mudando a velocidade; acima, faz seek. */
   maxNudge: number;
-  /** Desvio de velocidade usado na correção (ex.: 0,03 = ±3%). */
+  /** Desvio de velocidade usado na correção (ex.: 0,02 = ±2%). */
   rateDelta: number;
 }
 
@@ -63,7 +63,7 @@ export const DEFAULT_RESYNC: ResyncConfig = {
   threshold: 0.03,
   settle: 0.01,
   maxNudge: 0.15,
-  rateDelta: 0.03,
+  rateDelta: 0.02,
 };
 
 export type ResyncAction = { kind: 'none' } | { kind: 'rate'; rate: number } | { kind: 'seek' };

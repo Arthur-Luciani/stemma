@@ -10,6 +10,7 @@ import contextlib
 import logging
 import threading
 import uuid
+from collections.abc import Iterator
 from typing import Any
 
 from pydantic import BaseModel
@@ -112,19 +113,27 @@ def build_job_out(job: JobModel, session: SessionModel, estimate: JobEstimate | 
             "created_at": job.created_at,
             "started_at": job.started_at,
             "finished_at": job.finished_at,
+            "dismissed_at": job.dismissed_at,
             "session": SessionOut.model_validate(session),
         }
     )
 
 
 class EventPublisher:
-    """Monta e publica eventos. Chame **depois** do commit, com o estado já no banco."""
+    """Monta e publica eventos. Chame **depois** do commit, com o estado já no banco.
+
+    Publicar é melhor esforço: o banco é a verdade, então uma falha aqui (ex.: banco ocupado
+    ao calcular o ETA) só é logada e nunca derruba a escrita que já foi confirmada."""
 
     def __init__(self, db: Session, bus: EventBus) -> None:
         self.db = db
         self.bus = bus
 
     def session_updated(self, session_id: uuid.UUID) -> None:
+        with _best_effort("session.updated"):
+            self._session_updated(session_id)
+
+    def _session_updated(self, session_id: uuid.UUID) -> None:
         session = self.db.get(SessionModel, session_id, populate_existing=True)
         if session is None:
             return
@@ -145,6 +154,10 @@ class EventPublisher:
     def jobs_changed(self, *job_ids: uuid.UUID) -> None:
         """Publica os jobs indicados e todos os ativos: posição e ETA da fila inteira mudam
         quando um job entra, anda, sai ou termina."""
+        with _best_effort("job.updated"):
+            self._jobs_changed(job_ids)
+
+    def _jobs_changed(self, job_ids: tuple[uuid.UUID, ...]) -> None:
         estimates = QueueEstimator(self.db).estimate()
         rows = self.db.execute(
             select(JobModel, SessionModel)
@@ -163,3 +176,11 @@ class EventPublisher:
 
     def _publish(self, event: BaseModel) -> None:
         self.bus.publish(event.model_dump(mode="json"))
+
+
+@contextlib.contextmanager
+def _best_effort(event: str) -> Iterator[None]:
+    try:
+        yield
+    except Exception:
+        logger.exception("Falha ao publicar %s", event)

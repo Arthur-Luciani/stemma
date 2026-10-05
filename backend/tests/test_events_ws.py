@@ -8,10 +8,11 @@ from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
 from app.config import Settings
-from app.domain.enums import JobKind
+from app.domain.enums import JobKind, JobState
 from app.main import create_app
 from app.pipeline.fake import FakeProcessHandler
-from tests.conftest import create_session
+from tests.conftest import create_session, job_state
+from tests.fakes import wait_until
 
 Event = dict[str, Any]
 
@@ -94,3 +95,17 @@ def test_openapi_inclui_os_tipos_dos_eventos(fake_client: TestClient) -> None:
     mapping = schemas["LiveEvent"]["discriminator"]["mapping"]
     assert set(mapping) == {"session.updated", "session.deleted", "job.updated"}
     assert "JobUpdatedEvent" in schemas
+
+
+def test_descartar_publica_job_com_dismissed_at(fake_client: TestClient) -> None:
+    session = create_session(fake_client, title="Teste [falha]")
+    job = fake_client.post(f"/api/sessions/{session['id']}/process").json()
+    wait_until(lambda: job_state(fake_client, job["id"]) is JobState.FAILED)
+
+    with fake_client.websocket_connect("/ws") as ws:
+        fake_client.post(f"/api/jobs/{job['id']}/discard")
+        event = ws.receive_json()
+
+    assert event["type"] == "job.updated"
+    assert event["data"]["job"]["id"] == job["id"]
+    assert event["data"]["job"]["dismissed_at"] is not None

@@ -3,6 +3,7 @@
 import uuid
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import update
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ from app.db.models import JobModel, SessionModel
 from app.domain.enums import JobKind, JobState, SessionState
 from app.domain.errors import AppError
 from app.main import create_app
+from app.services import events as events_module
 from tests.conftest import (
     create_session,
     job_row,
@@ -262,3 +264,48 @@ def test_progresso_e_etapa_gravados_no_job_e_na_sessao(
     wait_until(lambda: job_state(queue_client, job["id"]) is JobState.DONE)
     durations = job_row(queue_client, job["id"]).stage_durations
     assert durations is not None and set(durations) == {"downloading"}
+
+
+def test_falha_ao_publicar_evento_nao_derruba_o_job(
+    queue_client: TestClient, handler: ControlledHandler, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class BrokenEstimator:
+        def __init__(self, _db: object) -> None:
+            pass
+
+        def estimate(self) -> None:
+            raise RuntimeError("banco ocupado")
+
+    # Só a publicação de eventos quebra; a rota continua respondendo.
+    monkeypatch.setattr(events_module, "QueueEstimator", BrokenEstimator)
+    job = process_session(queue_client)
+    handler.next_started()
+    handler.finish()
+
+    wait_until(lambda: job_state(queue_client, job["id"]) is JobState.DONE)
+    assert session_row(queue_client, job["session_id"]).state is SessionState.READY
+
+
+def test_worker_sobrevive_a_erro_ao_encerrar_job(
+    queue_client: TestClient, handler: ControlledHandler, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runner = queue_client.app.state.job_runner  # type: ignore[attr-defined]
+    original = runner._finish
+    calls = {"n": 0}
+
+    def flaky_finish(*args: Any, **kwargs: Any) -> None:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("database is locked")
+        original(*args, **kwargs)
+
+    monkeypatch.setattr(runner, "_finish", flaky_finish)
+    process_session(queue_client, title="um")
+    second = process_session(queue_client, title="dois")
+    handler.next_started()
+    handler.finish()
+
+    # O worker continua vivo e pega o próximo job.
+    assert handler.next_started() == "dois"
+    handler.finish()
+    wait_until(lambda: job_state(queue_client, second["id"]) is JobState.DONE)

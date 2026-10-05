@@ -283,6 +283,10 @@ class JobRunner:
                 continue
             try:
                 self._execute(ctx)
+            except Exception:
+                # Ex.: banco travado ao gravar o fim. O worker segue; o job fica `running`
+                # e a recuperação do próximo startup cuida dele.
+                logger.exception("Falha ao encerrar o job %s", ctx.job_id)
             finally:
                 with self._lock:
                     self._running.pop(ctx.job_id, None)

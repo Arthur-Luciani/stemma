@@ -34,7 +34,7 @@ Busca no YouTube, processamento, WebSocket, export real (F2a/F2b).
 CRUD de sessões, identidade e mix state testados via TestClient; CI verde; tipos TS gerados e commitados.
 
 ## Handoff
-**Status:** concluída em 2026-10-05. PR #5 (`feat: backend core (F1)`) com CI verde (`backend`, `frontend`, `pr-title`), aguardando o merge.
+**Status:** concluída em 2026-10-05. PR #5 (`feat: backend core (F1)`) mergeado com CI verde (`backend`, `frontend`, `pr-title`).
 
 ### Feito
 - `app/db/`:
@@ -71,7 +71,6 @@ CRUD de sessões, identidade e mix state testados via TestClient; CI verde; tipo
 - `DELETE` devolve 409 `session_busy` quando há job `queued`/`running` (a F2a deve manter isso).
 
 ### Pendente
-- Merge do PR #5 (ação do usuário).
 - Itens herdados da F0: teste no celular via Tailscale e branch protection.
 
 ### Decisões

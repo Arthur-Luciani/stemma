@@ -255,6 +255,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Dismissed At */
+            dismissed_at: string | null;
             /** Error Code */
             error_code: string | null;
             /** Error Message */

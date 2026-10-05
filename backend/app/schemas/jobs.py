@@ -27,6 +27,8 @@ class JobOut(BaseModel):
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    # Preenchido quando o usuário tira o job do dock (ou ao reprocessar a sessão).
+    dismissed_at: datetime | None
     session: SessionOut
 
 

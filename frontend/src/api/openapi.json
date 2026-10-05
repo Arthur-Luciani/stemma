@@ -144,6 +144,18 @@
             "title": "Created At",
             "type": "string"
           },
+          "dismissed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dismissed At"
+          },
           "error_code": {
             "anyOf": [
               {
@@ -274,6 +286,7 @@
           "created_at",
           "started_at",
           "finished_at",
+          "dismissed_at",
           "session"
         ],
         "title": "JobOut",

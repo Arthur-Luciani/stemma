@@ -153,6 +153,7 @@ class JobService:
                 "job_not_dismissable", "Só dá para descartar um job pronto ou que falhou."
             )
         self.db.commit()
+        self.events.jobs_changed(job_id)
 
     # --- internos ----------------------------------------------------------
 
@@ -168,7 +169,7 @@ class JobService:
             self.db.rollback()
             raise _session_busy()
         # Jobs encerrados anteriores desta sessão saem do dock.
-        self.db.execute(
+        dismissed = self.db.scalars(
             update(JobModel)
             .where(
                 JobModel.session_id == session_id,
@@ -176,7 +177,8 @@ class JobService:
                 JobModel.dismissed_at.is_(None),
             )
             .values(dismissed_at=utcnow())
-        )
+            .returning(JobModel.id)
+        ).all()
         job = JobModel(kind=JobKind.PROCESS, session_id=session_id, state=JobState.QUEUED)
         self.db.add(job)
         self.db.flush()
@@ -185,7 +187,7 @@ class JobService:
         self.runner.wake()
         logger.info("Sessão %s na fila (job %s)", session_id, job.id)
         self.events.session_updated(session_id)
-        self.events.jobs_changed(job.id)
+        self.events.jobs_changed(job.id, *dismissed)
         return self.get(job.id)
 
     def _get_model(self, job_id: uuid.UUID) -> JobModel:

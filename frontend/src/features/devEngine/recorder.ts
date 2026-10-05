@@ -77,6 +77,7 @@ export class DriftRecorder {
   private hiddenCount = 0;
   private hiddenSince: number | null = null;
   private hiddenMs = 0;
+  private report: DriftReport | null = null;
   private readonly unsubscribe: () => void;
 
   constructor(private readonly engine: AudioEngine) {
@@ -104,13 +105,15 @@ export class DriftRecorder {
     return this.samples.length;
   }
 
+  /** Para de gravar; chamadas seguintes devolvem o mesmo relatório. */
   stop(): DriftReport {
+    if (this.report) return this.report;
     this.unsubscribe();
     document.removeEventListener('visibilitychange', this.onVisibility);
     if (this.hiddenSince !== null) this.hiddenMs += performance.now() - this.hiddenSince;
     const stats = this.engine.stats;
     const thresholdMs = DEFAULT_RESYNC.threshold * 1000;
-    return {
+    this.report = {
       userAgent: navigator.userAgent,
       startedAt: this.startedAt.toISOString(),
       seconds: round(this.elapsed),
@@ -125,6 +128,7 @@ export class DriftRecorder {
       contextState: this.engine.contextState,
       baseLatencyMs: round(this.engine.baseLatency * 1000),
     };
+    return this.report;
   }
 
   private readonly onVisibility = () => {

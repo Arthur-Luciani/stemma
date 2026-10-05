@@ -1,4 +1,6 @@
-import { percentile, summarize, type DriftSample } from './recorder';
+import { AudioEngine } from '../../audio/AudioEngine';
+import { fakeAudio } from '../../test/audio';
+import { DriftRecorder, percentile, summarize, type DriftSample } from './recorder';
 
 const sample = (spread: number, drums = 0): DriftSample => ({
   t: 0,
@@ -23,5 +25,17 @@ describe('resumo da medição', () => {
 
   it('sem leituras, tudo zero', () => {
     expect(summarize([], 30).spreadMs).toEqual({ max: 0, avg: 0, p95: 0 });
+  });
+});
+
+describe('DriftRecorder', () => {
+  it('stop é idempotente e solta a escuta do engine', () => {
+    const engine = new AudioEngine(fakeAudio().options);
+    const recorder = new DriftRecorder(engine);
+    const first = recorder.stop();
+    expect(recorder.stop()).toBe(first);
+    engine.resync();
+    expect(recorder.count).toBe(0);
+    engine.dispose();
   });
 });

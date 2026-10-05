@@ -140,6 +140,32 @@ describe('AudioEngine', () => {
     expect(engine.state).toBe('playing');
   });
 
+  it('com loop até o fim, um stem que acaba volta para A em vez de parar', async () => {
+    const { engine, media, el } = await setup(100);
+    const ended = vi.fn();
+    engine.on('ended', ended);
+    engine.setLoop(90, 100);
+    engine.seek(99.9);
+    engine.play();
+    el(1).paused = true;
+    el(1).ended = true;
+    el(1).fire('ended');
+    expect(ended).not.toHaveBeenCalled();
+    expect(engine.state).toBe('playing');
+    expect(engine.getPosition()).toBeCloseTo(90);
+    expect(media.every((m) => m.currentTime === 90 && !m.paused)).toBe(true);
+  });
+
+  it('waiting causado por seek pausa até carregar, mas não conta como travada', async () => {
+    const { engine, el } = await setup();
+    engine.play();
+    el(0).seeking = true;
+    el(0).readyState = 1;
+    el(0).fire('waiting');
+    expect(engine.state).toBe('buffering');
+    expect(engine.stats.stalls).toBe(0);
+  });
+
   it('emite ended e para no fim', async () => {
     const { engine, el } = await setup(100);
     const ended = vi.fn();

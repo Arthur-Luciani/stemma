@@ -369,7 +369,8 @@ export class AudioEngine {
     };
 
     const onWaiting = () => {
-      this.onStall();
+      // Um seek também dispara `waiting`: pausa igual, mas só conta como travada se não for seek.
+      this.onStall(!el.seeking);
     };
     const onReady = () => {
       this.onElementReady();
@@ -462,9 +463,9 @@ export class AudioEngine {
   }
 
   /** Algum stem parou para carregar: pausa todos até todos terem dados. */
-  private onStall(): void {
+  private onStall(network: boolean): void {
     if (this._state !== 'playing') return;
-    this._stats = { ...this._stats, stalls: this._stats.stalls + 1 };
+    if (network) this._stats = { ...this._stats, stalls: this._stats.stalls + 1 };
     this.setState('buffering');
     this.pauseElements();
     this.clock.stop();
@@ -483,7 +484,14 @@ export class AudioEngine {
 
   private onElementEnded(): void {
     if (this._state !== 'playing') return;
-    if (this.channels.some((ch) => ch.el.ended)) this.finish();
+    if (!this.channels.some((ch) => ch.el.ended)) return;
+    // Um stem um pouco mais curto (ou o relógio um pouco atrás) chega ao fim antes do B.
+    if (this.loop) {
+      this.seek(this.loop.a);
+      this.playElements();
+      return;
+    }
+    this.finish();
   }
 
   private finish(): void {

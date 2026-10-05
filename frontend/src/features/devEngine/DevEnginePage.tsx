@@ -68,6 +68,14 @@ export function DevEnginePage() {
     engine?.setLoop(loopA, loopB);
   }, [engine, loopA, loopB]);
 
+  // Sair da página (ou trocar o engine) no meio de uma medição solta o listener e o engine.
+  useEffect(
+    () => () => {
+      recorder?.stop();
+    },
+    [recorder],
+  );
+
   const setControl = (stem: Stem, patch: Partial<StemControl>) => {
     setControls((current) => ({ ...current, [stem]: { ...current[stem], ...patch } }));
   };

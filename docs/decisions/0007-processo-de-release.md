@@ -1,0 +1,14 @@
+# 0007 — Versionamento, CI e release
+
+- **Status:** aceita (2026-10-05)
+
+## Decisão
+- **SemVer**, tags `vX.Y.Z`. Versão em `backend/pyproject.toml` (lida via `importlib.metadata`, exposta no `/health`) sincronizada com `frontend/package.json` pelo **release-please**.
+- **Conventional Commits** + squash merge; título de PR validado por `amannn/action-semantic-pull-request`.
+- **CI** (`ci.yml`, PR e push em `main`) em runners **GitHub-hosted Linux** (repo público = gratuito): backend `uv sync --group api --group dev` (nunca `pipeline`), ruff, mypy, pytest, smoke `alembic upgrade head`; frontend lint, typecheck, vitest, build; checagem de drift dos tipos OpenAPI. Branch protection exige CI verde.
+- **Release** (`release.yml`): release-please mantém o PR de release (bump + `CHANGELOG.md`); ao mergear, cria tag + GitHub Release; um job anexa `stemma-vX.Y.Z.zip` + SHA256 (backend, migrations, `uv.lock`, `frontend/dist`, `deploy/`).
+- **Atualização no PC** por `deploy/update.ps1` (pull, nunca push): baixa e verifica a release, extrai lado a lado em `releases\vX.Y.Z\`, `uv sync`, para o serviço, **backup do banco**, `alembic upgrade head`, troca a junction `current`, sobe e valida `/health`; rollback automático em falha. Mantém 3 releases. `-YtDlpOnly` atualiza só o yt-dlp.
+- **Sem self-hosted runner**: num repo público, PRs de fork executariam código no PC.
+
+## Consequências
+A GPU nunca é exercitada no CI → smoke manual pós-update (processar faixa curta, abrir mixer no celular, exportar).

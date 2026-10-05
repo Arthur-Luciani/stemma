@@ -31,7 +31,10 @@ STDERR_TAIL_LINES = 40
 _POLL_S = 0.1
 _LINE_BREAK = re.compile(rb"[\r\n]+")
 # Sem janela de console quando o app roda como serviço no Windows.
-_CREATION_FLAGS = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+if sys.platform == "win32":
+    _CREATION_FLAGS = subprocess.CREATE_NO_WINDOW
+else:
+    _CREATION_FLAGS = 0
 
 
 class Attachable(Protocol):

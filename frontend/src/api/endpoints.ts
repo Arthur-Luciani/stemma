@@ -1,4 +1,4 @@
-import { apiClient, call } from './client';
+import { apiClient, call, toApiError } from './client';
 import type {
   Artist,
   Job,
@@ -8,6 +8,8 @@ import type {
   SessionList,
   SessionListParams,
   SessionPatch,
+  Stem,
+  StemPeaks,
 } from './types';
 
 const path = (id: string) => ({ params: { path: { session_id: id } } });
@@ -67,4 +69,26 @@ export async function search(q: string, signal?: AbortSignal): Promise<SearchRes
 
 export function searchArtists(q: string, signal?: AbortSignal): Promise<Artist[]> {
   return call(() => apiClient.GET('/api/artists', { params: { query: { q, limit: 6 } }, signal }));
+}
+
+/** URL do MP3 do stem, para o `<audio>` do AudioEngine (o navegador faz os Range requests). */
+export function stemUrl(id: string, stem: Stem): string {
+  return `/api/sessions/${encodeURIComponent(id)}/stems/${stem}.mp3`;
+}
+
+function isStemPeaks(body: unknown): body is StemPeaks {
+  if (typeof body !== 'object' || body === null) return false;
+  const { duration_s, peaks } = body as Partial<StemPeaks>;
+  return typeof duration_s === 'number' && Array.isArray(peaks);
+}
+
+export async function getPeaks(id: string, stem: Stem, signal?: AbortSignal): Promise<StemPeaks> {
+  const data: unknown = await call(() =>
+    apiClient.GET('/api/sessions/{session_id}/peaks/{stem}.json', {
+      params: { path: { session_id: id, stem } },
+      signal,
+    }),
+  );
+  if (!isStemPeaks(data)) throw toApiError(200, data);
+  return data;
 }

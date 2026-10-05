@@ -29,13 +29,13 @@ Mixer, AudioEngine, export (F4), PWA (F5).
 - [x] Processamento (dock + pílula/sheet)
 - [x] Biblioteca completa
 - [x] strings PT-BR centralizadas
-- [ ] conferido no celular real via Tailscale (retrato) e no desktop — desktop e viewport 390×844 conferidos com Edge (Playwright); **celular real pendente (usuário)**
+- [x] conferido no celular real via Tailscale (retrato) e no desktop
 
 ## Critério de pronto
 Pelo celular (via Tailscale, dev server): buscar, confirmar identidade, acompanhar o processamento ao vivo, gerenciar a biblioteca — sem layout quebrado, back do Android funcionando; CI verde.
 
 ## Handoff
-**Status:** implementada no PR da branch `feat/f3-frontend-fluxos`, com CI verde. **Falta a conferência no celular real via Tailscale** (passo do usuário, abaixo), que é critério de pronto. Depois dela, o PR pode ser mergeado.
+**Status:** concluída em 2026-10-05. PR #10 (`feat: frontend de descobrir, processamento e biblioteca (F3)`) com CI verde. Conferida pelo usuário no celular real (Android) via Tailscale.
 
 ### Feito
 - **Base**:
@@ -98,13 +98,7 @@ Pelo celular (via Tailscale, dev server): buscar, confirmar identidade, acompanh
   - Reprocessar pelo sheet do celular não fechava o sheet.
 
 ### Pendente
-- **Conferir no celular real via Tailscale (retrato)**: rode `scripts/dev.ps1` e depois `tailscale serve --bg --https=5183 http://127.0.0.1:5183`. Abra `https://<máquina>.<tailnet>.ts.net:5183` e confira:
-  - buscar, confirmar a identidade no sheet, Separar;
-  - acompanhar pela pílula e pelo sheet;
-  - Biblioteca (filtros, ⋯, editar, excluir);
-  - back do Android fechando sheets e diálogos e voltando telas.
-  - Isso também fecha a pendência da F0.
-- Herdado: branch protection (F0).
+- Herdado: branch protection (F0). A pendência da F0 de testar no celular via Tailscale fechou nesta fase.
 
 ### Decisões
 - [ADR 0011](../decisions/0011-frontend-dados-ao-vivo-e-url.md):
@@ -126,6 +120,10 @@ Pelo celular (via Tailscale, dev server): buscar, confirmar identidade, acompanh
   - dev: `msw` 2 e `@testing-library/user-event`.
 
 ### Pegadinhas
+- **Acesso pelo celular**: use `https://<máquina>.<tailnet>.ts.net:5183`, com `https` e a porta, e o app do Tailscale ligado. Se não abrir, confira:
+  - `tailscale status` (o celular aparece `active`);
+  - `tailscale serve status` (proxy para `http://127.0.0.1:5183`);
+  - DNS privado ou outra VPN no Android, que podem impedir o nome `.ts.net` de resolver.
 - **MSW 2 também substitui o `WebSocket` global** no `server.listen()`. O `FakeWebSocket` dos testes é instalado com `vi.stubGlobal` **depois** do `listen` (`src/test/setup.ts`); antes disso, o stub é sobrescrito. Atribuir `globalThis.WebSocket = …` direto não funciona no jsdom.
 - O `openapi-fetch` recebe `fetch: (r) => globalThis.fetch(r)`: o global é lido a cada chamada, porque o MSW troca o `fetch` depois dos imports. O `baseUrl` é `window.location.origin`, porque o Node não aceita URL relativa.
 - **Callbacks passados ao `mutate(..., {onSuccess})` não disparam se o componente desmontar antes da resposta.** Feche sheets e diálogos no `onSettled`, não antes de chamar a mutation.

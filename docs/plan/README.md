@@ -7,11 +7,11 @@ Reescrita do `music-analyzer` sem o inspetor de bateria ([ADR 0001](../decisions
 | Fase | Arquivo | Depende de | Status |
 |---|---|---|---|
 | F-1 Design | [docs/design](../design/README.md) | — | ✅ concluída (pendente: variação do mixer no celular, decidir até F4) |
-| F0 Fundação | [F0-fundacao.md](F0-fundacao.md) | — | ✅ concluída — release v1.0.0 (pendente: teste no celular via Tailscale) |
+| F0 Fundação | [F0-fundacao.md](F0-fundacao.md) | — | ✅ concluída — release v1.0.0 (teste no celular via Tailscale feito na F3) |
 | F1 Backend core | [F1-backend-core.md](F1-backend-core.md) | F0 | ✅ concluída — PR #5 (mergeado) |
 | F2a Fila e eventos | [F2a-fila-e-eventos.md](F2a-fila-e-eventos.md) | F1 | ✅ concluída — PR #7 (mergeado) |
 | F2b Pipeline de áudio | [F2b-pipeline-audio.md](F2b-pipeline-audio.md) | F2a | ✅ concluída — PR #8 (mergeado), release v1.1.0 |
-| F3 Frontend: Descobrir, Processamento, Biblioteca | [F3-frontend-fluxos.md](F3-frontend-fluxos.md) | F0 (+ contrato da F1) | 🟡 PR aberto (pendente: conferir no celular real via Tailscale) |
+| F3 Frontend: Descobrir, Processamento, Biblioteca | [F3-frontend-fluxos.md](F3-frontend-fluxos.md) | F0 (+ contrato da F1) | ✅ concluída — PR #10 |
 | F4a Protótipo do AudioEngine | [F4a-audio-engine.md](F4a-audio-engine.md) | F2b, F3 | ⬜ |
 | F4b Mixer e Export | [F4b-mixer-export.md](F4b-mixer-export.md) | F4a | ⬜ |
 | F5 Runtime, PWA e update | [F5-runtime-pwa.md](F5-runtime-pwa.md) | F4b | ⬜ |

@@ -12,6 +12,14 @@ export function formatDuration(seconds: number | null | undefined): string {
   return h > 0 ? `${String(h)}:${pad(m)}:${pad(s)}` : `${String(m)}:${pad(s)}`;
 }
 
+/** Tempo do transport, com décimos: `72.43` → `1:12.4`. */
+export function formatClock(seconds: number): string {
+  const tenths = Math.max(0, Math.floor((Number.isFinite(seconds) ? seconds : 0) * 10));
+  const m = Math.floor(tenths / 600);
+  const s = Math.floor((tenths % 600) / 10);
+  return `${String(m)}:${pad(s)}.${String(tenths % 10)}`;
+}
+
 /** ETA curta: `~40s`, `~2 min`, `~1 h 5 min`. */
 export function formatEta(seconds: number | null | undefined): string | null {
   if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return null;

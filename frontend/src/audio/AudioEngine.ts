@@ -134,7 +134,7 @@ export class AudioEngine {
     const nav = navigator as Navigator & { audioSession?: { type: string } };
     if (nav.audioSession) nav.audioSession.type = 'playback';
 
-    const createAudio = options.createAudio ?? (() => document.createElement('audio'));
+    const createAudio = options.createAudio ?? (() => new Audio());
     this.channels = STEMS.map((stem) => this.createChannel(stem, createAudio()));
     document.addEventListener('visibilitychange', this.onVisibilityChange);
   }

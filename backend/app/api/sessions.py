@@ -3,9 +3,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import SessionServiceDep
+from app.api.deps import JobServiceDep, SessionServiceDep
 from app.api.errors import ERROR_RESPONSES
 from app.domain.enums import SessionSort, SessionState
+from app.schemas.jobs import JobOut
 from app.schemas.sessions import SessionCreate, SessionListOut, SessionOut, SessionPatch
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"], responses=ERROR_RESPONSES)
@@ -46,3 +47,15 @@ def update_session(
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_session(session_id: uuid.UUID, service: SessionServiceDep) -> None:
     service.delete(session_id)
+
+
+@router.post("/{session_id}/process", status_code=status.HTTP_201_CREATED)
+def process_session(session_id: uuid.UUID, service: JobServiceDep) -> JobOut:
+    """Confirma o rascunho e o põe na fila de processamento."""
+    return service.process(session_id)
+
+
+@router.post("/{session_id}/reprocess", status_code=status.HTTP_201_CREATED)
+def reprocess_session(session_id: uuid.UUID, service: JobServiceDep) -> JobOut:
+    """Processa de novo uma sessão pronta ou que falhou (409 se já houver job ativo)."""
+    return service.reprocess(session_id)

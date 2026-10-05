@@ -14,3 +14,6 @@ Na v1, o estado dos jobs vivia num cache em memória que divergia do SQLite; job
 
 ## Consequências
 Restart seguro, posição na fila e ETA calculáveis, cancelamento possível. Exige um único processo (ver 0002).
+
+## Atualização (F2a, 2026-10-05)
+Detalhes da implementação (workers em threads, eventos, recuperação e relógio) na [ADR 0009](0009-workers-em-threads-e-eventos.md).

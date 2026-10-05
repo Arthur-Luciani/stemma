@@ -1,3 +1,4 @@
+import time
 from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Dialect
@@ -24,5 +25,20 @@ class UTCDateTime(TypeDecorator[datetime]):
         return value.replace(tzinfo=UTC)
 
 
+# No Windows (Python 3.12) o relógio de parede anda em degraus de 15,6 ms: registros criados
+# em sequência empatariam no `created_at` e a ordem da fila e das listas ficaria aleatória.
+# O relógio daqui é a âncora de parede + o `perf_counter` (resolução de µs), reancorado se
+# os dois se afastarem mais que `_MAX_DRIFT_NS` (ex.: ajuste de NTP).
+_MAX_DRIFT_NS = 1_000_000_000
+_anchor = (time.time_ns(), time.perf_counter_ns())
+
+
 def utcnow() -> datetime:
-    return datetime.now(UTC)
+    global _anchor
+    wall_anchor, perf_anchor = _anchor
+    ns = wall_anchor + time.perf_counter_ns() - perf_anchor
+    if abs(ns - time.time_ns()) > _MAX_DRIFT_NS:
+        _anchor = (time.time_ns(), time.perf_counter_ns())
+        ns = _anchor[0]
+    seconds, rest = divmod(ns, 1_000_000_000)
+    return datetime.fromtimestamp(seconds, UTC).replace(microsecond=rest // 1000)

@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -8,7 +9,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.config import BACKEND_DIR, Settings
+from app.db.models import JobModel, SessionModel
+from app.domain.enums import JobKind, JobState
 from app.main import create_app
+from tests.fakes import ControlledHandler
 
 
 def alembic_config(database_url: str) -> Config:
@@ -43,6 +47,23 @@ def client(migrated: Settings) -> Iterator[TestClient]:
 
 
 @pytest.fixture
+def handler() -> ControlledHandler:
+    return ControlledHandler()
+
+
+@pytest.fixture
+def queue_client(migrated: Settings, handler: ControlledHandler) -> Iterator[TestClient]:
+    """App com o `handler` controlável no lugar do pipeline de processamento."""
+    with TestClient(create_app(migrated, job_handlers={JobKind.PROCESS: handler})) as test_client:
+        yield test_client
+
+
+def open_db(client: TestClient) -> Session:
+    session: Session = client.app.state.sessionmaker()  # type: ignore[attr-defined]
+    return session
+
+
+@pytest.fixture
 def db(client: TestClient) -> Iterator[Session]:
     """Sessão direta no mesmo banco do app, para preparar/conferir dados."""
     session: Session = client.app.state.sessionmaker()  # type: ignore[attr-defined]
@@ -71,3 +92,30 @@ def create_session(client: TestClient, **overrides: object) -> dict[str, object]
     assert response.status_code == 201, response.text
     body: dict[str, object] = response.json()
     return body
+
+
+def process_session(client: TestClient, **overrides: object) -> dict[str, object]:
+    """Cria uma sessão e a põe na fila; devolve o job."""
+    session = create_session(client, **overrides)
+    response = client.post(f"/api/sessions/{session['id']}/process")
+    assert response.status_code == 201, response.text
+    body: dict[str, object] = response.json()
+    return body
+
+
+def job_row(client: TestClient, job_id: object) -> JobModel:
+    with open_db(client) as db:
+        job = db.get(JobModel, uuid.UUID(str(job_id)))
+        assert job is not None
+        return job
+
+
+def session_row(client: TestClient, session_id: object) -> SessionModel:
+    with open_db(client) as db:
+        session = db.get(SessionModel, uuid.UUID(str(session_id)))
+        assert session is not None
+        return session
+
+
+def job_state(client: TestClient, job_id: object) -> JobState:
+    return job_row(client, job_id).state

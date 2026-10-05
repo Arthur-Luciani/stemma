@@ -119,6 +119,8 @@ class JobModel(Base):
         ForeignKey("exports.id", ondelete="CASCADE")
     )
     state: Mapped[JobState] = mapped_column(_enum(JobState), default=JobState.QUEUED)
+    # Etapa atual (process: downloading/separating) e progresso dela, 0–100.
+    stage: Mapped[SessionState | None] = mapped_column(_enum(SessionState))
     progress: Mapped[float] = mapped_column(default=0.0)
     attempt: Mapped[int] = mapped_column(default=0)
     error_code: Mapped[str | None] = mapped_column(String(64))
@@ -126,7 +128,12 @@ class JobModel(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    stage_started_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # {etapa: segundos} das etapas concluídas; base do ETA (média móvel).
+    stage_durations: Mapped[dict[str, float] | None] = mapped_column(JSON)
     finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # Job falho que o usuário tirou do dock (a sessão continua "Falhou").
+    dismissed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 class SessionEventModel(Base):

@@ -109,6 +109,251 @@
         "title": "HealthOut",
         "type": "object"
       },
+      "JobKind": {
+        "enum": [
+          "process",
+          "export"
+        ],
+        "title": "JobKind",
+        "type": "string"
+      },
+      "JobListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JobOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "JobListOut",
+        "type": "object"
+      },
+      "JobOut": {
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "dismissed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dismissed At"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "eta_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta S"
+          },
+          "export_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Export Id"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/JobKind"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "progress": {
+            "title": "Progress",
+            "type": "number"
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionOut"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "$ref": "#/components/schemas/JobState"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "session_id",
+          "export_id",
+          "state",
+          "stage",
+          "progress",
+          "attempt",
+          "error_code",
+          "error_message",
+          "position",
+          "eta_s",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "dismissed_at",
+          "session"
+        ],
+        "title": "JobOut",
+        "type": "object"
+      },
+      "JobState": {
+        "enum": [
+          "queued",
+          "running",
+          "done",
+          "failed",
+          "cancelled"
+        ],
+        "title": "JobState",
+        "type": "string"
+      },
+      "JobUpdatedData": {
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/JobOut"
+          }
+        },
+        "required": [
+          "job"
+        ],
+        "title": "JobUpdatedData",
+        "type": "object"
+      },
+      "JobUpdatedEvent": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/JobUpdatedData"
+          },
+          "type": {
+            "const": "job.updated",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "data"
+        ],
+        "title": "JobUpdatedEvent",
+        "type": "object"
+      },
+      "LiveEvent": {
+        "discriminator": {
+          "mapping": {
+            "job.updated": "#/components/schemas/JobUpdatedEvent",
+            "session.deleted": "#/components/schemas/SessionDeletedEvent",
+            "session.updated": "#/components/schemas/SessionUpdatedEvent"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SessionUpdatedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/SessionDeletedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/JobUpdatedEvent"
+          }
+        ]
+      },
       "MixPreset": {
         "enum": [
           "original",
@@ -308,6 +553,38 @@
           "title"
         ],
         "title": "SessionCreate",
+        "type": "object"
+      },
+      "SessionDeletedData": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "SessionDeletedData",
+        "type": "object"
+      },
+      "SessionDeletedEvent": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SessionDeletedData"
+          },
+          "type": {
+            "const": "session.deleted",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "data"
+        ],
+        "title": "SessionDeletedEvent",
         "type": "object"
       },
       "SessionListOut": {
@@ -560,6 +837,36 @@
         "title": "SessionState",
         "type": "string"
       },
+      "SessionUpdatedData": {
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/SessionOut"
+          }
+        },
+        "required": [
+          "session"
+        ],
+        "title": "SessionUpdatedData",
+        "type": "object"
+      },
+      "SessionUpdatedEvent": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SessionUpdatedData"
+          },
+          "type": {
+            "const": "session.updated",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "data"
+        ],
+        "title": "SessionUpdatedEvent",
+        "type": "object"
+      },
       "Stem": {
         "enum": [
           "vocals",
@@ -691,6 +998,169 @@
         "summary": "Search Artists",
         "tags": [
           "identity"
+        ]
+      }
+    },
+    "/api/jobs": {
+      "get": {
+        "operationId": "list_jobs_api_jobs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "List Jobs",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}": {
+      "delete": {
+        "operationId": "cancel_job_api_jobs__job_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Cancel Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/discard": {
+      "post": {
+        "operationId": "discard_job_api_jobs__job_id__discard_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Discard Job",
+        "tags": [
+          "jobs"
         ]
       }
     },
@@ -1193,6 +1663,134 @@
         "summary": "Save Mix",
         "tags": [
           "mix"
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/process": {
+      "post": {
+        "description": "Confirma o rascunho e o põe na fila de processamento.",
+        "operationId": "process_session_api_sessions__session_id__process_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Process Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/reprocess": {
+      "post": {
+        "description": "Processa de novo uma sessão pronta ou que falhou (409 se já houver job ativo).",
+        "operationId": "reprocess_session_api_sessions__session_id__reprocess_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Reprocess Session",
+        "tags": [
+          "sessions"
         ]
       }
     },

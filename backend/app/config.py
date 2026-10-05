@@ -3,7 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     database_url: str = ""
     ffmpeg_bin: str = "ffmpeg"
     ytdlp_js_runtime: str = "deno"
+    # Pipeline falso: simula download/separação sem yt-dlp/Demucs (desenvolvimento do frontend).
+    stemma_fake_pipeline: bool = False
+    fake_pipeline_seconds: float = Field(default=20.0, gt=0)
+    # Tentativas de um job interrompido (servidor caiu no meio) antes de falhar.
+    job_max_attempts: int = Field(default=2, ge=1)
 
     @field_validator("storage_root")
     @classmethod

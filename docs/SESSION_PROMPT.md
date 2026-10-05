@@ -12,8 +12,8 @@ Vamos trabalhar no Stemma.
 3. Entre em plan mode e me apresente o plano da sessão: o que vai fazer, em que ordem, quais arquivos vai criar/alterar e como vai verificar cada item do critério de pronto. Liste antes tudo o que for transversal.
 4. Depois que eu aprovar: crie uma branch, implemente com testes junto, rode lint/typecheck/testes localmente e mantenha o checklist da fase atualizado.
 5. Antes do PR, rode /code-review e corrija o que for relevante.
-6. Abra o PR (título em Conventional Commits) e acompanhe o CI até ficar verde.
-7. No fim, preencha o Handoff da fase (feito, pendente, decisões, pegadinhas), atualize a tabela de status e crie ADR se alguma decisão de arquitetura mudou.
+6. Antes de me pedir o merge, preencha o Handoff da fase (feito, pendente, decisões, pegadinhas), atualize a tabela de status e crie ADR se alguma decisão de arquitetura mudou, tudo no mesmo PR.
+7. Abra o PR (título em Conventional Commits), acompanhe o CI até ficar verde e só então me diga que pode mergear. O que ficar de fora do merge vira na hora um PR `docs:` à parte.
 
 Regras: siga o CLAUDE.md à risca; não expanda o escopo além da fase sem me perguntar; se travar numa decisão que é minha, pergunte; se a sessão ficar longa demais, pare num ponto estável, faça o Handoff e me diga para abrir uma sessão nova.
 ```

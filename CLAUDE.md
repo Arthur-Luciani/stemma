@@ -66,6 +66,8 @@ Um processo uvicorn (1 worker) serve `/api`, `/ws` e o `frontend/dist` na mesma 
 - CI verde é obrigatório. Não desabilite regra de lint para passar; corrija.
 - Antes de mudanças transversais (que tocam muitos arquivos), **liste tudo o que será afetado e só depois implemente** num passo consistente.
 - Ao terminar uma fase, atualize o checklist e a seção **Handoff** do arquivo da fase e a tabela de status em `docs/plan/README.md`.
+- Handoff, tabela de status e pegadinhas entram **no PR da fase, antes de pedir o merge**. Avise quando o último commit estiver no PR e o CI estiver verde.
+- O que ficar de fora do merge (uma pegadinha achada depois, o status "mergeado", o release) vira **na hora** um PR `docs:` à parte, antes de começar a fase seguinte. Nada fica anotado para depois.
 - Decisão de arquitetura nova ou mudada → ADR em `docs/decisions/`.
 
 ## Comandos

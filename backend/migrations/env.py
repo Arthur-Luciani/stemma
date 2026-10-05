@@ -50,7 +50,8 @@ def run_migrations_online() -> None:
     if url.startswith("sqlite:///"):
         # Garante que a pasta do arquivo exista (ex.: STORAGE_ROOT novo).
         Path(url.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)
-    engine = make_engine(url)
+    # FKs desligadas: o batch do SQLite recria tabelas e o DROP dispararia os cascades.
+    engine = make_engine(url, foreign_keys=False)
     try:
         with engine.connect() as connection:
             context.configure(

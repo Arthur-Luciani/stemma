@@ -2,7 +2,10 @@
 
 import uuid
 
+from sqlalchemy.dialects.sqlite import insert
+
 from app.db.models import MixStateModel
+from app.db.types import utcnow
 from app.domain.enums import STEMS, MixPreset
 from app.domain.errors import InvalidInputError
 from app.schemas.mix import MixStateIn, MixStateOut, StemMix
@@ -46,14 +49,18 @@ class MixService:
         ):
             raise InvalidInputError("loop_out_of_range", "O loop A–B passa do fim da música.")
 
-        stems = {stem.value: data.stems[stem].model_dump() for stem in STEMS}
-        row = self.db.get(MixStateModel, session_id)
-        if row is None:
-            row = MixStateModel(session_id=session_id)
-            self.db.add(row)
-        row.stems = stems
-        row.preset = data.preset
-        row.loop_a_s = data.loop_a_s
-        row.loop_b_s = data.loop_b_s
+        values = {
+            "stems": {stem.value: data.stems[stem].model_dump() for stem in STEMS},
+            "preset": data.preset,
+            "loop_a_s": data.loop_a_s,
+            "loop_b_s": data.loop_b_s,
+            "updated_at": utcnow(),
+        }
+        # Upsert atômico: dois saves simultâneos do primeiro mix não colidem na PK.
+        stmt = insert(MixStateModel).values(session_id=session_id, **values)
+        self.db.execute(
+            stmt.on_conflict_do_update(index_elements=[MixStateModel.session_id], set_=values)
+        )
         self.db.commit()
+        self.db.expire_all()
         return self.get(session_id)

@@ -121,7 +121,7 @@ export interface components {
              * Db
              * @enum {string}
              */
-            db: "ok" | "error";
+            db: "ok" | "outdated" | "error";
             /**
              * Ffmpeg
              * @enum {string}

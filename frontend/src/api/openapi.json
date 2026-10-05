@@ -54,6 +54,7 @@
           "db": {
             "enum": [
               "ok",
+              "outdated",
               "error"
             ],
             "title": "Db",

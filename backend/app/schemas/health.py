@@ -3,7 +3,8 @@ from typing import Literal
 from pydantic import BaseModel
 
 Check = Literal["ok", "missing"]
-DbCheck = Literal["ok", "error"]
+# outdated = banco sem `alembic upgrade head` (vazio ou em revisão antiga).
+DbCheck = Literal["ok", "outdated", "error"]
 
 
 class HealthOut(BaseModel):

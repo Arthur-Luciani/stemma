@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import ColumnElement, func, select, update
 from sqlalchemy.orm import Session
 
+from app.db.engine import TEXT_COLLATION
 from app.db.models import CounterModel, JobModel, SessionEventModel, SessionModel
 from app.domain.enums import ACTIVE_JOB_STATES, SessionSort, SessionState
 from app.domain.errors import ConflictError, session_not_found
@@ -138,7 +139,13 @@ class SessionService:
         except Exception:
             self.db.rollback()
             if moved:
-                trash.rename(folder)
+                try:
+                    trash.rename(folder)
+                except OSError:
+                    # Não mascara o erro original do banco; os arquivos ficam na lixeira.
+                    logger.exception(
+                        "Não deu para devolver os arquivos da sessão %s de %s", session.code, trash
+                    )
             raise
 
         if moved:
@@ -201,9 +208,12 @@ def _order_by(sort: SessionSort) -> list[ColumnElement[Any]]:
         case SessionSort.OLDEST:
             return [SessionModel.created_at.asc()]
         case SessionSort.TITLE:
-            return [func.lower(SessionModel.title).asc()]
+            return [SessionModel.title.collate(TEXT_COLLATION).asc()]
         case SessionSort.ARTIST:
-            return [func.lower(SessionModel.artist).asc(), func.lower(SessionModel.title).asc()]
+            return [
+                SessionModel.artist.collate(TEXT_COLLATION).asc(),
+                SessionModel.title.collate(TEXT_COLLATION).asc(),
+            ]
         case SessionSort.LONGEST:
             return [SessionModel.duration_s.desc().nulls_last()]
         case SessionSort.SHORTEST:

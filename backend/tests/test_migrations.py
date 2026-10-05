@@ -1,6 +1,7 @@
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
-from sqlalchemy import text
+from alembic.operations import Operations
+from sqlalchemy import String, text
 
 from app.config import Settings
 from app.db.engine import make_engine
@@ -41,3 +42,42 @@ def test_baseline_semeia_contador_de_codigo(migrated: Settings) -> None:
         engine.dispose()
 
     assert value == 0
+
+
+def _rebuild_sessions_table(database_url: str, *, foreign_keys: bool) -> int:
+    """Recria `sessions` como uma migration em batch faria; devolve quantos eventos sobraram."""
+    engine = make_engine(database_url, foreign_keys=foreign_keys)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO sessions (id, code, source_url, artist, title, artist_key,"
+                    " search_key, state, progress, created_at, updated_at) VALUES"
+                    " ('a1', 'ST-001', 'u', 'a', 't', 'a', 'a', 'draft', 0, '2026-01-01',"
+                    " '2026-01-01')"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO session_events (session_id, type, payload, created_at)"
+                    " VALUES ('a1', 'created', '{}', '2026-01-01')"
+                )
+            )
+        with engine.begin() as conn:
+            ops = Operations(MigrationContext.configure(conn))
+            with ops.batch_alter_table("sessions", recreate="always") as batch:
+                batch.alter_column("title", existing_type=String(200), type_=String(300))
+        with engine.connect() as conn:
+            return int(conn.execute(text("SELECT count(*) FROM session_events")).scalar_one())
+    finally:
+        engine.dispose()
+
+
+def test_batch_com_fks_desligadas_preserva_filhos(migrated: Settings) -> None:
+    # Como o env.py roda as migrations.
+    assert _rebuild_sessions_table(migrated.database_url, foreign_keys=False) == 1
+
+
+def test_batch_com_fks_ligadas_apagaria_filhos(migrated: Settings) -> None:
+    # Controle: prova que o teste acima detecta o problema.
+    assert _rebuild_sessions_table(migrated.database_url, foreign_keys=True) == 0

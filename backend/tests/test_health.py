@@ -49,3 +49,11 @@ def test_health_degradado_sem_banco(settings: Settings) -> None:
 
     assert body["db"] == "error"
     assert body["status"] == "degraded"
+
+
+def test_health_acusa_banco_sem_migration(settings: Settings) -> None:
+    with TestClient(create_app(settings)) as client:
+        body = client.get("/health").json()
+
+    assert body["db"] == "outdated"
+    assert body["status"] == "degraded"

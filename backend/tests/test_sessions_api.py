@@ -346,3 +346,35 @@ def _any_mix() -> dict[str, object]:
         "stems": {s: stem for s in ("vocals", "drums", "bass", "other")},
         "preset": "custom",
     }
+
+
+def test_ordenacao_ignora_acento_e_caixa(client: TestClient) -> None:
+    for title in ("zebra", "Água", "banana", "Éramos"):
+        create_session(client, title=title)
+
+    body = client.get("/api/sessions", params={"sort": "title"}).json()
+
+    assert [s["title"] for s in body["items"]] == ["Água", "banana", "Éramos", "zebra"]
+
+
+def test_falha_ao_devolver_pasta_nao_mascara_erro(
+    client: TestClient, migrated_storage: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    created = create_session(client)
+    (migrated_storage / "sessions" / str(created["id"])).mkdir(parents=True)
+    calls = {"n": 0}
+    real_rename = Path.rename
+
+    def flaky_rename(self: Path, target: Path) -> Path:
+        calls["n"] += 1
+        if calls["n"] > 1:
+            raise PermissionError("arquivo em uso")
+        return real_rename(self, target)
+
+    def boom(self: Session) -> None:
+        raise RuntimeError("disco cheio")
+
+    monkeypatch.setattr(Path, "rename", flaky_rename)
+    monkeypatch.setattr(Session, "commit", boom)
+    with pytest.raises(RuntimeError, match="disco cheio"):
+        client.delete(f"/api/sessions/{created['id']}")

@@ -121,3 +121,15 @@ def test_mix_de_sessao_inexistente(client: TestClient) -> None:
 
     assert client.get(url).status_code == 404
     assert client.put(url, json=_mix()).status_code == 404
+
+
+def test_primeiro_save_concorrente_nao_colide(client: TestClient) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    session = create_session(client)
+    url = f"/api/sessions/{session['id']}/mix"
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        statuses = list(pool.map(lambda _: client.put(url, json=_mix()).status_code, range(16)))
+
+    assert statuses == [200] * 16

@@ -1,0 +1,65 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-chip);
+  font-size: var(--text-label-size);
+  white-space: nowrap;
+}
+
+.sm {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.hollow {
+  background: transparent;
+  border: 1.5px solid var(--text-muted);
+}
+
+.icon {
+  font-size: 14px;
+}
+
+.neutral {
+  background: var(--bg-soft);
+  color: var(--text-body);
+}
+
+.neutral .dot:not(.hollow) {
+  background: var(--text-muted);
+}
+
+.warn {
+  background: var(--warn-soft);
+  color: var(--warn-text);
+}
+
+.warn .dot {
+  background: var(--warn);
+}
+
+.good {
+  background: var(--good-soft);
+  color: var(--good-text);
+}
+
+.good .dot {
+  background: var(--good);
+}
+
+.bad {
+  background: var(--bad-soft);
+  color: var(--bad-text);
+}

@@ -1,0 +1,97 @@
+.group {
+  display: flex;
+  gap: 2px;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-body);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 1px;
+}
+
+/* Segmented (desktop): container surface + borda, itens 36px raio 9 */
+.segmented {
+  align-self: flex-start;
+  padding: 3px;
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.segmented .item {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 9px;
+}
+
+.accent .active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.neutral .active {
+  background: var(--bg-raised-2);
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+/* Chips (celular): pílulas roláveis */
+.chips {
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 calc(-1 * var(--space-4));
+  padding: 4px var(--space-4);
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+/* O botão tem 44px de alvo; a pílula visível tem 36px. */
+.chips .item {
+  flex: none;
+  height: var(--touch-min);
+  padding: 0;
+}
+
+.chips .label {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  font-size: 13px;
+}
+
+.chips .active .label {
+  background: var(--text-strong);
+  border-color: var(--text-strong);
+  color: var(--bg-base);
+  font-weight: 600;
+}
+
+.chips .active {
+  background: transparent;
+}
+
+@media (hover: hover) {
+  .segmented .item:not(.active):hover {
+    color: var(--text-strong);
+    background: var(--bg-soft);
+  }
+}

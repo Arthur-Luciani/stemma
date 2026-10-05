@@ -1,0 +1,32 @@
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-4) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.source {
+  align-self: flex-start;
+  font-size: 13px;
+  color: var(--accent-text);
+}
+
+@media (min-width: 900px) {
+  .page {
+    padding-top: var(--space-6);
+  }
+}

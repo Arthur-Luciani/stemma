@@ -128,4 +128,16 @@ Todas já refletidas nas fases (`docs/plan/`):
 
 ## Desvios
 
-_Nenhum ainda._
+Feitos na F3 (frontend fora do mixer), de propósito:
+
+- **Sem "Vai entrar como ST-046"** no card de identidade do desktop. A API só gera o código no `POST /api/sessions`, e não há como prevê-lo antes. O card mostra só a previsão de fila, como o M3 do celular já fazia. O código aparece no toast "ST-046 entrou na fila".
+- **Previsão de fila** é "N jobs na frente · começa em ~X" (X = maior ETA entre os jobs ativos) ou "Fila livre · começa agora", e não "pronto em ~2 min". O backend não estima a duração de um job que ainda não existe.
+- **`/sessions/:id` (detalhe/acompanhar)** não tem tela no design. É uma página simples feita com peças existentes:
+  - o cabeçalho do mixer (título, artista · `ST-###` · duração · data) + chip de estado;
+  - o card de job do sheet M4 (etapas, ETA, Cancelar);
+  - para rascunho, o formulário de identidade + Separar (é para onde aponta "Continuar"); para falha, a mensagem + Tentar de novo; para pronta, Abrir mixer.
+- **"Duplicar"** saiu do menu ⋯ e do sheet de ações (decisão da F1).
+- **Filtros no celular**: a pílula visível tem 36px, como no M5, mas o alvo de toque é de 44px.
+- **Ordenação no celular**: o M5 não mostra ordenação. Ela aparece como um menu "Mais recentes ▾" abaixo dos filtros.
+- **Logo no celular**: só aparece no Descobrir vazio (M1). As outras telas começam pelo título.
+- **"Colar link"** é um botão (ícone + texto no desktop) no lugar da dica `⌘V`. No Windows o atalho seria Ctrl+V, e o botão funciona igual nos dois.

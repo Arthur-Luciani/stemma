@@ -1,0 +1,35 @@
+.stages {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.step {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wide {
+  flex: 2;
+}
+
+.label {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.done {
+  color: var(--good-text);
+}
+
+.current {
+  color: var(--text-strong);
+}
+
+.todo {
+  color: var(--text-muted);
+}

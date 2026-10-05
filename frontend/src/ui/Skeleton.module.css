@@ -1,0 +1,61 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+}
+
+.fade {
+  opacity: 0.6;
+}
+
+.lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.block {
+  background: var(--bg-soft);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.thumb {
+  width: 112px;
+  height: 63px;
+  border-radius: 8px;
+  flex: none;
+}
+
+.line {
+  border-radius: 4px;
+}
+
+.wide {
+  width: 75%;
+  height: 12px;
+}
+
+.narrow {
+  width: 40%;
+  height: 10px;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block {
+    animation: none;
+  }
+}

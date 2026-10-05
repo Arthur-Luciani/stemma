@@ -1,0 +1,61 @@
+.box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 56px;
+  padding: 0 6px 0 var(--space-4);
+  background: var(--bg-soft);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+}
+
+.box:focus-within {
+  border-color: var(--accent);
+}
+
+.icon {
+  color: var(--text-muted);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-strong);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.paste {
+  padding: 0 12px;
+}
+
+.pasteText {
+  display: none;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+@media (min-width: 900px) {
+  .box {
+    height: 60px;
+    padding-left: 18px;
+  }
+  .input {
+    font-size: 17px;
+  }
+  .pasteText {
+    display: inline;
+  }
+}

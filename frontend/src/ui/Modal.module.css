@@ -1,0 +1,33 @@
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-sheet);
+  display: flex;
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--overlay);
+  animation: fade 160ms ease-out;
+}
+
+.panel {
+  position: relative;
+  background: var(--bg-raised);
+  color: var(--text-body);
+  box-shadow: var(--shadow-raised);
+  outline: none;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrim {
+    animation: none;
+  }
+}

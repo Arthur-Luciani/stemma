@@ -1,0 +1,137 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--bg-surface);
+  border-radius: var(--radius-card);
+}
+
+.compact {
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: 12px;
+}
+
+.row {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+}
+
+.compact.row {
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
+  background: transparent;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  flex: none;
+}
+
+.now {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-chip);
+  background: var(--warn-soft);
+  color: var(--warn-text);
+  font-size: 12px;
+}
+
+.name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.running .name {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.compact .name,
+.compact.running .name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.failed .head .name {
+  flex: 1;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.meta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.eta {
+  font-family: var(--font-mono);
+  font-size: var(--text-mono-size);
+  color: var(--text-body);
+  white-space: nowrap;
+}
+
+.position {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--bg-soft);
+  color: var(--text-body);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.compact .position {
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+}
+
+.error {
+  font-size: 14px;
+  color: var(--bad-text);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.badIcon {
+  color: var(--bad-text);
+}
+
+.goodIcon {
+  color: var(--good-text);
+}

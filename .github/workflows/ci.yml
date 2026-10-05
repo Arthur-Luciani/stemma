@@ -24,6 +24,8 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
+      # ffmpeg real para os testes de áudio (peaks, loudnorm, mixdown).
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       # Nunca instalar o grupo `pipeline` (torch/demucs) no CI.
       - run: uv sync --locked --group api --group dev
       - run: uv run ruff check .

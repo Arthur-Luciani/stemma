@@ -17,10 +17,13 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import JobModel, SessionModel
+from app.db.models import ExportModel, JobModel, SessionModel
 from app.domain.enums import ACTIVE_JOB_STATES, EventType
+from app.domain.text import safe_filename
 from app.pipeline.eta import JobEstimate, QueueEstimator
 from app.schemas.events import (
+    ExportUpdatedData,
+    ExportUpdatedEvent,
     JobUpdatedData,
     JobUpdatedEvent,
     SessionDeletedData,
@@ -28,6 +31,7 @@ from app.schemas.events import (
     SessionUpdatedData,
     SessionUpdatedEvent,
 )
+from app.schemas.exports import ExportOut
 from app.schemas.jobs import JobOut
 from app.schemas.sessions import SessionOut
 
@@ -119,6 +123,33 @@ def build_job_out(job: JobModel, session: SessionModel, estimate: JobEstimate | 
     )
 
 
+def export_file_name(export: ExportModel, session: SessionModel) -> str:
+    """ "Artista - Título (Sem voz).mp3", válido como nome de arquivo no Windows."""
+    preset = f" ({export.preset.label})" if export.preset else ""
+    return f"{safe_filename(f'{session.artist} - {session.title}{preset}')}.{export.format.value}"
+
+
+def build_export_out(export: ExportModel, session: SessionModel) -> ExportOut:
+    return ExportOut.model_validate(
+        {
+            "id": export.id,
+            "session_id": export.session_id,
+            "format": export.format,
+            "preset": export.preset,
+            "stems": export.levels,
+            "state": export.state,
+            "progress": export.progress,
+            "size_bytes": export.size_bytes,
+            "lufs": export.lufs,
+            "error_code": export.error_code,
+            "error_message": export.error_message,
+            "file_name": export_file_name(export, session),
+            "created_at": export.created_at,
+            "finished_at": export.finished_at,
+        }
+    )
+
+
 class EventPublisher:
     """Monta e publica eventos. Chame **depois** do commit, com o estado já no banco.
 
@@ -148,6 +179,26 @@ class EventPublisher:
         self._publish(
             SessionDeletedEvent(
                 type=EventType.SESSION_DELETED, data=SessionDeletedData(id=session_id)
+            )
+        )
+
+    def export_updated(self, export_id: uuid.UUID) -> None:
+        with _best_effort("export.updated"):
+            self._export_updated(export_id)
+
+    def _export_updated(self, export_id: uuid.UUID) -> None:
+        row = self.db.execute(
+            select(ExportModel, SessionModel)
+            .join(SessionModel, SessionModel.id == ExportModel.session_id)
+            .where(ExportModel.id == export_id)
+            .execution_options(populate_existing=True)
+        ).first()
+        if row is None:
+            return
+        self._publish(
+            ExportUpdatedEvent(
+                type=EventType.EXPORT_UPDATED,
+                data=ExportUpdatedData(export=build_export_out(*row)),
             )
         )
 

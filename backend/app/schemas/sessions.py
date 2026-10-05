@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 from pydantic import (
     AnyHttpUrl,
@@ -45,6 +45,13 @@ class SessionPatch(BaseModel):
         return self
 
 
+class SessionMetrics(BaseModel):
+    """Loudness do áudio original (medido com `loudnorm`); nulo se não deu para medir."""
+
+    lufs: float | None
+    true_peak_db: float | None
+
+
 class SessionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -61,9 +68,9 @@ class SessionOut(BaseModel):
     progress: float
     error_code: str | None
     error_message: str | None
-    # Só quais stems existem; os arquivos são servidos por rota própria (F4).
+    # Só quais stems existem; arquivos em /api/sessions/{id}/stems/{stem}.mp3 e /peaks.
     stems: list[Stem]
-    metrics: dict[str, Any] | None
+    metrics: SessionMetrics | None
     created_at: datetime
     updated_at: datetime
     processed_at: datetime | None

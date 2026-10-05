@@ -1,4 +1,5 @@
-"""Checagens baratas para o `/health` (nada de subprocess aqui)."""
+"""Checagens baratas para o `/health`. A GPU vem da sonda em segundo plano
+(`pipeline/probe.py`); aqui nada roda subprocess."""
 
 import logging
 import shutil
@@ -8,18 +9,21 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import OperationalError
+from yt_dlp.version import __version__ as ytdlp_version
 
 from app import __version__
 from app.config import BACKEND_DIR, Settings
+from app.pipeline.probe import GpuProbe
 from app.schemas.health import Check, DbCheck, HealthOut
 
 logger = logging.getLogger(__name__)
 
 
 class HealthService:
-    def __init__(self, settings: Settings, engine: Engine) -> None:
+    def __init__(self, settings: Settings, engine: Engine, gpu: GpuProbe) -> None:
         self.settings = settings
         self.engine = engine
+        self.gpu = gpu
 
     def check(self) -> HealthOut:
         db = self._check_db()
@@ -28,8 +32,9 @@ class HealthService:
             version=__version__,
             db=db,
             ffmpeg=_binary(self.settings.ffmpeg_bin),
-            js_runtime=_binary(self.settings.ytdlp_js_runtime),
-            gpu="unknown",
+            js_runtime=_any_binary(self.settings.ytdlp_js_runtime),
+            gpu=self.gpu.status,
+            ytdlp=ytdlp_version,
         )
 
     def _check_db(self) -> DbCheck:
@@ -57,3 +62,7 @@ def expected_db_revision() -> str | None:
 
 def _binary(name: str) -> Check:
     return "ok" if shutil.which(name) else "missing"
+
+
+def _any_binary(names: list[str]) -> Check:
+    return "ok" if any(shutil.which(name) for name in names) else "missing"

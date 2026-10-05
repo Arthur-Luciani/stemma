@@ -7,6 +7,8 @@ from app.config import Settings
 from app.domain.enums import JobKind, JobState, SessionState
 from app.main import create_app, default_job_handlers
 from app.pipeline.fake import FakeProcessHandler
+from app.pipeline.handlers import ExportHandler, ProcessHandler
+from app.storage import Storage
 from tests.conftest import job_row, job_state, process_session, session_row
 from tests.fakes import wait_until
 
@@ -19,9 +21,13 @@ def fake_client(migrated: Settings) -> Iterator[TestClient]:
 
 
 def test_flag_liga_o_pipeline_falso(settings: Settings) -> None:
-    assert default_job_handlers(settings) == {}
+    storage = Storage(settings.storage_root)
+    assert isinstance(default_job_handlers(settings, storage)[JobKind.PROCESS], ProcessHandler)
     settings.stemma_fake_pipeline = True
-    assert isinstance(default_job_handlers(settings)[JobKind.PROCESS], FakeProcessHandler)
+    handlers = default_job_handlers(settings, storage)
+    assert isinstance(handlers[JobKind.PROCESS], FakeProcessHandler)
+    # O export é real mesmo com o pipeline falso (só precisa do ffmpeg).
+    assert isinstance(handlers[JobKind.EXPORT], ExportHandler)
 
 
 def test_pipeline_falso_passa_pelas_etapas_ate_pronta(fake_client: TestClient) -> None:

@@ -6,25 +6,55 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import artists, events, health, jobs, mix, sessions
+from app.api import artists, events, exports, health, jobs, media, mix, search, sessions
 from app.api.errors import install_error_handlers
 from app.config import Settings, get_settings
 from app.db.engine import make_engine, make_sessionmaker
 from app.domain.enums import JobKind
 from app.logging_setup import configure_logging
+from app.pipeline.audio import Ffmpeg
+from app.pipeline.download import YtDlpClient
 from app.pipeline.fake import FakeProcessHandler
+from app.pipeline.handlers import ExportHandler, ProcessHandler
+from app.pipeline.probe import GpuProbe
 from app.pipeline.queue import JobHandler, JobRunner
+from app.pipeline.separate import DemucsSeparator, DemucsSettings
 from app.services.events import EventBus
 from app.storage import Storage
 
 logger = logging.getLogger(__name__)
 
 
-def default_job_handlers(settings: Settings) -> dict[JobKind, JobHandler]:
-    # Os handlers reais entram na F2b; sem eles, o job falha com `pipeline_unavailable`.
+def default_job_handlers(settings: Settings, storage: Storage) -> dict[JobKind, JobHandler]:
+    ffmpeg = Ffmpeg(settings.ffmpeg_bin, settings.ffmpeg_timeout_s)
+    export = ExportHandler(storage, ffmpeg)
     if settings.stemma_fake_pipeline:
-        return {JobKind.PROCESS: FakeProcessHandler(settings.fake_pipeline_seconds)}
-    return {}
+        return {
+            JobKind.PROCESS: FakeProcessHandler(settings.fake_pipeline_seconds),
+            JobKind.EXPORT: export,
+        }
+    assert settings.torch_home is not None  # preenchido pelo validador do Settings
+    process = ProcessHandler(
+        storage,
+        YtDlpClient(
+            js_runtimes=settings.ytdlp_js_runtime,
+            cookie_file=settings.ytdlp_cookie_file,
+            timeout=settings.download_timeout_s,
+        ),
+        DemucsSeparator(
+            DemucsSettings(
+                model=settings.separation_model,
+                device=settings.demucs_device,
+                segment=settings.demucs_segment,
+                overlap=settings.demucs_overlap,
+                shifts=settings.demucs_shifts,
+                torch_home=settings.torch_home,
+                timeout=settings.separation_timeout_s,
+            )
+        ),
+        ffmpeg,
+    )
+    return {JobKind.PROCESS: process, JobKind.EXPORT: export}
 
 
 def create_app(
@@ -38,7 +68,9 @@ def create_app(
     engine = make_engine(settings.database_url)
     sessionmaker = make_sessionmaker(engine)
     event_bus = EventBus()
-    handlers = default_job_handlers(settings) if job_handlers is None else job_handlers
+    storage = Storage(settings.storage_root)
+    gpu_probe = GpuProbe()
+    handlers = default_job_handlers(settings, storage) if job_handlers is None else job_handlers
     job_runner = JobRunner(
         sessionmaker, event_bus, handlers, max_attempts=settings.job_max_attempts
     )
@@ -47,6 +79,7 @@ def create_app(
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         settings.storage_root.mkdir(parents=True, exist_ok=True)
         logger.info("Stemma %s — dados em %s", __version__, settings.storage_root)
+        gpu_probe.start()
         job_runner.start()
         try:
             yield
@@ -60,7 +93,8 @@ def create_app(
     app.state.sessionmaker = sessionmaker
     app.state.event_bus = event_bus
     app.state.job_runner = job_runner
-    app.state.storage = Storage(settings.storage_root)
+    app.state.storage = storage
+    app.state.gpu_probe = gpu_probe
 
     if settings.cors_origins:
         app.add_middleware(
@@ -76,6 +110,9 @@ def create_app(
     app.include_router(mix.router)
     app.include_router(artists.router)
     app.include_router(jobs.router)
+    app.include_router(search.router)
+    app.include_router(exports.router)
+    app.include_router(media.router)
     app.include_router(events.router)
     return app
 

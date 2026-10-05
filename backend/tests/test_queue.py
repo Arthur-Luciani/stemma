@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.db.engine import make_engine
-from app.db.models import JobModel, SessionModel
-from app.domain.enums import JobKind, JobState, SessionState
+from app.db.models import ExportModel, JobModel, SessionModel
+from app.domain.enums import ExportFormat, ExportState, JobKind, JobState, SessionState
 from app.domain.errors import AppError
 from app.main import create_app
 from app.services import events as events_module
@@ -61,12 +61,21 @@ def test_worker_leve_roda_em_paralelo_ao_gpu(migrated: Settings) -> None:
         assert gpu.next_started() == "processo"
 
         session = create_session(client, title="export")
+        session_id = uuid.UUID(str(session["id"]))
         with open_db(client) as db:
-            db.add(JobModel(kind=JobKind.EXPORT, session_id=uuid.UUID(str(session["id"]))))
+            export = ExportModel(
+                session_id=session_id, format=ExportFormat.WAV, levels={}, preset=None
+            )
+            db.add(export)
+            db.flush()
+            db.add(JobModel(kind=JobKind.EXPORT, session_id=session_id, export_id=export.id))
             db.commit()
+            export_id = export.id
         app.state.job_runner.wake()
 
         assert light.next_started() == "export"
+        with open_db(client) as db:
+            assert db.get(ExportModel, export_id).state is ExportState.RUNNING  # type: ignore[union-attr]
         # O export não mexe no estado da sessão (só o processamento mexe).
         assert session_row(client, session["id"]).state is SessionState.DRAFT
         gpu.finish()

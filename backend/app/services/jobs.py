@@ -10,11 +10,12 @@ import uuid
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.db.models import JobModel, SessionModel
+from app.db.models import ExportModel, JobModel, SessionModel
 from app.db.types import utcnow
 from app.domain.enums import (
     ACTIVE_JOB_STATES,
     DISMISSABLE_JOB_STATES,
+    ExportState,
     JobKind,
     JobState,
     SessionState,
@@ -128,11 +129,26 @@ class JobService:
                     error_message="Processamento cancelado.",
                 )
             )
+        if job.export_id is not None:
+            # Export cancelado sai do dock; fica na lista de exports como falho.
+            self.db.execute(update(JobModel).where(JobModel.id == job_id).values(dismissed_at=now))
+            self.db.execute(
+                update(ExportModel)
+                .where(ExportModel.id == job.export_id)
+                .values(
+                    state=ExportState.FAILED,
+                    error_code="cancelled",
+                    error_message="Export cancelado.",
+                    finished_at=now,
+                )
+            )
         self.db.commit()
         self.runner.cancel(job_id)
         logger.info("Job %s cancelado", job_id)
         if job.kind is JobKind.PROCESS:
             self.events.session_updated(job.session_id)
+        if job.export_id is not None:
+            self.events.export_updated(job.export_id)
         self.events.jobs_changed(job_id)
 
     def discard(self, job_id: uuid.UUID) -> None:

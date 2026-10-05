@@ -6,6 +6,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
 from app.domain.enums import EventType
+from app.schemas.exports import ExportOut
 from app.schemas.jobs import JobOut
 from app.schemas.sessions import SessionOut
 
@@ -37,6 +38,16 @@ class JobUpdatedEvent(BaseModel):
     data: JobUpdatedData
 
 
+class ExportUpdatedData(BaseModel):
+    export: ExportOut
+
+
+class ExportUpdatedEvent(BaseModel):
+    type: Literal[EventType.EXPORT_UPDATED]
+    data: ExportUpdatedData
+
+
 LiveEvent = Annotated[
-    SessionUpdatedEvent | SessionDeletedEvent | JobUpdatedEvent, Field(discriminator="type")
+    SessionUpdatedEvent | SessionDeletedEvent | JobUpdatedEvent | ExportUpdatedEvent,
+    Field(discriminator="type"),
 ]

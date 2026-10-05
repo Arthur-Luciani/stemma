@@ -63,7 +63,6 @@ class EventType(StrEnum):
     SESSION_UPDATED = "session.updated"
     SESSION_DELETED = "session.deleted"
     JOB_UPDATED = "job.updated"
-    # Publicado a partir da F2b (exports reais).
     EXPORT_UPDATED = "export.updated"
 
 
@@ -86,6 +85,20 @@ class MixPreset(StrEnum):
     NO_BASS = "no_bass"
     VOCALS_ONLY = "vocals_only"
     CUSTOM = "custom"
+
+    @property
+    def label(self) -> str:
+        return _PRESET_LABELS[self]
+
+
+_PRESET_LABELS = {
+    MixPreset.ORIGINAL: "Original",
+    MixPreset.NO_VOCALS: "Sem voz",
+    MixPreset.NO_DRUMS: "Sem bateria",
+    MixPreset.NO_BASS: "Sem baixo",
+    MixPreset.VOCALS_ONLY: "Só voz",
+    MixPreset.CUSTOM: "Personalizado",
+}
 
 
 class SessionSort(StrEnum):

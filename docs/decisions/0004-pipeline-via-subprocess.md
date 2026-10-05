@@ -13,3 +13,6 @@ Na v1 o Demucs rodava dentro do processo da API (`demucs_main`), sem liberar VRA
 
 ## Consequências
 VRAM liberada ao fim de cada job, falhas diagnosticáveis, testes mockam a fronteira de subprocess.
+
+## Atualização (F2b, 2026-10-05)
+O **download do yt-dlp também virou subprocess** (só a busca segue in-process), para ter timeout e cancelamento reais. Layout de arquivos (os peaks ficam em `sessions/{id}/stems/{stem}.peaks.json`), formato dos peaks, mixdown, exports e sonda da GPU na [ADR 0010](0010-pipeline-de-audio.md).

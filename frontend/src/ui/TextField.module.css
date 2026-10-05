@@ -1,0 +1,72 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+.label {
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  color: var(--text-muted);
+}
+
+.box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 52px;
+  padding: 0 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.box:focus-within {
+  border-color: var(--accent);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 50px;
+  border: 0;
+  background: transparent;
+  color: var(--text-strong);
+  font-family: var(--font-ui);
+  /* 16px evita o zoom automático do iOS ao focar. */
+  font-size: 16px;
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.trailing {
+  flex: none;
+  font-size: 12px;
+  color: var(--good-text);
+  white-space: nowrap;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (min-width: 900px) {
+  .box {
+    min-height: 48px;
+    background: var(--bg-soft);
+    border-radius: var(--radius-control);
+  }
+  .input {
+    height: 46px;
+    font-size: 15px;
+  }
+}

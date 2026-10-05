@@ -1,0 +1,98 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-min);
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.secondary {
+  background: var(--bg-soft);
+  border-color: var(--line);
+  color: var(--text-strong);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--text-body);
+  padding: 0 14px;
+}
+
+.danger {
+  background: transparent;
+  border-color: var(--bad);
+  color: var(--bad-text);
+}
+
+.destructive {
+  background: var(--bad);
+  color: var(--bad-ink);
+  font-weight: 600;
+}
+
+.sm {
+  font-size: 14px;
+  padding: 0 14px;
+}
+
+.lg {
+  min-height: 56px;
+  border-radius: var(--radius-card);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.iconOnly {
+  width: var(--touch-min);
+  padding: 0;
+}
+
+.block {
+  display: flex;
+  width: 100%;
+}
+
+@media (hover: hover) {
+  .primary:hover:not(:disabled) {
+    background: var(--accent-text);
+  }
+  .secondary:hover:not(:disabled),
+  .ghost:hover:not(:disabled) {
+    background: var(--bg-raised-2);
+    color: var(--text-strong);
+  }
+  .danger:hover:not(:disabled) {
+    background: var(--bad-soft);
+  }
+}

@@ -1,0 +1,116 @@
+/* Desktop */
+.row {
+  height: 60px;
+  border-bottom: 1px solid var(--thumb-stripe-b);
+}
+
+.row td {
+  padding: 0 var(--space-4);
+  vertical-align: middle;
+}
+
+.row:hover,
+.row:focus-within {
+  background: var(--bg-surface);
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.song {
+  max-width: 0;
+  width: 100%;
+}
+
+.songLink {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
+}
+
+.songLink:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.songTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.songArtist {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-body);
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.actions a,
+.actions button {
+  min-height: 34px;
+}
+
+/* Celular */
+.card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 66px;
+  padding-left: var(--space-3);
+  border-bottom: 1px solid var(--thumb-stripe-b);
+}
+
+.cardLink {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-2) 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.cardTitle,
+.cardMeta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.cardMeta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.cardMono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}

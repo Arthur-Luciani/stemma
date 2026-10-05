@@ -1,0 +1,157 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  padding-bottom: 6px;
+}
+
+.mark span {
+  width: 3px;
+  border-radius: 2px;
+}
+
+.mark span:nth-child(1) {
+  height: 8px;
+  background: var(--stem-vocals);
+}
+.mark span:nth-child(2) {
+  height: 15px;
+  background: var(--stem-drums);
+}
+.mark span:nth-child(3) {
+  height: 11px;
+  background: var(--stem-bass);
+}
+.mark span:nth-child(4) {
+  height: 5px;
+  background: var(--stem-other);
+}
+
+.wordmark {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+
+/* Desktop */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-nav);
+  height: var(--topbar-height);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: 0 var(--space-5);
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--bg-soft);
+}
+
+.home {
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.topnav {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.toplink {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  color: var(--text-body);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.toplink:hover {
+  color: var(--text-strong);
+}
+
+.topActive {
+  background: var(--bg-soft);
+  color: var(--text-strong);
+  font-weight: 500;
+}
+
+.home:focus-visible,
+.toplink:focus-visible,
+.tab:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+/* Celular */
+.mobileBrand {
+  padding: var(--space-3) var(--space-5) 0;
+}
+
+.mobileBrand .wordmark {
+  font-size: 16px;
+}
+
+.bottomnav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-nav);
+  display: flex;
+  height: calc(var(--bottomnav-height) + env(safe-area-inset-bottom));
+  padding: 0 var(--space-2) env(safe-area-inset-bottom);
+  background: var(--bg-nav);
+  border-top: 1px solid var(--bg-soft);
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.tabIcon {
+  width: 56px;
+  height: 30px;
+  border-radius: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tabLabel {
+  font-size: 12px;
+}
+
+.tabActive {
+  color: var(--accent-text);
+}
+
+.tabActive .tabIcon {
+  background: var(--accent-soft);
+}
+
+.tabActive .tabLabel {
+  font-weight: 600;
+}

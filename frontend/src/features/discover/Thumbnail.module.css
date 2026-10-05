@@ -1,0 +1,46 @@
+.thumb {
+  position: relative;
+  flex: none;
+  border-radius: 8px;
+  overflow: hidden;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--thumb-stripe-a) 0 6px,
+    var(--thumb-stripe-b) 6px 12px
+  );
+}
+
+.lg {
+  width: 128px;
+  height: 72px;
+}
+
+.md {
+  width: 112px;
+  height: 63px;
+}
+
+.sm {
+  width: 80px;
+  height: 45px;
+  border-radius: 6px;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.duration {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--scrim-strong);
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}

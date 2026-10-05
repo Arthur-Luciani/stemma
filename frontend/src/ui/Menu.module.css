@@ -1,0 +1,75 @@
+.root {
+  position: relative;
+  display: inline-flex;
+}
+
+.small {
+  width: 34px;
+  min-height: 34px;
+  height: 34px;
+  border-radius: 8px;
+}
+
+.triggerOpen {
+  background: var(--bg-raised-2);
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: var(--z-dock);
+  min-width: 240px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-raised);
+  border-radius: 12px;
+  box-shadow: var(--shadow-raised);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-strong);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.item:focus-visible,
+.item:hover {
+  background: var(--bg-raised-2);
+  outline: none;
+}
+
+.itemIcon {
+  color: var(--text-body);
+}
+
+.itemLabel {
+  flex: 1;
+}
+
+.check {
+  color: var(--accent-text);
+}
+
+.destructive,
+.destructive .itemIcon {
+  color: var(--bad-text);
+}
+
+.divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--bg-raised-2);
+}

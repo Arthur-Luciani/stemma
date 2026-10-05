@@ -1,0 +1,20 @@
+.desktop,
+.mobile {
+  min-height: 100dvh;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.mobile {
+  padding-top: env(safe-area-inset-top);
+  /* Espaço para a bottom nav e a pílula de processamento não cobrirem o fim da página. */
+  padding-bottom: calc(var(--bottomnav-height) + 76px + env(safe-area-inset-bottom));
+}
+
+.desktop {
+  padding-bottom: 96px;
+}
+
+.main {
+  width: 100%;
+}

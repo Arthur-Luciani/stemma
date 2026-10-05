@@ -20,14 +20,14 @@ Repo pronto para desenvolver: estrutura, tooling, CI e release automatizado func
 Banco, rotas de produto, UI real, WinSW/serviço (F5).
 
 ## Checklist
-- [ ] `.gitignore`, `.editorconfig`, `.gitattributes`, `.env.example`
-- [ ] backend: pyproject + uv.lock + esqueleto + `/health` + ruff/mypy/pytest verdes
-- [ ] GPU validada localmente; ADR 0008 atualizada
-- [ ] frontend: Vite/React/TS + ESLint/Prettier/Vitest + tokens + placeholder + teste
+- [x] `.gitignore`, `.editorconfig`, `.gitattributes`, `.env.example`
+- [x] backend: pyproject + uv.lock + esqueleto + `/health` + ruff/mypy/pytest verdes
+- [x] GPU validada localmente; ADR 0008 atualizada
+- [x] frontend: Vite/React/TS + ESLint/Prettier/Vitest + tokens + placeholder + teste
 - [ ] `ci.yml` verde num PR
 - [ ] release-please configurado; merge gera PR de release; merge do PR de release gera `v0.1.0` com zip anexado
-- [ ] `scripts/dev.ps1` funcionando (abrir no celular via Tailscale mostra o placeholder)
-- [ ] CLAUDE.md (Comandos) e README atualizados
+- [ ] `scripts/dev.ps1` funcionando (abrir no celular via Tailscale mostra o placeholder) — local OK (página + proxy `/health`); falta o teste no celular
+- [x] CLAUDE.md (Comandos) e README atualizados
 
 ## Critério de pronto
 Um PR com CI verde é mergeado e a GitHub Release **v0.1.0** existe com `stemma-v0.1.0.zip` + SHA256 anexados.

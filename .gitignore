@@ -1,0 +1,44 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+
+# Dados e segredos
+.env
+.env.*
+!.env.example
+storage/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.bak
+
+# Logs
+logs/
+*.log
+
+# Ferramentas
+.claude/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Artefatos de release
+stemma-v*.zip
+stemma-v*.zip.sha256

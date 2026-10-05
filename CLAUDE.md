@@ -70,18 +70,28 @@ Um processo uvicorn (1 worker) serve `/api`, `/ws` e o `frontend/dist` na mesma 
 
 ## Comandos
 
-> Preenchidos na F0. Até lá, esta seção é um placeholder.
-
 ```bash
-# backend
-cd backend && uv sync --group api --group dev
+# tudo junto (Windows): backend :8010 (--reload) + Vite :5183 com proxy de /api, /ws e /health
+powershell -ExecutionPolicy Bypass -File scripts/dev.ps1   # -SkipInstall pula uv sync/npm ci
+
+# backend (Python 3.12 fixado em backend/.python-version; o uv instala se faltar)
+cd backend
+uv sync --group api --group dev          # o que o CI usa
+uv sync --all-groups                     # + torch cu118/demucs (só no PC com GPU)
 uv run pytest
 uv run ruff check . && uv run ruff format --check . && uv run mypy app
+uv run uvicorn app.main:app --reload --port 8010
 
-# frontend
+# frontend (Node >= 22.12)
 cd frontend && npm ci
-npm run dev | npm run lint | npm run typecheck | npm test | npm run build
+npm run dev          # http://127.0.0.1:5183
+npm run lint && npm run format:check && npm run typecheck && npm test && npm run build
+npm run format       # aplica Prettier
 ```
+
+Cuidados:
+- `uv sync` sem `--inexact` **remove** o grupo `pipeline` se ele estiver instalado; para manter torch/demucs use `uv sync --all-groups` ou `--inexact`.
+- Versão do app: `backend/pyproject.toml` e `frontend/package.json` são atualizados **só** pelo release-please (PR de release). Não edite à mão.
 
 ## Ambiente
 

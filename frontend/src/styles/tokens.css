@@ -1,0 +1,83 @@
+/* Design tokens do Stemma — fonte: docs/design/README.md.
+   Único lugar do frontend com valores de cor, espaço, raio e tipografia. */
+
+:root {
+  /* Superfícies */
+  --bg-base: #121416;
+  --bg-canvas: #0d0f11;
+  --bg-surface: #1a1d21;
+  --bg-soft: #242931;
+  --bg-raised: #2c323b;
+  --bg-raised-2: #3a414b;
+
+  /* Texto e linhas */
+  --text-strong: #eceff3;
+  --text-body: #c2c8d0;
+  --text-muted: #9199a3;
+  --line: #323840;
+  --line-strong: #4c5560;
+
+  /* Ação principal */
+  --accent: #c18a3a;
+  --accent-ink: #17120a;
+  --accent-text: #eec07a;
+  --accent-soft: rgba(193, 138, 58, 0.16);
+
+  /* Estados */
+  --good: #5ba17a;
+  --good-text: #8fd0aa;
+  --good-soft: rgba(91, 161, 122, 0.16);
+  --warn: #bc9050;
+  --warn-text: #e2b878;
+  --warn-soft: rgba(188, 144, 80, 0.16);
+  --bad: #ba6b78;
+  --bad-text: #eaa6b1;
+  --bad-soft: rgba(186, 107, 120, 0.16);
+  --bad-ink: #1d0f12;
+  --solo: #e3c46a;
+  --solo-ink: #1c1606;
+
+  /* Stems (Okabe-Ito) */
+  --stem-vocals: #6cb8f0;
+  --stem-drums: #e07a4f;
+  --stem-bass: #3fb896;
+  --stem-other: #c98bd0;
+
+  /* Tipografia */
+  --font-ui: 'Sora', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-icon: 'Material Symbols Rounded';
+
+  --text-display-size: 32px;
+  --text-display-weight: 600;
+  --text-display-tracking: -0.02em;
+  --text-title-size: 20px;
+  --text-title-weight: 600;
+  --text-body-size: 15px;
+  --text-body-weight: 400;
+  --text-label-size: 13px;
+  --text-label-weight: 500;
+  --text-mono-lg-size: 28px;
+  --text-mono-lg-weight: 500;
+  --text-mono-size: 13px;
+  --text-mono-weight: 400;
+
+  /* Espaçamento */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Raio */
+  --radius-chip: 6px;
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-dialog: 18px;
+  --radius-sheet: 22px;
+
+  /* Toque */
+  --touch-min: 44px;
+}

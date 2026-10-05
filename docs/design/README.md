@@ -112,7 +112,7 @@ Stem mutado = cor a 30% de opacidade + waveform tracejada. A cor **sempre** acom
 
 ## Decisões pendentes
 
-- [ ] **Mixer no celular**: qual variação é a padrão? Sugestão: **1f (Modo prática) como tela inicial do mixer**, com "Ajustar" abrindo **1e (Lanes compactas)**, e **1g** ao girar para paisagem. Decidir até o início da F4.
+- [x] **Mixer no celular** (decidido na F4a, 2026-10-05): **1f (Modo prática) é a tela inicial do mixer**; "Ajustar" abre **1e (Lanes compactas)**; ao girar para paisagem, **1g**.
 
 ## Funcionalidades que o design adicionou ao escopo
 

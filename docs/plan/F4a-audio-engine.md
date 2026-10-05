@@ -15,7 +15,7 @@ Provar no celular real que 4 stems tocam sincronizados, com baixo consumo de mem
 UI final do mixer e export (F4b).
 
 ## Checklist
-- [ ] variação do mixer no celular decidida e registrada
+- [x] variação do mixer no celular decidida e registrada
 - [ ] AudioEngine completo
 - [ ] waveform por peaks + playhead
 - [ ] página /dev/engine

@@ -35,7 +35,7 @@ Mixer, AudioEngine, export (F4), PWA (F5).
 Pelo celular (via Tailscale, dev server): buscar, confirmar identidade, acompanhar o processamento ao vivo, gerenciar a biblioteca — sem layout quebrado, back do Android funcionando; CI verde.
 
 ## Handoff
-**Status:** concluída em 2026-10-05. PR #10 (`feat: frontend de descobrir, processamento e biblioteca (F3)`) com CI verde. Conferida pelo usuário no celular real (Android) via Tailscale.
+**Status:** concluída em 2026-10-05. PR #10 (`feat: frontend de descobrir, processamento e biblioteca (F3)`) mergeado com CI verde. Conferida pelo usuário no celular real (Android) via Tailscale.
 
 ### Feito
 - **Base**:

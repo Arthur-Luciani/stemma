@@ -34,6 +34,10 @@ class SessionState(StrEnum):
     FAILED = "failed"
 
 
+# Etapas do job de processamento, na ordem. O estado da sessão acompanha a etapa.
+PROCESS_STAGES: tuple[SessionState, ...] = (SessionState.DOWNLOADING, SessionState.SEPARATING)
+
+
 class JobKind(StrEnum):
     PROCESS = "process"
     EXPORT = "export"
@@ -49,6 +53,18 @@ class JobState(StrEnum):
 
 # Jobs que ainda vão (ou estão) rodando.
 ACTIVE_JOB_STATES: frozenset[JobState] = frozenset({JobState.QUEUED, JobState.RUNNING})
+# Jobs encerrados que aparecem no dock até o usuário descartar.
+DISMISSABLE_JOB_STATES: frozenset[JobState] = frozenset({JobState.DONE, JobState.FAILED})
+
+
+class EventType(StrEnum):
+    """Tipos de evento enviados pelo `/ws`."""
+
+    SESSION_UPDATED = "session.updated"
+    SESSION_DELETED = "session.deleted"
+    JOB_UPDATED = "job.updated"
+    # Publicado a partir da F2b (exports reais).
+    EXPORT_UPDATED = "export.updated"
 
 
 class ExportState(StrEnum):

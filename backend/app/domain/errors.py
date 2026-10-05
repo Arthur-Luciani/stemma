@@ -28,3 +28,7 @@ class InvalidInputError(AppError):
 
 def session_not_found() -> NotFoundError:
     return NotFoundError("session_not_found", "Sessão não encontrada.")
+
+
+def job_not_found() -> NotFoundError:
+    return NotFoundError("job_not_found", "Job não encontrado.")

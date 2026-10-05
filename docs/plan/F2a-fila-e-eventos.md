@@ -17,14 +17,14 @@ Infraestrutura de execução: fila persistente, workers, eventos por WebSocket, 
 yt-dlp, Demucs, ffmpeg reais (F2b).
 
 ## Checklist
-- [ ] JobRunner + workers + lifespan
-- [ ] recuperação no startup
-- [ ] cancelamento + descartar
-- [ ] EventBus + `/ws`
-- [ ] posição na fila + ETA
-- [ ] rotas process/reprocess/jobs
-- [ ] pipeline falso via env
-- [ ] testes listados acima
+- [x] JobRunner + workers + lifespan
+- [x] recuperação no startup
+- [x] cancelamento + descartar
+- [x] EventBus + `/ws`
+- [x] posição na fila + ETA
+- [x] rotas process/reprocess/jobs
+- [x] pipeline falso via env
+- [x] testes listados acima
 
 ## Critério de pronto
 Com o pipeline falso: enfileirar 2 sessões mostra a 2ª como "Na fila · 1º" com ETA; matar e reiniciar o servidor no meio retoma/falha corretamente; eventos chegam no WebSocket; CI verde.

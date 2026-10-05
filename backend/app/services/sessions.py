@@ -14,6 +14,7 @@ from app.domain.enums import ACTIVE_JOB_STATES, SessionSort, SessionState
 from app.domain.errors import ConflictError, session_not_found
 from app.domain.text import normalize_artist, search_tokens
 from app.schemas.sessions import SessionCreate, SessionPatch
+from app.services.events import EventPublisher
 from app.storage import Storage
 
 logger = logging.getLogger(__name__)
@@ -27,9 +28,10 @@ def format_session_code(value: int) -> str:
 
 
 class SessionService:
-    def __init__(self, db: Session, storage: Storage) -> None:
+    def __init__(self, db: Session, storage: Storage, events: EventPublisher) -> None:
         self.db = db
         self.storage = storage
+        self.events = events
 
     # --- leitura -----------------------------------------------------------
 
@@ -85,9 +87,10 @@ class SessionService:
         _refresh_keys(session)
         self.db.add(session)
         self.db.flush()
-        self._event(session.id, "created", {"code": code})
+        self.log_event(session.id, "created", {"code": code})
         self.db.commit()
         logger.info("Sessão %s criada (%s)", code, session.id)
+        self.events.session_updated(session.id)
         return session
 
     def update_identity(self, session_id: uuid.UUID, patch: SessionPatch) -> SessionModel:
@@ -100,8 +103,10 @@ class SessionService:
         after = {"artist": session.artist, "title": session.title}
         if after != before:
             _refresh_keys(session)
-            self._event(session.id, "identity_updated", {"before": before, "after": after})
+            self.log_event(session.id, "identity_updated", {"before": before, "after": after})
         self.db.commit()
+        if after != before:
+            self.events.session_updated(session.id)
         return session
 
     def delete(self, session_id: uuid.UUID) -> None:
@@ -111,7 +116,7 @@ class SessionService:
         e só é apagada de vez depois que o banco confirmou a exclusão.
         """
         session = self.get(session_id)
-        if self._has_active_job(session_id):
+        if self.has_active_job(session_id):
             raise ConflictError(
                 "session_busy",
                 "Esta sessão está sendo processada. Cancele o processamento antes de excluir.",
@@ -153,10 +158,11 @@ class SessionService:
             if trash.exists():
                 logger.warning("Sobrou lixo da sessão %s em %s", session.code, trash)
         logger.info("Sessão %s excluída", session.code)
+        self.events.session_deleted(session_id)
 
-    # --- internos ----------------------------------------------------------
+    # --- auxiliares (também usados pelo JobService) ------------------------
 
-    def _has_active_job(self, session_id: uuid.UUID) -> bool:
+    def has_active_job(self, session_id: uuid.UUID) -> bool:
         return (
             self.db.scalar(
                 select(JobModel.id)
@@ -180,7 +186,7 @@ class SessionService:
             value = 1
         return value
 
-    def _event(self, session_id: uuid.UUID, type_: str, payload: dict[str, Any]) -> None:
+    def log_event(self, session_id: uuid.UUID, type_: str, payload: dict[str, Any]) -> None:
         self.db.add(SessionEventModel(session_id=session_id, type=type_, payload=payload))
 
 

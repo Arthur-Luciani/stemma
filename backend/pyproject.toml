@@ -1,6 +1,6 @@
 [project]
 name = "stemma"
-version = "1.0.0"
+version = "1.1.0"
 description = "Separa músicas em stems (voz, bateria, baixo, outros) e oferece um mixer por stem."
 requires-python = ">=3.12,<3.13"
 dependencies = []

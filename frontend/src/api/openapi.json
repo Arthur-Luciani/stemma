@@ -49,6 +49,238 @@
         "title": "ErrorOut",
         "type": "object"
       },
+      "ExportCreate": {
+        "additionalProperties": false,
+        "description": "Pedido de export. Sem `stems`, vale o mix salvo da sessão.",
+        "properties": {
+          "format": {
+            "$ref": "#/components/schemas/ExportFormat"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MixPreset"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stems": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/StemMix"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/Stem"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stems"
+          }
+        },
+        "required": [
+          "format"
+        ],
+        "title": "ExportCreate",
+        "type": "object"
+      },
+      "ExportFormat": {
+        "enum": [
+          "wav",
+          "mp3"
+        ],
+        "title": "ExportFormat",
+        "type": "string"
+      },
+      "ExportListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExportOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ExportListOut",
+        "type": "object"
+      },
+      "ExportOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "format": {
+            "$ref": "#/components/schemas/ExportFormat"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lufs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lufs"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MixPreset"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "progress": {
+            "title": "Progress",
+            "type": "number"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ExportState"
+          },
+          "stems": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/StemMix"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Stem"
+            },
+            "title": "Stems",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "session_id",
+          "format",
+          "preset",
+          "stems",
+          "state",
+          "progress",
+          "size_bytes",
+          "lufs",
+          "error_code",
+          "error_message",
+          "file_name",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "ExportOut",
+        "type": "object"
+      },
+      "ExportState": {
+        "enum": [
+          "queued",
+          "running",
+          "done",
+          "failed"
+        ],
+        "title": "ExportState",
+        "type": "string"
+      },
+      "ExportUpdatedData": {
+        "properties": {
+          "export": {
+            "$ref": "#/components/schemas/ExportOut"
+          }
+        },
+        "required": [
+          "export"
+        ],
+        "title": "ExportUpdatedData",
+        "type": "object"
+      },
+      "ExportUpdatedEvent": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ExportUpdatedData"
+          },
+          "type": {
+            "const": "export.updated",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "data"
+        ],
+        "title": "ExportUpdatedEvent",
+        "type": "object"
+      },
       "HealthOut": {
         "properties": {
           "db": {
@@ -96,6 +328,10 @@
           "version": {
             "title": "Version",
             "type": "string"
+          },
+          "ytdlp": {
+            "title": "Ytdlp",
+            "type": "string"
           }
         },
         "required": [
@@ -104,7 +340,8 @@
           "db",
           "ffmpeg",
           "js_runtime",
-          "gpu"
+          "gpu",
+          "ytdlp"
         ],
         "title": "HealthOut",
         "type": "object"
@@ -336,6 +573,7 @@
       "LiveEvent": {
         "discriminator": {
           "mapping": {
+            "export.updated": "#/components/schemas/ExportUpdatedEvent",
             "job.updated": "#/components/schemas/JobUpdatedEvent",
             "session.deleted": "#/components/schemas/SessionDeletedEvent",
             "session.updated": "#/components/schemas/SessionUpdatedEvent"
@@ -351,6 +589,9 @@
           },
           {
             "$ref": "#/components/schemas/JobUpdatedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ExportUpdatedEvent"
           }
         ]
       },
@@ -473,6 +714,87 @@
           "updated_at"
         ],
         "title": "MixStateOut",
+        "type": "object"
+      },
+      "SearchOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SearchResultOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "SearchOut",
+        "type": "object"
+      },
+      "SearchResultOut": {
+        "description": "Um resultado da busca. Os campos casam com o `SessionCreate` (rascunho).",
+        "properties": {
+          "artist": {
+            "title": "Artist",
+            "type": "string"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "source_channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Channel"
+          },
+          "source_title": {
+            "title": "Source Title",
+            "type": "string"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_url",
+          "source_title",
+          "source_channel",
+          "duration_s",
+          "thumbnail_url",
+          "artist",
+          "title"
+        ],
+        "title": "SearchResultOut",
         "type": "object"
       },
       "SessionCreate": {
@@ -619,6 +941,39 @@
         "title": "SessionListOut",
         "type": "object"
       },
+      "SessionMetrics": {
+        "description": "Loudness do áudio original (medido com `loudnorm`); nulo se não deu para medir.",
+        "properties": {
+          "lufs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lufs"
+          },
+          "true_peak_db": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "True Peak Db"
+          }
+        },
+        "required": [
+          "lufs",
+          "true_peak_db"
+        ],
+        "title": "SessionMetrics",
+        "type": "object"
+      },
       "SessionOut": {
         "properties": {
           "artist": {
@@ -675,14 +1030,12 @@
           "metrics": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/SessionMetrics"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Metrics"
+            ]
           },
           "processed_at": {
             "anyOf": [
@@ -1001,6 +1354,66 @@
         ]
       }
     },
+    "/api/exports/{export_id}/file": {
+      "get": {
+        "operationId": "download_export_api_exports__export_id__file_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Export Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "audio/mpeg": {},
+              "audio/wav": {}
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Download Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
     "/api/jobs": {
       "get": {
         "operationId": "list_jobs_api_jobs_get",
@@ -1161,6 +1574,71 @@
         "summary": "Discard Job",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/api/search": {
+      "get": {
+        "description": "Busca no YouTube (texto) ou lê um link. `items` vazio = nenhum resultado;\nYouTube indisponível responde 502 `youtube_unavailable`.",
+        "operationId": "search_api_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 500,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Search",
+        "tags": [
+          "search"
         ]
       }
     },
@@ -1532,6 +2010,141 @@
         ]
       }
     },
+    "/api/sessions/{session_id}/exports": {
+      "get": {
+        "operationId": "list_exports_api_sessions__session_id__exports_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "List Exports",
+        "tags": [
+          "exports"
+        ]
+      },
+      "post": {
+        "description": "Exporta o mix (WAV ou MP3 320). Sem `stems` no corpo, usa o mix salvo da sessão.",
+        "operationId": "create_export_api_sessions__session_id__exports_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Create Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
     "/api/sessions/{session_id}/mix": {
       "get": {
         "operationId": "get_mix_api_sessions__session_id__mix_get",
@@ -1666,6 +2279,74 @@
         ]
       }
     },
+    "/api/sessions/{session_id}/peaks/{stem}.json": {
+      "get": {
+        "description": "`{\"duration_s\": float, \"peaks\": [0–1, ...]}` (pico absoluto por ponto, ~1600 pontos).",
+        "operationId": "stem_peaks_api_sessions__session_id__peaks__stem__json_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stem",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Stem"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {}
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Stem Peaks",
+        "tags": [
+          "media"
+        ]
+      }
+    },
     "/api/sessions/{session_id}/process": {
       "post": {
         "description": "Confirma o rascunho e o põe na fila de processamento.",
@@ -1791,6 +2472,73 @@
         "summary": "Reprocess Session",
         "tags": [
           "sessions"
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/stems/{stem}.mp3": {
+      "get": {
+        "operationId": "stem_audio_api_sessions__session_id__stems__stem__mp3_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stem",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Stem"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "audio/mpeg": {}
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Stem Audio",
+        "tags": [
+          "media"
         ]
       }
     },

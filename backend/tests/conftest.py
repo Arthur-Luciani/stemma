@@ -12,6 +12,7 @@ from app.config import BACKEND_DIR, Settings
 from app.db.models import JobModel, SessionModel
 from app.domain.enums import JobKind, JobState
 from app.main import create_app
+from app.pipeline.probe import GpuProbe
 from tests.fakes import ControlledHandler
 
 
@@ -20,6 +21,12 @@ def alembic_config(database_url: str) -> Config:
     config.attributes["database_url"] = database_url
     config.attributes["skip_logging_config"] = True
     return config
+
+
+@pytest.fixture(autouse=True)
+def _no_gpu_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A sonda da GPU importaria o torch num subprocess a cada app de teste."""
+    monkeypatch.setattr(GpuProbe, "start", lambda self: None)
 
 
 @pytest.fixture
@@ -42,7 +49,8 @@ def migrated_storage(migrated: Settings) -> Path:
 
 @pytest.fixture
 def client(migrated: Settings) -> Iterator[TestClient]:
-    with TestClient(create_app(migrated)) as test_client:
+    # Sem handlers: jobs falham com `pipeline_unavailable` (testes da API sem pipeline).
+    with TestClient(create_app(migrated, job_handlers={})) as test_client:
         yield test_client
 
 

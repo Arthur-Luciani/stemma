@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/exports/{export_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Export */
+        get: operations["download_export_api_exports__export_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs": {
         parameters: {
             query?: never;
@@ -72,6 +89,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search
+         * @description Busca no YouTube (texto) ou lê um link. `items` vazio = nenhum resultado;
+         *     YouTube indisponível responde 502 `youtube_unavailable`.
+         */
+        get: operations["search_api_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sessions": {
         parameters: {
             query?: never;
@@ -109,6 +147,27 @@ export interface paths {
         patch: operations["update_session_api_sessions__session_id__patch"];
         trace?: never;
     };
+    "/api/sessions/{session_id}/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Exports */
+        get: operations["list_exports_api_sessions__session_id__exports_get"];
+        put?: never;
+        /**
+         * Create Export
+         * @description Exporta o mix (WAV ou MP3 320). Sem `stems` no corpo, usa o mix salvo da sessão.
+         */
+        post: operations["create_export_api_sessions__session_id__exports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sessions/{session_id}/mix": {
         parameters: {
             query?: never;
@@ -120,6 +179,26 @@ export interface paths {
         get: operations["get_mix_api_sessions__session_id__mix_get"];
         /** Save Mix */
         put: operations["save_mix_api_sessions__session_id__mix_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sessions/{session_id}/peaks/{stem}.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stem Peaks
+         * @description `{"duration_s": float, "peaks": [0–1, ...]}` (pico absoluto por ponto, ~1600 pontos).
+         */
+        get: operations["stem_peaks_api_sessions__session_id__peaks__stem__json_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -167,6 +246,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sessions/{session_id}/stems/{stem}.mp3": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stem Audio */
+        get: operations["stem_audio_api_sessions__session_id__stems__stem__mp3_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -206,6 +302,85 @@ export interface components {
         ErrorOut: {
             error: components["schemas"]["ErrorDetail"];
         };
+        /**
+         * ExportCreate
+         * @description Pedido de export. Sem `stems`, vale o mix salvo da sessão.
+         */
+        ExportCreate: {
+            format: components["schemas"]["ExportFormat"];
+            preset?: components["schemas"]["MixPreset"] | null;
+            /** Stems */
+            stems?: {
+                [key: string]: components["schemas"]["StemMix"];
+            } | null;
+        };
+        /**
+         * ExportFormat
+         * @enum {string}
+         */
+        ExportFormat: "wav" | "mp3";
+        /** ExportListOut */
+        ExportListOut: {
+            /** Items */
+            items: components["schemas"]["ExportOut"][];
+        };
+        /** ExportOut */
+        ExportOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** File Name */
+            file_name: string;
+            /** Finished At */
+            finished_at: string | null;
+            format: components["schemas"]["ExportFormat"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lufs */
+            lufs: number | null;
+            preset: components["schemas"]["MixPreset"] | null;
+            /** Progress */
+            progress: number;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Size Bytes */
+            size_bytes: number | null;
+            state: components["schemas"]["ExportState"];
+            /** Stems */
+            stems: {
+                [key: string]: components["schemas"]["StemMix"];
+            };
+        };
+        /**
+         * ExportState
+         * @enum {string}
+         */
+        ExportState: "queued" | "running" | "done" | "failed";
+        /** ExportUpdatedData */
+        ExportUpdatedData: {
+            export: components["schemas"]["ExportOut"];
+        };
+        /** ExportUpdatedEvent */
+        ExportUpdatedEvent: {
+            data: components["schemas"]["ExportUpdatedData"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "export.updated";
+        };
         /** HealthOut */
         HealthOut: {
             /**
@@ -235,6 +410,8 @@ export interface components {
             status: "ok" | "degraded";
             /** Version */
             version: string;
+            /** Ytdlp */
+            ytdlp: string;
         };
         /**
          * JobKind
@@ -306,7 +483,7 @@ export interface components {
              */
             type: "job.updated";
         };
-        LiveEvent: components["schemas"]["SessionUpdatedEvent"] | components["schemas"]["SessionDeletedEvent"] | components["schemas"]["JobUpdatedEvent"];
+        LiveEvent: components["schemas"]["SessionUpdatedEvent"] | components["schemas"]["SessionDeletedEvent"] | components["schemas"]["JobUpdatedEvent"] | components["schemas"]["ExportUpdatedEvent"];
         /**
          * MixPreset
          * @enum {string}
@@ -337,6 +514,31 @@ export interface components {
             };
             /** Updated At */
             updated_at: string | null;
+        };
+        /** SearchOut */
+        SearchOut: {
+            /** Items */
+            items: components["schemas"]["SearchResultOut"][];
+        };
+        /**
+         * SearchResultOut
+         * @description Um resultado da busca. Os campos casam com o `SessionCreate` (rascunho).
+         */
+        SearchResultOut: {
+            /** Artist */
+            artist: string;
+            /** Duration S */
+            duration_s: number | null;
+            /** Source Channel */
+            source_channel: string | null;
+            /** Source Title */
+            source_title: string;
+            /** Source Url */
+            source_url: string;
+            /** Thumbnail Url */
+            thumbnail_url: string | null;
+            /** Title */
+            title: string;
         };
         /**
          * SessionCreate
@@ -389,6 +591,16 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * SessionMetrics
+         * @description Loudness do áudio original (medido com `loudnorm`); nulo se não deu para medir.
+         */
+        SessionMetrics: {
+            /** Lufs */
+            lufs: number | null;
+            /** True Peak Db */
+            true_peak_db: number | null;
+        };
         /** SessionOut */
         SessionOut: {
             /** Artist */
@@ -411,10 +623,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Metrics */
-            metrics: {
-                [key: string]: unknown;
-            } | null;
+            metrics: components["schemas"]["SessionMetrics"] | null;
             /** Processed At */
             processed_at: string | null;
             /** Progress */
@@ -524,6 +733,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArtistOut"][];
+                };
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    download_export_api_exports__export_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/mpeg": unknown;
+                    "audio/wav": unknown;
                 };
             };
             /** @description Não encontrado */
@@ -666,6 +925,55 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    search_api_search_get: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchOut"];
+                };
             };
             /** @description Não encontrado */
             404: {
@@ -949,6 +1257,108 @@ export interface operations {
             };
         };
     };
+    list_exports_api_sessions__session_id__exports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportListOut"];
+                };
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    create_export_api_sessions__session_id__exports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
+                };
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
     get_mix_api_sessions__session_id__mix_get: {
         parameters: {
             query?: never;
@@ -1051,6 +1461,56 @@ export interface operations {
             };
         };
     };
+    stem_peaks_api_sessions__session_id__peaks__stem__json_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                stem: components["schemas"]["Stem"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
     process_session_api_sessions__session_id__process_post: {
         parameters: {
             query?: never;
@@ -1118,6 +1578,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    stem_audio_api_sessions__session_id__stems__stem__mp3_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                stem: components["schemas"]["Stem"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/mpeg": unknown;
                 };
             };
             /** @description Não encontrado */

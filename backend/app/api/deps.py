@@ -5,12 +5,17 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.db.deps import get_db
+from app.pipeline.download import YtDlpClient
+from app.pipeline.probe import GpuProbe
 from app.pipeline.queue import JobRunner
 from app.services.events import EventBus, EventPublisher
+from app.services.exports import ExportService
 from app.services.health import HealthService
 from app.services.identity import IdentityService
 from app.services.jobs import JobService
+from app.services.media import MediaService
 from app.services.mix import MixService
+from app.services.search import SearchService
 from app.services.sessions import SessionService
 from app.storage import Storage
 
@@ -68,10 +73,36 @@ def get_job_service(
     return JobService(sessions.db, sessions, sessions.events, runner)
 
 
+def get_export_service(
+    sessions: Annotated[SessionService, Depends(get_session_service)],
+    runner: Annotated[JobRunner, Depends(get_job_runner)],
+) -> ExportService:
+    return ExportService(sessions, MixService(sessions), sessions.events, runner, sessions.storage)
+
+
+def get_media_service(
+    sessions: Annotated[SessionService, Depends(get_session_service)],
+) -> MediaService:
+    return MediaService(sessions, sessions.storage)
+
+
+def get_search_service(
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> SearchService:
+    return SearchService(
+        YtDlpClient(
+            js_runtimes=settings.ytdlp_js_runtime,
+            cookie_file=settings.ytdlp_cookie_file,
+            timeout=settings.download_timeout_s,
+        )
+    )
+
+
 def get_health_service(
     request: Request, settings: Annotated[Settings, Depends(get_app_settings)]
 ) -> HealthService:
-    return HealthService(settings, request.app.state.engine)
+    probe: GpuProbe = request.app.state.gpu_probe
+    return HealthService(settings, request.app.state.engine, probe)
 
 
 SessionServiceDep = Annotated[SessionService, Depends(get_session_service)]
@@ -79,3 +110,6 @@ IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]
 MixServiceDep = Annotated[MixService, Depends(get_mix_service)]
 JobServiceDep = Annotated[JobService, Depends(get_job_service)]
 HealthServiceDep = Annotated[HealthService, Depends(get_health_service)]
+ExportServiceDep = Annotated[ExportService, Depends(get_export_service)]
+MediaServiceDep = Annotated[MediaService, Depends(get_media_service)]
+SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]

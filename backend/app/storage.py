@@ -9,6 +9,8 @@ from pathlib import Path, PurePosixPath
 
 from app.domain.errors import AppError
 
+SESSIONS_DIR = "sessions"
+
 
 class Storage:
     def __init__(self, root: Path) -> None:
@@ -30,9 +32,41 @@ class Storage:
             raise _invalid_path(str(path))
         return resolved.relative_to(self.root).as_posix()
 
+    # --- layout de uma sessão (ADR 0010); tudo relativo ao STORAGE_ROOT -----------
+
     @staticmethod
     def session_dir(session_id: uuid.UUID) -> str:
-        return f"sessions/{session_id}"
+        return f"{SESSIONS_DIR}/{session_id}"
+
+    @classmethod
+    def raw_dir(cls, session_id: uuid.UUID) -> str:
+        """Áudio baixado; apagado ao fim do processamento."""
+        return f"{cls.session_dir(session_id)}/raw"
+
+    @classmethod
+    def work_dir(cls, session_id: uuid.UUID) -> str:
+        """Saída temporária do Demucs (WAVs); apagada ao fim do processamento."""
+        return f"{cls.session_dir(session_id)}/work"
+
+    @classmethod
+    def stems_dir(cls, session_id: uuid.UUID) -> str:
+        return f"{cls.session_dir(session_id)}/stems"
+
+    @classmethod
+    def stem_audio(cls, session_id: uuid.UUID, stem: str) -> str:
+        return f"{cls.stems_dir(session_id)}/{stem}.mp3"
+
+    @classmethod
+    def stem_peaks(cls, session_id: uuid.UUID, stem: str) -> str:
+        return f"{cls.stems_dir(session_id)}/{stem}.peaks.json"
+
+    @classmethod
+    def exports_dir(cls, session_id: uuid.UUID) -> str:
+        return f"{cls.session_dir(session_id)}/exports"
+
+    @classmethod
+    def export_file(cls, session_id: uuid.UUID, export_id: uuid.UUID, ext: str) -> str:
+        return f"{cls.exports_dir(session_id)}/{export_id}.{ext}"
 
 
 def _invalid_path(rel: object) -> AppError:

@@ -3,6 +3,8 @@
 Cada worker é uma thread com um conjunto de kinds; o de GPU (`process`) roda um job por vez.
 Toda escrita do runner é condicional a `state = 'running'`: se a API cancelou o job no meio,
 nada do runner sobrescreve o cancelamento.
+
+O job `process` espelha estado/progresso na sessão; o `export`, na linha de `exports`.
 """
 
 import logging
@@ -17,9 +19,16 @@ from typing import Any, Protocol
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.db.models import JobModel, SessionModel
+from app.db.models import ExportModel, JobModel, SessionModel
 from app.db.types import utcnow
-from app.domain.enums import JobKind, JobState, SessionState
+from app.domain.enums import (
+    ExportFormat,
+    ExportState,
+    JobKind,
+    JobState,
+    MixPreset,
+    SessionState,
+)
 from app.domain.errors import AppError
 from app.pipeline.eta import RUN_STAGE
 from app.services.events import EventBus, EventPublisher
@@ -58,6 +67,19 @@ class SessionInfo:
     artist: str
     title: str
     duration_s: float | None
+    # {stem: path relativo ao STORAGE_ROOT}; vazio antes de processar.
+    stems: dict[str, str]
+
+
+@dataclass(frozen=True)
+class ExportInfo:
+    """Pedido de export (job `export`), lido ao começar o job."""
+
+    id: uuid.UUID
+    format: ExportFormat
+    preset: MixPreset | None
+    # Snapshot dos níveis: {stem: {volume, pan, mute, solo}}
+    levels: dict[str, Any]
 
 
 class JobHandler(Protocol):
@@ -75,10 +97,12 @@ class JobContext:
         session: SessionInfo,
         db: Session,
         bus: EventBus,
+        export: ExportInfo | None = None,
     ) -> None:
         self.job_id = job_id
         self.kind = kind
         self.session = session
+        self.export = export
         self._db = db
         self._events = EventPublisher(db, bus)
         self._cancel = threading.Event()
@@ -150,9 +174,29 @@ class JobContext:
         if percent < 100 and now - self._last_progress_at < PROGRESS_INTERVAL_S:
             return
         self._last_progress_at = now
-        self._write({"progress": percent}, session={"progress": percent})
+        self._write(
+            {"progress": percent}, session={"progress": percent}, export={"progress": percent}
+        )
 
-    def _write(self, job_values: dict[str, Any], *, session: dict[str, Any]) -> None:
+    def save(
+        self, *, session: dict[str, Any] | None = None, export: dict[str, Any] | None = None
+    ) -> None:
+        """Grava o resultado do handler (ex.: `stems`/`metrics` da sessão, `path` do export),
+        só se o job ainda estiver rodando."""
+        self.check_cancelled()
+        self._write({"updated_at": utcnow()}, session=session or {}, export=export or {})
+
+    @property
+    def export_id(self) -> uuid.UUID | None:
+        return self.export.id if self.export else None
+
+    def _write(
+        self,
+        job_values: dict[str, Any],
+        *,
+        session: dict[str, Any],
+        export: dict[str, Any] | None = None,
+    ) -> None:
         updated = self._db.scalar(
             update(JobModel)
             .where(JobModel.id == self.job_id, JobModel.state == JobState.RUNNING)
@@ -164,13 +208,16 @@ class JobContext:
             self._db.rollback()
             self._cancel.set()
             raise JobCancelledError
-        if self.kind is JobKind.PROCESS:
+        if self.kind is JobKind.PROCESS and session:
             self._db.execute(
                 update(SessionModel).where(SessionModel.id == self.session.id).values(**session)
             )
+        if self.export is not None and export:
+            self._db.execute(
+                update(ExportModel).where(ExportModel.id == self.export.id).values(**export)
+            )
         self._db.commit()
-        if self.kind is JobKind.PROCESS:
-            self._events.session_updated(self.session.id)
+        _publish_target(self._events, self.kind, self.session.id, self.export_id)
         self._events.jobs_changed(self.job_id)
 
 
@@ -330,6 +377,21 @@ class JobRunner:
                 # Sessão excluída no meio (cascade); nada a fazer.
                 db.close()
                 return None
+            export = None
+            if job.kind is JobKind.EXPORT:
+                row = db.get(ExportModel, job.export_id) if job.export_id else None
+                if row is None:
+                    # Job de export sem o pedido (não deveria acontecer): falha em vez de travar.
+                    _fail(db, job, "export_not_found", "Export não encontrado.")
+                    db.commit()
+                    db.close()
+                    return None
+                row.state = ExportState.RUNNING
+                row.progress = 0.0
+                db.commit()
+                export = ExportInfo(
+                    id=row.id, format=row.format, preset=row.preset, levels=dict(row.levels)
+                )
             ctx = JobContext(
                 job_id=job.id,
                 kind=job.kind,
@@ -340,9 +402,11 @@ class JobRunner:
                     artist=session.artist,
                     title=session.title,
                     duration_s=session.duration_s,
+                    stems=dict(session.stems or {}),
                 ),
                 db=db,
                 bus=self._bus,
+                export=export,
             )
         except Exception:
             db.close()
@@ -352,6 +416,8 @@ class JobRunner:
         if self._stop.is_set():
             ctx.request_cancel(shutdown=True)
         logger.info("Job %s (%s, %s) começou", ctx.job_id, ctx.kind, ctx.session.code)
+        if ctx.export_id is not None:
+            ctx._events.export_updated(ctx.export_id)
         ctx._events.jobs_changed(ctx.job_id)
         return ctx
 
@@ -409,6 +475,8 @@ class JobRunner:
                 error_code=error_code,
                 error_message=error_message,
                 finished_at=now,
+                # Export encerrado não fica no dock; a lista de exports é o lugar dele.
+                dismissed_at=now if ctx.kind is JobKind.EXPORT else None,
             )
             .returning(JobModel.id)
         )
@@ -432,10 +500,22 @@ class JobRunner:
                 }
             )
             db.execute(update(SessionModel).where(SessionModel.id == ctx.session.id).values(values))
+        if ctx.export_id is not None:
+            done = state is JobState.DONE
+            db.execute(
+                update(ExportModel)
+                .where(ExportModel.id == ctx.export_id)
+                .values(
+                    state=ExportState.DONE if done else ExportState.FAILED,
+                    progress=100.0 if done else job.progress,
+                    error_code=error_code,
+                    error_message=error_message,
+                    finished_at=now,
+                )
+            )
         db.commit()
         logger.info("Job %s terminou: %s %s", ctx.job_id, state, error_code or "")
-        if ctx.kind is JobKind.PROCESS:
-            ctx._events.session_updated(ctx.session.id)
+        _publish_target(ctx._events, ctx.kind, ctx.session.id, ctx.export_id)
         ctx._events.jobs_changed(ctx.job_id)
 
     def _finish_interrupted(self, ctx: JobContext) -> None:
@@ -476,6 +556,12 @@ def _requeue(db: Session, job: JobModel, *, refund_attempt: bool = False) -> boo
             .where(SessionModel.id == job.session_id)
             .values(state=SessionState.QUEUED, progress=0.0)
         )
+    if job.export_id is not None:
+        db.execute(
+            update(ExportModel)
+            .where(ExportModel.id == job.export_id)
+            .values(state=ExportState.QUEUED, progress=0.0)
+        )
     return True
 
 
@@ -490,6 +576,31 @@ def _fail(db: Session, job: JobModel, code: str, message: str) -> None:
             .where(SessionModel.id == job.session_id)
             .values(state=SessionState.FAILED, error_code=code, error_message=message)
         )
+    if job.export_id is not None:
+        job.dismissed_at = job.finished_at
+        db.execute(
+            update(ExportModel)
+            .where(ExportModel.id == job.export_id)
+            .values(
+                state=ExportState.FAILED,
+                error_code=code,
+                error_message=message,
+                finished_at=job.finished_at,
+            )
+        )
+
+
+def _publish_target(
+    events: EventPublisher,
+    kind: JobKind,
+    session_id: uuid.UUID,
+    export_id: uuid.UUID | None,
+) -> None:
+    """Publica a entidade que o job espelha (sessão ou export)."""
+    if kind is JobKind.PROCESS:
+        events.session_updated(session_id)
+    elif export_id is not None:
+        events.export_updated(export_id)
 
 
 def _seconds_since(start: datetime | None, end: datetime) -> float:

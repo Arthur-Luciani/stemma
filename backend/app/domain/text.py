@@ -19,6 +19,18 @@ _NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 # Sufixos de nome de canal ("Queen Official", "Rihanna VEVO"): só fazem sentido no artista.
 _ARTIST_CHANNEL_SUFFIX_RE = re.compile(r"\b(official|vevo)\b", re.IGNORECASE)
 
+# Para sugerir a identidade: trechos entre parênteses que não fazem parte do título
+# ("(Official Video)", "[Lyrics]"), separador "Artista - Título" e ruído de nome de canal.
+_TITLE_NOISE_RE = re.compile(
+    r"\s*[\(\[][^\)\]]*\b(official|oficial|video|vídeo|clipe|clip|audio|áudio|lyrics?|letra|"
+    r"legendad[oa]|visuali[sz]er|hd|4k|remaster(ed)?|mv)\b[^\)\]]*[\)\]]",
+    re.IGNORECASE,
+)
+_TITLE_SEPARATOR_RE = re.compile(r"\s+[-–—|]\s+")
+_CHANNEL_NOISE_RE = re.compile(r"(\s*-\s*topic$|vevo$|\s+official$|\s+oficial$)", re.IGNORECASE)
+# Caracteres proibidos em nome de arquivo no Windows.
+_FILENAME_FORBIDDEN_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
 
 def _strip_diacritics(text: str) -> str:
     decomposed = unicodedata.normalize("NFKD", text)
@@ -46,3 +58,26 @@ def search_tokens(text: str | None) -> str:
     remover palavras (o usuário pode procurar por "remaster" ou "live")."""
     result = _NON_ALNUM_RE.sub(" ", _strip_diacritics((text or "").lower()))
     return " ".join(result.split())
+
+
+def guess_identity(source_title: str, channel: str | None) -> tuple[str, str]:
+    """Sugere artista e título a partir do vídeo: "Queen - Bohemian Rhapsody (Official Video)"
+    vira ("Queen", "Bohemian Rhapsody"); sem separador, o artista vem do canal."""
+    clean = _TITLE_NOISE_RE.sub("", source_title).strip() or source_title.strip()
+    parts = _TITLE_SEPARATOR_RE.split(clean, maxsplit=1)
+    if len(parts) == 2 and parts[0].strip() and parts[1].strip():
+        artist, title = parts[0].strip(), parts[1].strip()
+        # "The Beatles - The Beatles - Let It Be": o artista repetido sai do título.
+        again = _TITLE_SEPARATOR_RE.split(title, maxsplit=1)
+        if len(again) == 2 and again[0].strip().casefold() == artist.casefold():
+            title = again[1].strip()
+    else:
+        artist = _CHANNEL_NOISE_RE.sub("", channel or "").strip()
+        title = clean
+    return artist[:200], title[:200]
+
+
+def safe_filename(name: str, max_length: int = 150) -> str:
+    """Nome de arquivo válido no Windows, mantendo acentos."""
+    cleaned = " ".join(_FILENAME_FORBIDDEN_RE.sub(" ", name).split()).strip(" .")
+    return cleaned[:max_length].rstrip(" .") or "stemma"

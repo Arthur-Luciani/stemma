@@ -12,7 +12,7 @@ api = [
     "sqlalchemy>=2.0",
     "alembic>=1.14",
     "pydantic-settings>=2.6",
-    "yt-dlp>=2025.1.1",
+    "yt-dlp[default]>=2025.1.1",
 ]
 pipeline = [
     "torch==2.7.1",
@@ -60,6 +60,11 @@ allowed-confusables = ["–"]
 strict = true
 python_version = "3.12"
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+# yt-dlp não publica tipos.
+module = ["yt_dlp", "yt_dlp.*"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "tests.*"

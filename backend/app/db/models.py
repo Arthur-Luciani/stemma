@@ -65,7 +65,7 @@ class SessionModel(Base):
     error_message: Mapped[str | None] = mapped_column(Text)
     # {stem: path relativo ao STORAGE_ROOT}
     stems: Mapped[dict[str, str] | None] = mapped_column(JSON)
-    # {"lufs": float, "true_peak": float}
+    # {"lufs": float | None, "true_peak_db": float | None}
     metrics: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)

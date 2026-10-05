@@ -93,8 +93,9 @@ def test_openapi_inclui_os_tipos_dos_eventos(fake_client: TestClient) -> None:
     schemas = fake_client.get("/openapi.json").json()["components"]["schemas"]
 
     mapping = schemas["LiveEvent"]["discriminator"]["mapping"]
-    assert set(mapping) == {"session.updated", "session.deleted", "job.updated"}
+    assert set(mapping) == {"session.updated", "session.deleted", "job.updated", "export.updated"}
     assert "JobUpdatedEvent" in schemas
+    assert "ExportUpdatedEvent" in schemas
 
 
 def test_descartar_publica_job_com_dismissed_at(fake_client: TestClient) -> None:

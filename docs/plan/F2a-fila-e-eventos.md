@@ -30,7 +30,7 @@ yt-dlp, Demucs, ffmpeg reais (F2b).
 Com o pipeline falso: enfileirar 2 sessões mostra a 2ª como "Na fila · 1º" com ETA; matar e reiniciar o servidor no meio retoma/falha corretamente; eventos chegam no WebSocket; CI verde.
 
 ## Handoff
-**Status:** concluída em 2026-10-05, branch `feat/f2a-fila-e-eventos` (PR com CI verde; ver tabela no README).
+**Status:** concluída em 2026-10-05, PR #7 (`feat: fila de jobs e eventos ao vivo (F2a)`) com CI verde (`backend`, `frontend`, `pr-title`), aguardando o merge.
 
 ### Feito
 - **Migration `0002`**: `jobs` ganhou `stage`, `stage_started_at`, `stage_durations` (JSON) e `dismissed_at`.

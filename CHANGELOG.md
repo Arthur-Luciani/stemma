@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/Arthur-Luciani/stemma/compare/v1.4.0...v1.4.1) (2026-10-06)
+
+
+### Bug Fixes
+
+* portas no instalador (porta em uso, 443 de outro app, desinstalador) ([#24](https://github.com/Arthur-Luciani/stemma/issues/24)) ([c2417f0](https://github.com/Arthur-Luciani/stemma/commit/c2417f0fb1284b8e10caee53cae4f004a9d1ad01))
+
 ## [1.4.0](https://github.com/Arthur-Luciani/stemma/compare/v1.3.0...v1.4.0) (2026-10-06)
 
 

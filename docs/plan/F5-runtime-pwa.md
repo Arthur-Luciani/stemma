@@ -75,7 +75,7 @@ O ensaio real do critério de pronto (instalar, atualizar, simular falha, PWA no
 
 ### Pendente
 - **Critério de pronto real → F5b**: instalar no PC, atualizar para a release seguinte, simular falha e ver o rollback, PWA instalado no celular. Na F5b isso é feito pelo instalador, que reaproveita `deploy/StemmaDeploy.psm1`.
-- Ao instalar o PWA de produção: remover o atalho antigo (`:5183`, é outra origem).
+- ~~Ao instalar o PWA de produção: remover o atalho antigo (`:5183`, é outra origem).~~ Feito em 2026-10-06 (ver pegadinha do Vite de dev).
 - iPhone: sem aparelho. As metas e o apple-touch-icon estão lá; não há splash própria no iOS.
 - Herdados: medição do AudioEngine no Android (F4a), branch protection (F0).
 
@@ -91,6 +91,7 @@ O ensaio real do critério de pronto (instalar, atualizar, simular falha, PWA no
 - O módulo virtual `virtual:pwa-register/react` não existe no Vitest. Há um alias para `src/test/pwaRegister.ts` (fake com `pwaFake.needRefresh(true)`).
 - `SERVE_FRONTEND_DIR` relativo é a partir da **raiz do repo** (`frontend/dist`), não de `backend/`.
 - O PWA da produção é outra origem (`https://<pc>…ts.net`, sem `:5183`): precisa reinstalar no celular.
+- **O Vite de dev (`:5183`) não serve manifest nem service worker** (`vite-plugin-pwa` sem `devOptions`; `/manifest.webmanifest` e `/sw.js` caem no `index.html`). "Instalar" pelo `:5183` cria só um **atalho do Chrome** (`display-mode: browser`): ícone de fallback, sem a splash do manifest e sem o modo app, porque a seleção de texto ao segurar continua. Achado em 2026-10-06, depois do merge. Para ver o PWA real sem o instalador: `npm run build`, backend com `SERVE_FRONTEND_DIR` apontando para o `dist` na porta 8000 e `tailscale serve --bg --https=443 http://127.0.0.1:8000`. Instalado assim no celular, ícone, splash e modo app ficaram corretos.
 - O release-please só abre release com commit `feat:`/`fix:` (ou breaking). `test:`, `docs:` e `chore:` não geram versão nova. Para testar o update é preciso um `fix:` real.
 - `test_descartar_publica_job_com_dismissed_at` era intermitente (evento da falha chegando depois do `wait_until`); corrigido no PR #18.
 - O Pester do Windows é o 3.4. Para rodar localmente: `Install-Module Pester -Scope CurrentUser` (pede o provedor NuGet, interativo) ou importe um Pester 5 baixado.

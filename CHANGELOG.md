@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/Arthur-Luciani/stemma/compare/v1.3.0...v1.4.0) (2026-10-06)
+
+
+### Features
+
+* instalador do Windows com ícone na bandeja (F5b) ([#21](https://github.com/Arthur-Luciani/stemma/issues/21)) ([5d896f7](https://github.com/Arthur-Luciani/stemma/commit/5d896f78f8ee2bf25fb2e81996f3eec5f2fae6c4))
+
 ## [1.3.0](https://github.com/Arthur-Luciani/stemma/compare/v1.2.0...v1.3.0) (2026-10-06)
 
 

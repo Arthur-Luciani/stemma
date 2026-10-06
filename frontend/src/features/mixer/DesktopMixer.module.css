@@ -87,7 +87,19 @@
 }
 
 .metrics {
+  flex: none;
   margin-left: auto;
+}
+
+/* Janela estreita: as métricas saem antes de algo encavalar no transport. */
+@media (max-width: 1180px) {
+  .transport .metrics {
+    display: none;
+  }
+
+  .metrics + .divider {
+    margin-left: auto;
+  }
 }
 
 .lanesArea {
@@ -100,12 +112,14 @@
   overflow-y: auto;
 }
 
-/* A régua só cobre a coluna das waveforms. */
+/* A régua só cobre a coluna das waveforms (e não encolhe quando falta altura). */
 .ruler {
+  flex: none;
   margin-left: calc(var(--lane-header) + 1px);
 }
 
 .lanes {
+  flex: none;
   position: relative;
   display: flex;
   flex-direction: column;

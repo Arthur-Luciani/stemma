@@ -152,3 +152,4 @@ Feitos na F4b (mixer e export), de propósito:
 - **LUFS/dBTP do transport e do resumo do M6 são do áudio original** (medidos no processamento). O LUFS da mixagem aparece em cada export pronto, na lista "Anteriores".
 - **1g (paisagem)**: nome do stem numa linha e knob de pan com o valor na de baixo (no design ficam lado a lado e o nome não cabe). Os presets quebram linha em vez de rolar, para todos e o "Personalizado" ficarem à vista. Há uma linha de loop A–B (o design não tem) e a waveform ocupa o espaço livre.
 - **Stem mudo no celular**: apaga nome, valor e fader, mas não os botões M/S (no design o card inteiro fica a 55%). Assim o M ativo continua legível.
+- **Desktop = 900px de largura e 600px de altura.** O celular deitado fica no layout de celular (no mixer, o 1g), e não no desktop espremido. Abaixo de 1180px de largura, o transport do desktop esconde LUFS/dBTP.

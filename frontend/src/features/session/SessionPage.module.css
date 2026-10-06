@@ -25,7 +25,7 @@
   color: var(--accent-text);
 }
 
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   .page {
     padding-top: var(--space-6);
   }

@@ -59,7 +59,7 @@
   white-space: nowrap;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   .box {
     min-height: 48px;
     background: var(--bg-soft);

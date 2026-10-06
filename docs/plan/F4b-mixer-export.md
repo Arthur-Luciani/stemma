@@ -58,6 +58,7 @@ No celular e no desktop: abrir uma sessão, mixar, usar loop A–B, aplicar pres
   - o polegar passava das pontas do trilho. Agora o centro dele anda dentro do trilho, e o toque é calculado do mesmo jeito (`--thumb-travel`);
   - paisagem: nome do stem e pan em linhas separadas (o knob cortava o nome), presets quebrando linha (todos à vista, com "Personalizado"), waveform no espaço vazio, controle de loop, margens do notch, e só o meio rola quando falta altura (cabeçalho e transport fixos);
   - mudo apaga nome e fader, não os botões M/S.
+- **Segunda conferência no celular (usuário)**: deitado, o celular (~950×420) caía no mixer do **desktop**, porque "desktop" era só largura ≥ 900px. Agora `DESKTOP_QUERY` é `(min-width: 900px) and (min-height: 600px)`, e os 6 `@media` dos CSS Modules acompanham. Celular deitado usa o layout de celular em todas as telas (no mixer, o console 1g). No desktop com janela estreita, as métricas saem do transport abaixo de 1180px e a régua não é mais espremida.
 - **Conferido ao vivo** (backend local, sessão ST-002):
   - capturas do Edge headless no desktop (1440×900), retrato e paisagem;
   - export MP3 pela API: `PUT /mix` (Sem voz) → `POST /exports` → `done` em ~10 s, 9,8 MB, −15,2 LUFS, download com `Content-Disposition` "Survivor - Eye Of The Tiger (Sem voz).mp3". Depois o mix da ST-002 voltou ao Original.
@@ -76,6 +77,7 @@ No celular e no desktop: abrir uma sessão, mixar, usar loop A–B, aplicar pres
 
 ### Pegadinhas
 - **Edge/Chrome headless não fica com menos de ~500px de largura.** `--window-size=390,844` desenha a 500px e corta a imagem, e o layout parece vazar à direita. Para conferir o celular sem o aparelho, use o DevTools Protocol (`Emulation.setDeviceMetricsOverride` com `mobile: true` + `Emulation.setTouchEmulationEnabled`, e `Input.dispatchTouchEvent` para arrastar). Captura estática não pega controle sem área de toque.
+- **"Desktop" depende da altura também** (`DESKTOP_QUERY` em `ui/useMediaQuery.ts`). Os `@media` de desktop dos CSS Modules repetem a mesma query: mudou uma, mude todas.
 - **`flex: 1` em controle dentro de coluna** dá altura 0 (base 0). Os testes no jsdom não pegam isso, porque não há layout.
 - **TanStack Query avisa a tela num `setTimeout`.** Depois de `FakeWebSocket.receive()` dentro de `act()`, use `findBy…`/`waitFor`, não `getBy…`.
 - **jsdom não tem pointer capture**: `src/test/setup.ts` tem um polyfill de `setPointerCapture`/`hasPointerCapture`, que solta no `pointerup`. `fireEvent.pointerDown` cria `PointerEvent` com `clientX` e `pointerId`.

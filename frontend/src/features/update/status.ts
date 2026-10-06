@@ -17,6 +17,12 @@ export type UpdateView =
 export function updateView(data: SystemUpdate, now = Date.now()): UpdateView {
   const run = data.last_run;
   if (run?.state === 'running') return { kind: 'running', target: run.target_version };
+  // Versão mais nova que a do "atualizado agora há pouco" ganha: o aviso não pode sumir.
+  if (data.available && data.latest_version) {
+    const lastFailure =
+      run?.state === 'failed' ? failureText(run.message, data.current_version) : null;
+    return { kind: 'available', target: data.latest_version, lastFailure };
+  }
   if (
     run?.state === 'succeeded' &&
     run.target_version === data.current_version &&
@@ -24,11 +30,6 @@ export function updateView(data: SystemUpdate, now = Date.now()): UpdateView {
     now - Date.parse(run.finished_at) < RECENT_MS
   ) {
     return { kind: 'updated', version: data.current_version };
-  }
-  if (data.available && data.latest_version) {
-    const lastFailure =
-      run?.state === 'failed' ? failureText(run.message, data.current_version) : null;
-    return { kind: 'available', target: data.latest_version, lastFailure };
   }
   return data.check === 'ok' ? { kind: 'upToDate' } : { kind: 'unknown' };
 }

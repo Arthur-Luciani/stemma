@@ -162,6 +162,16 @@ describe('updateView', () => {
     expect(updateView(data).kind).toBe('upToDate');
   });
 
+  it('versão mais nova logo depois de atualizar continua aparecendo', () => {
+    const data = makeSystemUpdate({
+      current_version: '1.5.1',
+      latest_version: '1.5.2',
+      available: true,
+      last_run: makeUpdateRun({ state: 'succeeded', finished_at: new Date().toISOString() }),
+    });
+    expect(updateView(data)).toEqual({ kind: 'available', target: '1.5.2', lastFailure: null });
+  });
+
   it('sem conseguir consultar o GitHub', () => {
     const data = makeSystemUpdate({ check: 'unavailable', latest_version: null });
     expect(updateView(data).kind).toBe('unknown');

@@ -7,6 +7,8 @@ import { useErrorToast } from '../../app/useErrorToast';
 
 /** Sem atualização em andamento: o backend consulta o GitHub com cache de horas. */
 export const UPDATE_CHECK_MS = 60 * 60 * 1000;
+/** Consulta barata (o backend tem cache): ao voltar para o app, confere de novo. */
+export const UPDATE_STALE_MS = 5 * 60 * 1000;
 /** Atualizando: acompanha até o servidor voltar e gravar o resultado. */
 export const UPDATE_POLL_MS = 5000;
 
@@ -14,7 +16,7 @@ export function useSystemUpdate() {
   return useQuery({
     queryKey: queryKeys.systemUpdate,
     queryFn: ({ signal }) => getSystemUpdate(signal),
-    staleTime: UPDATE_CHECK_MS,
+    staleTime: UPDATE_STALE_MS,
     // Durante a atualização o servidor sai do ar: os erros não apagam o último dado (que segue
     // "running") e a consulta continua a cada 5 s até ele voltar.
     refetchInterval: (query) =>

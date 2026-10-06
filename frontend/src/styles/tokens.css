@@ -92,6 +92,10 @@
   --thumb-stripe-b: #1d2126;
   --scrim-strong: rgba(0, 0, 0, 0.75);
 
+  /* QR code: escuro sobre claro (câmeras leem mal o invertido); claro = base do tema claro */
+  --qr-dark: var(--bg-base);
+  --qr-light: #f4f2ee;
+
   /* Layout */
   --topbar-height: 60px;
   --bottomnav-height: 64px;

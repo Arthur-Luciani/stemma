@@ -15,7 +15,7 @@ Reescrita do `music-analyzer` sem o inspetor de bateria ([ADR 0001](../decisions
 | F4a Protótipo do AudioEngine | [F4a-audio-engine.md](F4a-audio-engine.md) | F2b, F3 | ✅ concluída — PR #12 (mergeado); medição no Android passou para a F4b |
 | F4b Mixer e Export | [F4b-mixer-export.md](F4b-mixer-export.md) | F4a | ✅ concluída — PR #14 (mergeado) |
 | F5 Runtime, PWA e update | [F5-runtime-pwa.md](F5-runtime-pwa.md) | F4b | ✅ concluída — PR #16 (mergeado), release v1.3.0; ensaio real do critério passou para a F5b |
-| F5b Instalador | [F5b-instalador.md](F5b-instalador.md) | F5 | ⬜ |
+| F5b Instalador | [F5b-instalador.md](F5b-instalador.md) | F5 | 🟡 em andamento |
 | F5c Atualizar pelo app | [F5c-atualizar-pelo-app.md](F5c-atualizar-pelo-app.md) | F5b | ⬜ |
 | F6 Corte | [F6-corte.md](F6-corte.md) | F5c | ⬜ |
 

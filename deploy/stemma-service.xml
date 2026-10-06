@@ -1,7 +1,8 @@
 <!--
-  Serviço do Stemma (WinSW 2.12, ADR 0002). O install.ps1 copia este modelo para
+  Serviço do Stemma (WinSW 2.12, ADRs 0002 e 0014). O instalador copia este modelo para
   <raiz>\winsw\<id>.xml (trocando {{SERVICE_ID}}) ao lado do WinSW renomeado para <id>.exe.
-  %BASE% = <raiz>\winsw. A conta do usuário é pedida no `install /p`.
+  %BASE% = <raiz>\winsw. Sem <serviceaccount>: roda como LocalSystem (nada de senha);
+  o start.ps1 põe <raiz>\tools no PATH.
 -->
 <service>
   <id>{{SERVICE_ID}}</id>

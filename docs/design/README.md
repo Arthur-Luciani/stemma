@@ -160,3 +160,9 @@ Feitos na F5 (PWA), de propósito:
 - **Splash do Android** = `background_color` `--bg-base` + ícone 512 + nome (gerada pelo Chrome a partir do manifest). Sem splash própria no iOS (exigiria uma imagem por tamanho de iPhone).
 - **Modo app**: instalado, o app não seleciona texto ao segurar, não abre o menu do toque longo e não dá zoom com dois dedos. No navegador nada disso muda.
 
+
+Feitos na F5b (instalador), de propósito:
+
+- **"Abrir no celular" (só desktop)**: não há tela no design. É um botão só com ícone (`qr_code_2`, *ghost*) no canto direito da topbar, que abre um Dialog com o QR code do endereço atual, a dica de instalar o app e o endereço em mono. Se o app foi aberto por `localhost`/`127.0.0.1`, o Dialog explica que esse endereço só funciona no PC, em vez de mostrar um QR que não abre nada.
+- **QR code escuro sobre claro** (`--qr-dark` = `--bg-base` sobre `--qr-light` = base do tema claro): a única área clara do app escuro. QR invertido (claro sobre escuro) falha em parte das câmeras.
+- **Fora do app**: o ícone da bandeja do Windows (`installer/tray`) e as telas do instalador usam o ícone da marca e os controles nativos do Windows, sem os tokens.

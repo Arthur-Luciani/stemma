@@ -19,7 +19,7 @@ Guia para o Claude Code (e humanos) trabalhando neste repositório. Leia inteiro
 | **Projeto de design (fonte da verdade visual)** | Claude Design: https://claude.ai/design/p/e8a6b561-5c39-487b-8fb1-c0ff17dfed7b — arquivos `Stemma - Marca e Sistema`, `Stemma - Celular`, `Stemma - Desktop` |
 | Lógica da v1 a portar | `docs/reference-v1.md` |
 | Prompt padrão das sessões | `docs/SESSION_PROMPT.md` |
-| Instalar, atualizar, rollback, logs (produção) | `docs/operacao.md` |
+| Instalar (instalador `.exe`), atualizar, parar, rollback, logs (produção) | `docs/operacao.md` |
 
 ## Arquitetura (alvo)
 
@@ -36,7 +36,8 @@ frontend/  React + TypeScript + Vite
   src/features/   discover, library, session, mixer (hooks + componentes da feature)
   src/ui/         componentes base do design system
   src/audio/      AudioEngine (fora do React)
-deploy/    WinSW XML, start.ps1, install.ps1, update.ps1 (funções em StemmaDeploy.psm1)
+deploy/    WinSW XML, start.ps1, setup.ps1 (motor do instalador), install.ps1, update.ps1 (funções em StemmaDeploy.psm1)
+installer/ Inno Setup (stemma.iss) + build.ps1 + qr.py — casca sem lógica sobre o deploy/
 ```
 
 Um processo uvicorn (1 worker) serve `/api`, `/ws` e o `frontend/dist` na mesma origem, atrás de `tailscale serve`.
@@ -96,15 +97,17 @@ npm run format       # aplica Prettier
 npm run gen:api      # regenera src/api/openapi.json + schema.d.ts (após mudar rotas/schemas; precisa do uv)
 npm run gen:icons    # regenera os ícones do PWA em public/ (só se a marca mudar)
 
-# deploy (produção no PC; detalhes em docs/operacao.md) — PowerShell como administrador
-powershell -ExecutionPolicy Bypass -File C:\stemma\current\deploy\update.ps1   # -Version, -Rollback, -YtDlpOnly
-Invoke-Pester deploy/tests   # testes dos scripts (Pester 5)
+# deploy (produção no PC; detalhes em docs/operacao.md): instalar/atualizar = Stemma-Setup-vX.Y.Z.exe da Release
+powershell -ExecutionPolicy Bypass -File C:\stemma\current\deploy\update.ps1 -Rollback   # ou -YtDlpOnly (administrador)
+Invoke-Pester deploy/tests   # testes dos scripts (Pester 5, no Windows PowerShell 5.1)
+bash scripts/package.sh v1.2.3 build                                    # zip da release (precisa do frontend/dist)
+powershell -File installer\build.ps1 -ZipPath build\stemma-v1.2.3.zip   # instalador (Inno Setup 6.3+: winget install JRSoftware.InnoSetup)
 ```
 
 Cuidados:
 - `uv sync` sem `--inexact` **remove** o grupo `pipeline` se ele estiver instalado; para manter torch/demucs use `uv sync --all-groups` ou `--inexact`.
 - Mudou rota ou schema da API → `npm run gen:api` e commite os dois arquivos gerados; o CI acusa drift.
-- Scripts `.ps1`/`.psm1` são salvos com **BOM** (o Windows PowerShell 5.1 lê sem BOM como ANSI e estraga os acentos); o Pester confere.
+- Scripts `.ps1`/`.psm1` e o `installer/stemma.iss` são salvos com **BOM** (o Windows PowerShell 5.1 lê sem BOM como ANSI e estraga os acentos); o Pester confere.
 - Versão do app: `backend/pyproject.toml` e `frontend/package.json` são atualizados **só** pelo release-please (PR de release). Não edite à mão.
 
 ## Ambiente

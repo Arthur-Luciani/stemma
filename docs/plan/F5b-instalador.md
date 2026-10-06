@@ -36,15 +36,16 @@ Instalar e atualizar o Stemma no PC por um **instalador `.exe`**, sem rodar scri
 - Instalar o driver NVIDIA (pré-requisito: o instalador só confere com `nvidia-smi` e avisa).
 
 ## Checklist
-- [ ] CUDA funciona como LocalSystem (verificado antes de tudo)
-- [ ] ferramentas portáteis com SHA256 em `C:\stemma\tools`
-- [ ] cache do uv fixo em `C:\stemma\cache\uv`, semeado do cache do usuário (hardlink), com `--offline` primeiro: instalar no PC atual não baixa o torch de novo
-- [ ] Tailscale: instalar, login, checagem de HTTPS e `serve`
-- [ ] assistente Inno Setup em PT-BR com QR code no fim
-- [ ] mesma `.exe` instala e atualiza (backup, migrations, rollback)
-- [ ] desinstalador
-- [ ] instalador gerado e anexado pelo `release.yml`
-- [ ] docs/operacao.md, ADR nova, ADR 0007 e CLAUDE.md
+- [x] CUDA funciona como LocalSystem (verificado antes de tudo: `2.7.1+cu118 True GTX 1650` numa tarefa como SYSTEM)
+- [x] ferramentas portáteis com SHA256 em `C:\stemma\tools`
+- [x] cache do uv fixo em `C:\stemma\cache\uv`, semeado do cache do usuário (hardlink), com `--offline` primeiro: instalar no PC atual não baixa o torch de novo (ensaio: 226 mil arquivos ligados em ~2,5 min; venv em 7 s)
+- [x] Tailscale: instalar, login, checagem de HTTPS e `serve` (ensaio: tela "pronto" e 443 → ensaio; os ramos "não instalado", "sem login" e "sem HTTPS" só pelo Pester do parser, porque o PC já tinha o Tailscale logado)
+- [x] assistente Inno Setup em PT-BR com QR code no fim
+- [x] mesma `.exe` instala e atualiza (backup, migrations, rollback)
+- [x] desinstalador
+- [x] ícone na bandeja (`Stemma.exe`) e QR no app do desktop (pedidos na sessão)
+- [ ] instalador gerado e anexado pelo `release.yml` (confere na primeira release depois do merge)
+- [x] docs/operacao.md, ADR nova, ADR 0007 e CLAUDE.md
 
 ## Critério de pronto
 No PC (sem nada do Stemma instalado): baixar `Stemma-Setup-vX.Y.Z.exe` da GitHub Release, instalar pelo assistente (**sem baixar o torch de novo**, porque ele já está no cache do usuário) e abrir o endereço do QR code no celular. Publicar a release seguinte e rodar o instalador novo: o `/health` mostra a versão nova sem passo manual. Simular falha na atualização e ver o rollback (`-SimulateFailure` exposto como parâmetro de linha de comando do instalador, só para teste). App instalado na tela inicial do celular com ícone e splash corretos e sem seleção de texto ao segurar. CI verde.

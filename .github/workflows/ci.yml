@@ -64,19 +64,64 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  deploy:
+  # O instalador só é compilado quando algo dele muda (deploy/, installer/, empacotamento).
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      installer: ${{ steps.filter.outputs.installer }}
     steps:
       - uses: actions/checkout@v4
-      - name: Pester dos scripts de deploy
-        shell: pwsh
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            installer:
+              - 'deploy/**'
+              - 'installer/**'
+              - 'scripts/package.sh'
+              - '.github/workflows/**'
+
+  # Windows PowerShell 5.1 de verdade (junction, hardlink, serviço) + build do instalador.
+  installer:
+    needs: changes
+    if: needs.changes.outputs.installer == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pester no Windows PowerShell 5.1
+        shell: powershell
         run: |
-          Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force
+          $ErrorActionPreference = 'Stop'
+          if (-not (Get-Module -ListAvailable Pester | Where-Object { $_.Version -ge [version]'5.5' })) {
+            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
+            Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force -SkipPublisherCheck
+          }
+          Import-Module Pester -MinimumVersion 5.5
           $config = New-PesterConfiguration
           $config.Run.Path = 'deploy/tests'
           $config.Run.Exit = $true
           $config.Output.Verbosity = 'Detailed'
           Invoke-Pester -Configuration $config
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build do frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Pacote de teste
+        shell: bash
+        run: bash scripts/package.sh v0.0.0 build
+      - name: Inno Setup
+        shell: powershell
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: Compilar o instalador
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File installeruild.ps1 -ZipPath build\stemma-v0.0.0.zip
 
   pr-title:
     if: github.event_name == 'pull_request'

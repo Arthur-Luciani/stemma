@@ -60,6 +60,10 @@
   border-bottom: 1px solid var(--bg-soft);
 }
 
+.topActions {
+  margin-left: auto;
+}
+
 .home {
   text-decoration: none;
   border-radius: 8px;

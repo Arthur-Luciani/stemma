@@ -16,7 +16,8 @@ export class ApiError extends Error {
 }
 
 export const NETWORK_ERROR = 'network_error';
-const NETWORK_MESSAGE = 'Sem conexão com o servidor.';
+// Fora de casa, o caso comum é o Tailscale desligado no celular.
+const NETWORK_MESSAGE = 'Sem conexão com o PC. Confira se o Tailscale está ligado neste aparelho.';
 const UNKNOWN_MESSAGE = 'Algo deu errado. Tente de novo.';
 
 /** A API e o frontend dividem a mesma origem (proxy do Vite em dev, uvicorn em produção). */

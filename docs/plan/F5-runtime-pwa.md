@@ -17,15 +17,81 @@ Stemma rodando como serviço no PC, acessível pelo celular via HTTPS, instaláv
 Novas funcionalidades.
 
 ## Checklist
-- [ ] SPA servida pelo FastAPI com cache correto
-- [ ] WinSW + start.ps1 + install.ps1
-- [ ] update.ps1 com backup, migration e rollback
-- [ ] tailscale serve configurado e documentado
-- [ ] PWA instalável no Android e iPhone
-- [ ] docs/operacao.md com smoke checklist
+- [x] SPA servida pelo FastAPI com cache correto
+- [x] WinSW + start.ps1 + install.ps1 (ensaio real no PC depende da release)
+- [x] update.ps1 com backup, migration e rollback (ensaio real no PC depende da release)
+- [x] tailscale serve configurado (pelo install.ps1) e documentado
+- [ ] PWA instalável no Android (sem erros de instalabilidade no Edge; falta instalar no celular) — iPhone sem aparelho
+- [x] docs/operacao.md com smoke checklist
+- [x] Modo app no PWA instalado: sem seleção/menu ao segurar, sem pinch zoom (pedido do usuário na sessão)
 
 ## Critério de pronto
-Instalar a **v1.0.0** a partir do zip da GitHub Release com `install.ps1`; publicar **v1.0.1**; rodar `update.ps1` e ver a nova versão no `/health` sem passo manual; simular falha e ver o rollback; app instalado na tela inicial do celular abrindo via `https://<pc>.<tailnet>.ts.net`.
+Instalar a **primeira release com `deploy/`** (a da F5; as releases até a v1.2.0 não têm `deploy/` no zip) a partir do zip da GitHub Release com `install.ps1`; publicar a **release seguinte**; rodar `update.ps1` e ver a nova versão no `/health` sem passo manual; simular falha (`-SimulateFailure`) e ver o rollback; app instalado na tela inicial do celular abrindo via `https://<pc>.<tailnet>.ts.net`.
+
+_Critério reescrito com o usuário em 2026-10-06 (antes: v1.0.0 → v1.0.1)._
 
 ## Handoff
-_Preencher ao final da sessão._
+**Status:** em andamento. O código está pronto no PR da F5, e o critério de pronto depende de releases reais e de você rodar os scripts como administrador (ver "Pendente").
+
+### Feito
+- **SPA servida pelo backend** (`app/spa.py`, `SERVE_FRONTEND_DIR`):
+  - rota coringa registrada depois dos routers;
+  - arquivo do `dist` servido como está; qualquer outro path vai para o `index.html`;
+  - `/api`, `/ws` e `/health` nunca caem no fallback (404 JSON);
+  - cache: `assets/*` `immutable`; `index.html`, `sw.js`, `manifest.webmanifest` e `workbox-*` `no-cache`; ícones 1 dia;
+  - aceita `HEAD`; path fora do `dist` é bloqueado.
+- **Backup do banco**: `python -m app.cli backup --dest` / `restore --src` (`services/backup.py`, API de backup do SQLite). O backup é escrito num `.partial` e só depois renomeado.
+- **Deploy** (`deploy/`, ADRs [0002](../decisions/0002-runtime-nativo-windows.md) e [0007](../decisions/0007-processo-de-release.md) atualizadas):
+  - `StemmaDeploy.psm1` com as funções compartilhadas;
+  - `stemma-service.xml`: WinSW 2.12 com SHA256 fixado, conta do usuário via `install /p`, restart on failure, logs com rotação;
+  - `start.ps1`, `install.ps1` e `update.ps1` (`-Version`, `-ZipPath`, `-Rollback`, `-YtDlpOnly`, `-SimulateFailure`);
+  - **um venv por release**;
+  - Pester 5 (31 testes) no job novo `deploy` do CI.
+- **PWA**:
+  - `vite-plugin-pwa` (`registerType: 'prompt'`); o SW guarda só o app shell e nunca a API/stems;
+  - manifest `standalone` com fundo `#121416`;
+  - ícones 192/512 "any", 512 maskable, apple-touch 180 e favicon 16/32, gerados por `npm run gen:icons` a partir de `public/favicon.svg` e `pwa/icon-maskable.svg`;
+  - metas `apple-mobile-web-app-*`;
+  - toast persistente "Nova versão disponível · Recarregar" (`UpdatePrompt`), com checagem de hora em hora;
+  - instalado: o `Toast` ganhou `persistent`, que não é descartado pelo limite de 3.
+- **Modo app** (pedido na sessão; só com `display-mode: standalone`):
+  - sem seleção de texto ao segurar, sem menu do toque longo, sem arrastar imagem e sem pinch zoom (`lib/standaloneMode.ts` + `global.css`);
+  - campos de texto continuam normais;
+  - o duplo toque não dá zoom em nenhum modo (`touch-action: manipulation`);
+  - "puxar para atualizar" ficou como estava (decisão do usuário).
+- **Conferido localmente**:
+  - backend servindo o `dist`: headers de cache via `curl`;
+  - Edge headless (CDP): SW ativo, manifest sem erros e `Page.getInstallabilityErrors` vazio.
+- **Ensaio do deploy sem o serviço** (a sessão não era admin): pacote montado como o `release.yml` → `Get-StemmaPackage` (SHA256) → `Expand-StemmaPackage` → `uv sync` (14 s, torch do cache) → `start.ps1` com a saída redirecionada → `/health` 1.2.0.
+  - Depois, sequência do update para um pacote "v1.2.1": backup → `alembic upgrade` → junction → `/health` 1.2.1, com os dados preservados.
+  - Por fim, rollback: restore → junction de volta → `/health` 1.2.0.
+- **`/code-review`**: 5 achados, todos corrigidos:
+  - backup que falhava no meio deixava um arquivo vazio que o rollback restaurava por cima do banco;
+  - `GetFileName` não separa `\` no pwsh do Linux (o CI quebraria);
+  - o toast de versão nova podia ser descartado;
+  - os prompts do WinSW ficavam presos no pipe;
+  - uma falha no `-Rollback` manual deixava o serviço parado.
+
+### Pendente (critério de pronto — precisa de você)
+1. Mergear este PR. O release-please abre o PR de release (provável **v1.3.0**, a primeira com `deploy/` no zip); mergear também.
+2. PowerShell **como administrador**: baixar `stemma-v1.3.0.zip`, extrair e rodar `deploy\install.ps1` ([docs/operacao.md](../operacao.md)). Conferir `/health` e `tailscale serve status`.
+3. Publicar a release seguinte (qualquer `fix:`/`docs:` mergeado + PR de release → **v1.3.1**) e rodar `C:\stemma\current\deploy\update.ps1`. O `/health` deve mostrar 1.3.1.
+4. `update.ps1 -Version v1.3.1 -SimulateFailure` a partir da v1.3.0 (ou `-Rollback` e depois o update com `-SimulateFailure`): ver o rollback automático.
+5. Celular: remover o atalho antigo (`:5183`), abrir `https://desktop-arthur.tail301d2c.ts.net`, "Instalar app" e conferir o ícone, a splash e que segurar não seleciona texto.
+- iPhone: sem aparelho. As metas e o apple-touch-icon estão lá; não há splash própria no iOS.
+- Herdados: medição do AudioEngine no Android (F4a), branch protection (F0).
+
+### Decisões
+- Venv por release, backup/restore pelo app, rollback por restore (automático) ou downgrade (manual): [ADR 0007](../decisions/0007-processo-de-release.md#atualização-f5-2026-10-06).
+- Critério de pronto reescrito: primeira release com `deploy/` → seguinte.
+- Desvios do design (ícone maskable sem borda, splash, modo app) em [docs/design/README.md](../design/README.md#desvios).
+
+### Pegadinhas
+- **Windows PowerShell 5.1 + stderr de executável**: com a saída redirecionada (serviço, pipe), cada linha de stderr vira `ErrorRecord`. Com `$ErrorActionPreference='Stop'`, o log do uv/alembic derrubava o script. O `Invoke-Native` roda com `Continue`, junta stdout e stderr e decide só pelo exit code. Apareceu no ensaio.
+- **`.ps1`/`.psm1` com BOM** (senão os acentos quebram no 5.1). O Pester confere. Edite com cuidado: o editor pode tirar o BOM.
+- `-Skip:` do Pester é avaliado na descoberta. Variável usada nele vai em `BeforeDiscovery`, não em `BeforeAll`.
+- O módulo virtual `virtual:pwa-register/react` não existe no Vitest. Há um alias para `src/test/pwaRegister.ts` (fake com `pwaFake.needRefresh(true)`).
+- `SERVE_FRONTEND_DIR` relativo é a partir da **raiz do repo** (`frontend/dist`), não de `backend/`.
+- O PWA da produção é outra origem (`https://<pc>…ts.net`, sem `:5183`): precisa reinstalar no celular.
+- O Pester do Windows é o 3.4. Para rodar localmente: `Install-Module Pester -Scope CurrentUser` (pede o provedor NuGet, interativo) ou importe um Pester 5 baixado.
+

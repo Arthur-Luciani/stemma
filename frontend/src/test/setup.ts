@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 
 import { resetViewport, installMatchMedia } from './media';
+import { pwaFake } from './pwaRegister';
 import { server } from './server';
 import { FakeWebSocket } from './websocket';
 
@@ -45,6 +46,7 @@ afterEach(() => {
   resetViewport();
   FakeWebSocket.instances.length = 0;
   window.localStorage.clear();
+  pwaFake.reset();
 });
 
 afterAll(() => {

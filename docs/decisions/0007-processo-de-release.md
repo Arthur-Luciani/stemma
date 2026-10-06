@@ -18,3 +18,11 @@ Drift do OpenAPI sem subir servidor: `python -m app.openapi` grava o schema (cha
 
 ## Consequências
 A GPU nunca é exercitada no CI → smoke manual pós-update (processar faixa curta, abrir mixer no celular, exportar).
+
+## Atualização (F5, 2026-10-06)
+- **Um venv por release** (`releases\vX.Y.Z\backend\.venv`) no lugar do `C:\stemma\venv` único. O `uv sync` roda antes de parar o serviço (no Windows, `.pyd` em uso fica travado) e o rollback só troca a junction `current`. O torch vem do cache do uv por hardlink, então o custo de disco é pequeno.
+- **Backup e restauração** pelo próprio app: `python -m app.cli backup --dest` / `restore --src` (API de backup do SQLite, segura com WAL).
+- **Rollback automático** (falha depois de parar o serviço): restaura o backup, volta o `current`, sobe a anterior e confere o `/health`. **Rollback manual** (`-Rollback`): backup + `alembic downgrade` até o head da release anterior, sem perder dados novos.
+- `-SimulateFailure` força a falha do `/health` para testar o rollback. `-ZipPath` usa um pacote local.
+- Funções do deploy em `deploy/StemmaDeploy.psm1`, testadas com Pester no job `deploy` do CI (pwsh no Linux; a junction só é testada no Windows).
+- As releases até a v1.2.0 não têm `deploy/` no zip: o critério de pronto da F5 usa a primeira release com `deploy/` e a seguinte.

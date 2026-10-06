@@ -10,6 +10,11 @@ body {
   min-height: 100%;
 }
 
+/* Sem zoom por duplo toque (atrapalha o duplo toque dos faders) nem o atraso dele. */
+html {
+  touch-action: manipulation;
+}
+
 body {
   background: var(--bg-base);
   color: var(--text-body);
@@ -28,4 +33,23 @@ body {
 
 button {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* App instalado (PWA): sem seleção de texto e menu ao segurar, sem arrastar imagem e sem
+   pinch zoom. O atributo vem de lib/standaloneMode.ts. Campos de texto continuam normais. */
+[data-standalone] body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: pan-x pan-y;
+}
+
+[data-standalone] img {
+  -webkit-user-drag: none;
+}
+
+[data-standalone] :is(input, textarea, [contenteditable='true']) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }

@@ -2,6 +2,7 @@
 
 # Scripts PowerShell: CRLF + BOM para o Windows PowerShell 5.1 ler acentos corretamente
 *.ps1 text eol=crlf
+*.psm1 text eol=crlf
 
 # Binários
 *.png binary

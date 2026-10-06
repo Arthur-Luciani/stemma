@@ -153,3 +153,10 @@ Feitos na F4b (mixer e export), de propósito:
 - **1g (paisagem)**: nome do stem numa linha e knob de pan com o valor na de baixo (no design ficam lado a lado e o nome não cabe). Os presets quebram linha em vez de rolar, para todos e o "Personalizado" ficarem à vista. Há uma linha de loop A–B (o design não tem) e a waveform ocupa o espaço livre.
 - **Stem mudo no celular**: apaga nome, valor e fader, mas não os botões M/S (no design o card inteiro fica a 55%). Assim o M ativo continua legível.
 - **Desktop = 900px de largura e 600px de altura.** O celular deitado fica no layout de celular (no mixer, o 1g), e não no desktop espremido. Abaixo de 1180px de largura, o transport do desktop esconde LUFS/dBTP.
+
+Feitos na F5 (PWA), de propósito:
+
+- **Ícone maskable** (`frontend/pwa/icon-maskable.svg`): fundo `--bg-base` cheio, sem a borda `line`, com as 4 barras na zona segura. O Android recorta no formato do launcher; a borda ficaria cortada. O ícone "any" (192/512) e o favicon são a marca com borda, como no design. O `apple-touch-icon` usa a versão maskable (o iOS não aceita transparência).
+- **Splash do Android** = `background_color` `--bg-base` + ícone 512 + nome (gerada pelo Chrome a partir do manifest). Sem splash própria no iOS (exigiria uma imagem por tamanho de iPhone).
+- **Modo app**: instalado, o app não seleciona texto ao segurar, não abre o menu do toque longo e não dá zoom com dois dedos. No navegador nada disso muda.
+

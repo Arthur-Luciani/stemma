@@ -64,6 +64,20 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pester dos scripts de deploy
+        shell: pwsh
+        run: |
+          Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force
+          $config = New-PesterConfiguration
+          $config.Run.Path = 'deploy/tests'
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $config
+
   pr-title:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

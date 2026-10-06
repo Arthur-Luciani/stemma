@@ -1,0 +1,31 @@
+<!--
+  Serviço do Stemma (WinSW 2.12, ADR 0002). O install.ps1 copia este modelo para
+  <raiz>\winsw\<id>.xml (trocando {{SERVICE_ID}}) ao lado do WinSW renomeado para <id>.exe.
+  %BASE% = <raiz>\winsw. A conta do usuário é pedida no `install /p`.
+-->
+<service>
+  <id>{{SERVICE_ID}}</id>
+  <name>Stemma ({{SERVICE_ID}})</name>
+  <description>Stemma: separação de stems e mixer (uvicorn em 127.0.0.1, atrás do tailscale serve).</description>
+
+  <executable>powershell.exe</executable>
+  <arguments>-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%BASE%\..\current\deploy\start.ps1" -Root "%BASE%\.."</arguments>
+  <workingdirectory>%BASE%\..</workingdirectory>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+
+  <!-- Ctrl+C primeiro (o uvicorn encerra limpo); passado o prazo, mata a árvore. -->
+  <stopparentprocessfirst>true</stopparentprocessfirst>
+  <stoptimeout>20 sec</stoptimeout>
+
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="30 sec"/>
+  <onfailure action="restart" delay="60 sec"/>
+  <resetfailure>1 hour</resetfailure>
+
+  <logpath>%BASE%\..\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+</service>

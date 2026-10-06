@@ -21,14 +21,16 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
   useEffect(() => {
     onDismissRef.current = onDismiss;
   });
+  const { persistent } = toast;
   useEffect(() => {
+    if (persistent) return;
     const timer = setTimeout(() => {
       onDismissRef.current();
     }, TOAST_DURATION_MS);
     return () => {
       clearTimeout(timer);
     };
-  }, []);
+  }, [persistent]);
 
   const { action } = toast;
   return (
@@ -74,7 +76,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const show = useCallback((input: ToastInput) => {
     const id = nextId.current++;
-    setToasts((list) => [...list, { ...input, tone: input.tone ?? 'info', id }].slice(-MAX_TOASTS));
+    setToasts((list) => {
+      const next = [
+        ...list,
+        { ...input, tone: input.tone ?? 'info', persistent: input.persistent ?? false, id },
+      ];
+      // Passou do limite: sai o mais antigo que não é persistente (o aviso de versão nova fica).
+      while (next.length > MAX_TOASTS) {
+        const oldest = next.findIndex((t) => !t.persistent);
+        next.splice(oldest === -1 ? 0 : oldest, 1);
+      }
+      return next;
+    });
   }, []);
 
   const api = useMemo(() => ({ show }), [show]);

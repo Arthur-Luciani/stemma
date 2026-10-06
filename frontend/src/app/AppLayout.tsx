@@ -7,6 +7,7 @@ import { useIsDesktop } from '../ui/useMediaQuery';
 import styles from './AppLayout.module.css';
 import { BottomNav, Topbar } from './Navigation';
 import type { RouteHandle } from './routes';
+import { UpdatePrompt } from './UpdatePrompt';
 import { useLiveEvents } from './useLiveEvents';
 
 /** Casca do app: navegação, conteúdo da rota, processamento e toasts. */
@@ -18,6 +19,7 @@ export function AppLayout() {
 
   return (
     <ToastProvider>
+      <UpdatePrompt />
       <div className={isDesktop ? styles.desktop : fullscreen ? styles.fullscreen : styles.mobile}>
         {isDesktop && <Topbar />}
         <main className={styles.main}>

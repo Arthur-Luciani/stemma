@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     port: int = 8010
     log_level: str = "INFO"
     cors_origins: list[str] = []
+    # Build do frontend servido pelo backend (produção). Vazio = não serve (dev usa o Vite).
+    serve_frontend_dir: Path | None = None
     storage_root: Path = Path("storage")
     # Vazio = SQLite em <STORAGE_ROOT>/stemma.db.
     database_url: str = ""
@@ -58,16 +60,18 @@ class Settings(BaseSettings):
             return [part.strip() for part in value.split(",") if part.strip()]
         return value
 
-    @field_validator("ytdlp_cookie_file", "torch_home", mode="before")
+    @field_validator("ytdlp_cookie_file", "torch_home", "serve_frontend_dir", mode="before")
     @classmethod
     def _empty_path(cls, value: object) -> object:
         return None if value == "" else value
 
-    @field_validator("storage_root")
+    @field_validator("storage_root", "serve_frontend_dir")
     @classmethod
-    def _resolve_storage_root(cls, value: Path) -> Path:
+    def _resolve_from_repo(cls, value: Path | None) -> Path | None:
         # Relativo à raiz do repo, não ao diretório de trabalho do processo.
-        return value if value.is_absolute() else (REPO_DIR / value).resolve()
+        if value is None or value.is_absolute():
+            return value
+        return (REPO_DIR / value).resolve()
 
     @model_validator(mode="after")
     def _default_database_url(self) -> "Settings":

@@ -8,10 +8,12 @@ import './styles/global.css';
 import { createQueryClient } from './app/queryClient';
 import { RootErrorBoundary } from './app/RouteError';
 import { routes } from './app/routes';
+import { installStandaloneMode } from './lib/standaloneMode';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Elemento #root não encontrado');
 
+installStandaloneMode();
 const queryClient = createQueryClient();
 const router = createBrowserRouter(routes);
 

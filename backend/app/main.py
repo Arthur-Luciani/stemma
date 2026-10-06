@@ -20,6 +20,7 @@ from app.pipeline.probe import GpuProbe
 from app.pipeline.queue import JobHandler, JobRunner
 from app.pipeline.separate import DemucsSeparator, DemucsSettings
 from app.services.events import EventBus
+from app.spa import install_spa
 from app.storage import Storage
 
 logger = logging.getLogger(__name__)
@@ -114,6 +115,8 @@ def create_app(
     app.include_router(exports.router)
     app.include_router(media.router)
     app.include_router(events.router)
+    if settings.serve_frontend_dir is not None:
+        install_spa(app, settings.serve_frontend_dir)
     return app
 
 

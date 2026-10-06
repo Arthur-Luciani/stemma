@@ -44,19 +44,23 @@ Instalar e atualizar o Stemma no PC por um **instalador `.exe`**, sem rodar scri
 - [x] mesma `.exe` instala e atualiza (backup, migrations, rollback)
 - [x] desinstalador
 - [x] ícone na bandeja (`Stemma.exe`) e QR no app do desktop (pedidos na sessão)
-- [ ] instalador gerado e anexado pelo `release.yml` (confere na primeira release depois do merge)
+- [x] instalador gerado e anexado pelo `release.yml` (v1.4.0 e v1.4.1)
 - [x] docs/operacao.md, ADR nova, ADR 0007 e CLAUDE.md
 
 ## Critério de pronto
 No PC (sem nada do Stemma instalado): baixar `Stemma-Setup-vX.Y.Z.exe` da GitHub Release, instalar pelo assistente (**sem baixar o torch de novo**, porque ele já está no cache do usuário) e abrir o endereço do QR code no celular. Publicar a release seguinte e rodar o instalador novo: o `/health` mostra a versão nova sem passo manual. Simular falha na atualização e ver o rollback (`-SimulateFailure` exposto como parâmetro de linha de comando do instalador, só para teste). App instalado na tela inicial do celular com ícone e splash corretos e sem seleção de texto ao segurar. CI verde.
 
 ## Handoff
-**Status:** PR #21 mergeado em 2026-10-06; release **v1.4.0** com `Stemma-Setup-v1.4.0.exe`, gerado e anexado pelo `release.yml` na primeira tentativa. **Instalado de verdade no PC pelo `.exe` da Release**:
-- ~8 min no total, sem baixar o torch (venv do cache em 7,7 s);
-- `/health` 1.4.0 com `gpu ok`;
-- 443 publicada.
+**Status:** concluída em 2026-10-06.
+- **PRs mergeados**: #21 (instalador e bandeja), #23 (pós-merge) e #24 (`fix:` das portas).
+- **Releases**: v1.4.0 e **v1.4.1**, as duas com `Stemma-Setup-vX.Y.Z.exe` gerado e anexado pelo `release.yml`.
 
-Do critério de pronto, falta a **atualização para a v1.4.1** (com `/SIMULATEFAILURE` e depois normal). A v1.4.1 sai do PR `fix:` das portas (ver Pendente).
+Critério de pronto, no PC:
+- **Instalar pelo `.exe` da Release (v1.4.0)**: ~8 min no total, sem baixar o torch (venv do cache em 7,7 s), `/health` com `gpu ok`, 443 publicada e QR no celular.
+- **Atualizar pelo `.exe` da v1.4.1**: 21 s, venv do cache, backup do banco, `/health` 1.4.1. A 443 foi republicada sozinha depois que o desinstalador antigo do ensaio a desligou.
+- **Exceção, rollback pelo `.exe` da Release**: o `/SIMULATEFAILURE` não foi rodado na v1.4.1. Com a 1.4.1 já instalada, o mesmo `.exe` cai em "já está nesta versão", então o teste só será possível na próxima release.
+  - O rollback (banco restaurado, `current` de volta, versão anterior no ar) foi validado no **ensaio**, com instaladores compilados do mesmo código, e está coberto pelo Pester.
+  - Opcional na próxima release: `Stemma-Setup-vX.Y.Z.exe /SIMULATEFAILURE`.
 
 ### Feito
 - **Pré-checagem**: o torch enxerga a GPU como SYSTEM (`2.7.1+cu118 True GTX 1650`, tarefa agendada temporária).
@@ -109,15 +113,13 @@ Do critério de pronto, falta a **atualização para a v1.4.1** (com `/SIMULATEF
   - marcador vazio.
 
 ### Pendente
-- **Resto do critério de pronto** (depois do PR `fix:` das portas e da release v1.4.1):
-  1. **Remover o ensaio**: Configurações → Aplicativos → "Stemma (stemma-ensaio)" → Desinstalar, respondendo **Não** para apagar os dados. `D:\stemma-ensaio-data` tem 2 sessões do usuário, criadas nos testes de hoje. O desinstalador do ensaio é anterior à correção e **desliga a 443**; o passo 3 a republica.
-  2. `Stemma-Setup-v1.4.1.exe /SIMULATEFAILURE`: rollback para a 1.4.0, com a 1.4.0 no ar.
-  3. `Stemma-Setup-v1.4.1.exe` normal: `/health` 1.4.1, 443 republicada, PWA no celular atualiza.
-- **PR `fix:` das portas** (bugs achados na instalação real; decidido com o usuário):
-  1. A tela da porta recusa uma porta em uso ou reservada pelo Windows e sugere a próxima livre. Na instalação real, o usuário digitou 8001 (a do ensaio), e as duas instalações ficaram na mesma porta.
-  2. Antes de publicar na 443, conferir se ela já serve outro app: perguntar se pode substituir ou usar a 8443.
-  3. O desinstalador só desliga a 443 se ela apontar para a porta da própria instalação. Hoje, desinstalar o ensaio derruba a 443 da instalação real.
-  4. Seção "Portas" no `docs/operacao.md`.
+- **`/SIMULATEFAILURE` com o `.exe` de uma release** (opcional, na próxima release): ver Status.
+- **Sessões dos testes**: `D:\stemma-ensaio-data` (2 sessões) e `C:\git\stemma\storage` (4, dev) continuam guardadas fora da instalação real. Migrar só se o usuário pedir.
+- ~~PR `fix:` das portas~~: feito no #24 (v1.4.1).
+  - A tela da porta recusa porta em uso ou reservada e sugere a próxima livre.
+  - Pergunta antes de tomar a 443 de outro app (a alternativa é a 8443).
+  - O desinstalador só desliga a porta HTTPS se ela publica este Stemma e ninguém mais escuta na porta local.
+  - Seção "Portas" no `operacao.md`.
 - **UX do instalador** (pedido do usuário depois da instalação real: "bem lento e fica meio cego"):
   - **Otimizar**: a proteção das pastas é o gargalo, ~4–5 min de `icacls` sobre os ~230 mil arquivos do cache ligados por hardlink. Ideias:
     - aplicar a ACL no próprio seeder (C#), arquivo a arquivo, ao ligar;
@@ -142,6 +144,8 @@ Do critério de pronto, falta a **atualização para a v1.4.1** (com `/SIMULATEF
 - Desvios de design (QR na topbar, QR escuro sobre claro, bandeja fora dos tokens CSS) em [docs/design](../design/README.md#desvios).
 
 ### Pegadinhas
+- **Só dá para testar o rollback com o `/SIMULATEFAILURE` subindo de versão.** Com a versão do `.exe` já instalada, ele cai em "já está nesta versão", que só confere o `/health`. Rode o `/SIMULATEFAILURE` **antes** da atualização normal.
+- **O GitHub às vezes demora 1–2 min para disparar o CI de um PR** (`gh pr checks` diz "no checks reported"). Espere o run aparecer em `actions/runs?head_sha=…` antes de concluir que algo quebrou.
 - **"untrusted mount point"**: um processo elevado não atravessa junctions criadas pelo usuário. O cache antigo do uv (`wheels-v3`) tem junctions, e o seeder as pula.
 - **`uv python install` sem `--no-bin --no-registry`** escreve no perfil do usuário (`~\.local\bin`, `HKCU\Software\Python\Astral`). Aconteceu no primeiro ensaio; a chave foi apagada à mão.
 - **`icacls ... /T` com `(OI)(CI)` aplicado a arquivos deixa o arquivo sem nenhuma permissão.** O certo é: proteger a pasta (sem `/T`), depois `pasta\* /reset /T`, depois `/setowner /T`.

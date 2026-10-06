@@ -21,14 +21,16 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
   useEffect(() => {
     onDismissRef.current = onDismiss;
   });
+  const { persistent } = toast;
   useEffect(() => {
+    if (persistent) return;
     const timer = setTimeout(() => {
       onDismissRef.current();
     }, TOAST_DURATION_MS);
     return () => {
       clearTimeout(timer);
     };
-  }, []);
+  }, [persistent]);
 
   const { action } = toast;
   return (
@@ -74,7 +76,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const show = useCallback((input: ToastInput) => {
     const id = nextId.current++;
-    setToasts((list) => [...list, { ...input, tone: input.tone ?? 'info', id }].slice(-MAX_TOASTS));
+    setToasts((list) =>
+      [
+        ...list,
+        { ...input, tone: input.tone ?? 'info', persistent: input.persistent ?? false, id },
+      ].slice(-MAX_TOASTS),
+    );
   }, []);
 
   const api = useMemo(() => ({ show }), [show]);

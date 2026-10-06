@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Ícone maskable: fundo cheio (o Android recorta no formato do launcher) e as 4 barras
+       dentro da zona segura (círculo central de 80%). Mesmas proporções do icon.svg. -->
+  <rect width="512" height="512" fill="#121416"/>
+  <rect x="138.5" y="198.5" width="40" height="115" rx="20" fill="#6cb8f0"/>
+  <rect x="203.5" y="151" width="40" height="210" rx="20" fill="#e07a4f"/>
+  <rect x="268.5" y="178.5" width="40" height="155" rx="20" fill="#3fb896"/>
+  <rect x="333.5" y="218.5" width="40" height="75" rx="20" fill="#c98bd0"/>
+</svg>

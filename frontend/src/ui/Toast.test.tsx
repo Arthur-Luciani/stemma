@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router';
 import { TOAST_DURATION_MS, ToastProvider } from './Toast';
 import { useToast } from './toastContext';
 
-function Trigger() {
+function Trigger({ persistent }: { persistent?: boolean }) {
   const toast = useToast();
   return (
     <button
@@ -15,6 +15,7 @@ function Trigger() {
           tone: 'good',
           message: 'ST-044 entrou na fila',
           action: { label: 'Acompanhar', to: '/sessions/x' },
+          persistent,
         });
       }}
     >
@@ -23,11 +24,11 @@ function Trigger() {
   );
 }
 
-function setup() {
+function setup({ persistent }: { persistent?: boolean } = {}) {
   render(
     <MemoryRouter>
       <ToastProvider>
-        <Trigger />
+        <Trigger persistent={persistent} />
       </ToastProvider>
     </MemoryRouter>,
   );
@@ -55,6 +56,22 @@ describe('Toast', () => {
         vi.advanceTimersByTime(TOAST_DURATION_MS + 10);
       });
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('persistente fica até ser fechado', () => {
+    vi.useFakeTimers();
+    try {
+      setup({ persistent: true });
+      act(() => {
+        screen.getByRole('button', { name: 'mostrar' }).click();
+      });
+      act(() => {
+        vi.advanceTimersByTime(TOAST_DURATION_MS * 10);
+      });
+      expect(screen.getByRole('status')).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

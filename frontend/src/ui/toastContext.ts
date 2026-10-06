@@ -13,6 +13,8 @@ export interface ToastInput {
   message: string;
   tone?: ToastTone;
   action?: ToastAction;
+  /** Fica até o usuário fechar ou usar a ação (sem o tempo de 5 s). */
+  persistent?: boolean;
 }
 
 export interface ToastApi {

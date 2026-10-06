@@ -8,6 +8,9 @@ export const strings = {
     name: 'stemma',
     loading: 'Carregando…',
   },
+  pwa: {
+    updateAvailable: 'Nova versão disponível',
+  },
   nav: {
     label: 'Navegação principal',
     discover: 'Descobrir',

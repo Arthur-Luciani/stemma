@@ -379,6 +379,19 @@ begin
   if FreePort = '' then
     FreePort := '8000';
   LocalPort := ExpandConstant('{param:PORT|' + FreePort + '}');
+  { /PORT= (ensaio): só uma porta válida, e o que as portas HTTPS do Tailscale publicam é
+    conferido para ela (o Check inicial olhou a porta livre sugerida). }
+  if (not IsUpdate) and (LocalPort <> FreePort) then
+  begin
+    if (StrToIntDef(LocalPort, 0) < 1024) or (StrToIntDef(LocalPort, 0) > 65535) then
+    begin
+      SuppressibleMsgBox('/PORT=' + LocalPort + ' não é uma porta válida (de 1024 a 65535). Vou usar a ' + FreePort + '.',
+        mbInformation, MB_OK, IDOK);
+      LocalPort := FreePort;
+    end
+    else
+      RunEngineQuick('CheckPort', '-Port ' + LocalPort);
+  end;
 
   TailscalePage := CreateCustomPage(DataPage.ID, 'Tailscale',
     'Acesso pelo celular, com HTTPS, sem abrir portas no roteador.');

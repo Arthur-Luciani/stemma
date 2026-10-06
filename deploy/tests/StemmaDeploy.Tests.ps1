@@ -553,33 +553,31 @@ Describe 'Portas locais' {
         Should -Invoke -ModuleName StemmaDeploy Get-NetTCPConnection -Times 1 -Exactly
     }
 
-    It 'a instalação recusa uma porta em uso antes de mexer em qualquer coisa' {
+    It 'a instalação sem nenhuma porta livre falha antes de mexer em qualquer coisa' {
         Mock -ModuleName StemmaDeploy Test-StemmaService { $false }
         Mock -ModuleName StemmaDeploy Get-PortUsage { 'em uso por python (PID 4120)' }
-        Mock -ModuleName StemmaDeploy Find-FreePort { 8002 }
+        Mock -ModuleName StemmaDeploy Find-FreePort { $null }
         Mock -ModuleName StemmaDeploy Initialize-StemmaRuntime {}
         $root = Join-Path $TestDrive 'porta-ocupada'
-        { Invoke-StemmaInstall -Root $root -DataRoot (Join-Path $TestDrive 'dados') -Port 8001 -SkipTailscale } |
-            Should -Throw '*porta 8001 está em uso por python*8002*'
+        { Invoke-StemmaInstall -Root $root -DataRoot (Join-Path $TestDrive 'dados') -Port 8001 -SkipTailscale 6>$null } |
+            Should -Throw '*porta 8001 está em uso por python*não achei outra livre*'
         Should -Invoke -ModuleName StemmaDeploy Initialize-StemmaRuntime -Times 0 -Exactly
         Test-Path -LiteralPath $root | Should -BeFalse
     }
 
-    It 'protege as pastas antes de criar qualquer coisa e semeia com o lock da release' {
-        $root = Join-Path $TestDrive 'ordem'
-        $script:calls = [Collections.Generic.List[string]]::new()
+    It 'porta tomada entre o assistente e a instalação: usa a próxima livre (sem tela de porta)' {
+        $root = Join-Path $TestDrive 'porta-trocada'
         Mock -ModuleName StemmaDeploy Test-StemmaService { $false }
-        Mock -ModuleName StemmaDeploy Get-PortUsage { $null }
-        Mock -ModuleName StemmaDeploy Find-UserUvCache { 'C:\cache-usuario' }
-        Mock -ModuleName StemmaDeploy Test-SameVolume { $true }
-        Mock -ModuleName StemmaDeploy Protect-StemmaDirectory { $script:calls.Add("protect:$(Split-Path -Leaf $Path)") }
+        Mock -ModuleName StemmaDeploy Get-PortUsage { if ($Port -eq 8001) { 'em uso por python (PID 4120)' } }
+        Mock -ModuleName StemmaDeploy Find-FreePort { 8002 }
+        Mock -ModuleName StemmaDeploy Find-UserUvCache { $null }
+        Mock -ModuleName StemmaDeploy Protect-StemmaDirectory {}
         Mock -ModuleName StemmaDeploy Get-StemmaPackage { [pscustomobject]@{ Tag = 'v1.0.0'; Zip = 'x.zip' } }
-        Mock -ModuleName StemmaDeploy Expand-StemmaPackage { $script:calls.Add('package'); Join-Path $root 'releasesv1.0.0' }
-        Mock -ModuleName StemmaDeploy Initialize-StemmaRuntime { $script:calls.Add('tools') }
-        Mock -ModuleName StemmaDeploy Install-StemmaPython { $script:calls.Add('python') }
-        Mock -ModuleName StemmaDeploy Copy-UvCacheSeed { $script:calls.Add("seed:$(Split-Path -Leaf $LockPath)") }
+        Mock -ModuleName StemmaDeploy Expand-StemmaPackage { Join-Path $root 'releases\v1.0.0' }
+        Mock -ModuleName StemmaDeploy Initialize-StemmaRuntime {}
+        Mock -ModuleName StemmaDeploy Install-StemmaPython {}
         Mock -ModuleName StemmaDeploy Set-ComponentsStageWeight {}
-        Mock -ModuleName StemmaDeploy Sync-ReleaseEnvironment { $script:calls.Add('sync'); 'cache' }
+        Mock -ModuleName StemmaDeploy Sync-ReleaseEnvironment { 'cache' }
         Mock -ModuleName StemmaDeploy Invoke-Alembic {}
         Mock -ModuleName StemmaDeploy Set-CurrentRelease {}
         Mock -ModuleName StemmaDeploy Register-StemmaService {}
@@ -587,8 +585,9 @@ Describe 'Portas locais' {
         Mock -ModuleName StemmaDeploy Wait-StemmaHealth { $true }
         Mock -ModuleName StemmaDeploy Write-Step {}
 
-        Invoke-StemmaInstall -Root $root -DataRoot (Join-Path $TestDrive 'dados-ordem') -SkipTailscale 6>$null | Should -Be 'v1.0.0'
-        $script:calls | Should -Be @('protect:ordem', 'protect:dados-ordem', 'package', 'tools', 'python', 'seed:uv.lock', 'sync')
+        Invoke-StemmaInstall -Root $root -DataRoot (Join-Path $TestDrive 'dados-porta') -Port 8001 -SkipTailscale 6>$null | Should -Be 'v1.0.0'
+        (Read-DotEnv -Path (Join-Path $root '.env'))['PORT'] | Should -Be '8002'
+        Should -Invoke -ModuleName StemmaDeploy Wait-StemmaHealth -ParameterFilter { $Port -eq 8002 }
     }
 }
 
@@ -760,6 +759,38 @@ source = { editable = "." }
         $plan.Roots | Should -Not -Contain 'archive-v0/idOutro'
     }
 
+    It 'cache reconhecido, mas sem nada do Stemma: só as pastas pequenas, nunca o cache inteiro' {
+        $cache = Join-Path $TestDrive 'cache-de-outros'
+        New-FakeCache $cache @{ 'idOutroProjeto' = @('c.py') } @{ 'requests\2.32.0-py3-none-any' = 'idOutroProjeto' }
+        $lock = Join-Path $TestDrive 'uv-outros.lock'
+        Set-Content -LiteralPath $lock -Value $script:lockText -Encoding UTF8
+        $plan = Get-UvCacheSeedPlan -Source $cache -LockPath $lock
+        $plan.Selective | Should -BeTrue
+        $plan.Roots | Should -Not -Contain 'archive-v0'
+        @($plan.Roots | Where-Object { $_ -like 'archive-v0*' }).Count | Should -Be 0
+    }
+
+    It 'lê o requires só da seção [build-system]' {
+        $file = Join-Path $TestDrive 'pyproject-secoes.toml'
+        Set-Content -LiteralPath $file -Encoding UTF8 -Value @(
+            '[build-system]', 'build-backend = "flit_core.buildapi"', '',
+            '[tool.outro]', 'requires = ["nao-e-backend"]'
+        )
+        Get-BuildBackendNames -PyprojectPath $file | Should -BeNullOrEmpty
+        Set-Content -LiteralPath $file -Encoding UTF8 -Value @('[project]', 'name = "x"', '', '[build-system]', 'requires = ["Flit_Core>=3"]')
+        Get-BuildBackendNames -PyprojectPath $file | Should -Be @('flit-core')
+    }
+
+    It 'na atualização, a estimativa usa só o cache da instalação (o do usuário não é semeado)' {
+        $root = Join-Path $TestDrive 'raiz-caches'
+        $user = Join-Path $TestDrive 'cache-do-usuario'
+        New-Item -ItemType Directory -Force -Path $user | Out-Null
+        Mock -ModuleName StemmaDeploy Test-SameVolume { $true }
+        Get-StemmaCacheDirs -Root $root -UserCache $user | Should -Be @($user)
+        New-Item -ItemType Directory -Force -Path (Join-Path $root 'cache\uv\wheels-v6') | Out-Null
+        Get-StemmaCacheDirs -Root $root -UserCache $user | Should -Be @((Join-Path $root 'cache\uv'))
+    }
+
     It 'sem ponteiros (formato do cache mudou) semeia o archive inteiro' {
         $cache = Join-Path $TestDrive 'cache-sem-ponteiro'
         New-FakeCache $cache @{ 'id1' = @('a.py') } @{}
@@ -837,7 +868,7 @@ Describe 'Progresso por etapas' {
         Get-StemmaProgressValue -Stages $stages -Index 1 -Fraction 2 | Should -Be 1000
     }
 
-    It 'numera as etapas e nunca faz a barra voltar' {
+    It 'numera as etapas e a barra só anda para a frente' {
         $output = & {
             Start-StemmaProgress -Stages @(
                 @{ Id = 'a'; Text = 'Primeira'; Weight = 1 }
@@ -845,15 +876,35 @@ Describe 'Progresso por etapas' {
             )
             Enter-StemmaStage 'a'
             Set-StemmaStageProgress 0.5
+            Set-StemmaStageProgress 0.4  # não volta
             Enter-StemmaStage 'b'
-            Set-StemmaStageWeight -Id 'b' -Weight 9  # repesar não pode voltar a barra
-            Set-StemmaStageProgress 0.1
+            Set-StemmaStageProgress 0.5
             Complete-StemmaProgress
         } 6>&1 | ForEach-Object { "$_" }
         $output | Should -Contain '##STAGE Etapa 1 de 2: Primeira'
         $output | Should -Contain '##STAGE Etapa 2 de 2: Segunda'
         $values = @($output | Where-Object { $_ -like '##PROGRESS *' } | ForEach-Object { [int]($_ -split ' ')[1] })
-        $values | Should -Be @(0, 250, 500, 1000)
+        $values | Should -Be @(0, 250, 500, 750, 1000)
+    }
+
+    It 'repesar uma etapa mantém o que a barra já mostra e ela continua andando' {
+        $output = & {
+            Start-StemmaProgress -Stages @(
+                @{ Id = 'a'; Text = 'Antes'; Weight = 3 }
+                @{ Id = 'download'; Text = 'Download'; Weight = 1 }
+                @{ Id = 'c'; Text = 'Depois'; Weight = 1 }
+            )
+            Enter-StemmaStage 'a'
+            Set-StemmaStageProgress 1   # 600
+            # Vai baixar muito: o download passa a pesar 30.
+            Set-StemmaStageWeight -Id 'download' -Weight 30
+            Enter-StemmaStage 'download'  # continua 600
+            Set-StemmaStageProgress 0.1   # tem de andar logo, sem esperar o valor antigo
+        } 6>&1 | ForEach-Object { "$_" }
+        $values = @($output | Where-Object { $_ -like '##PROGRESS *' } | ForEach-Object { [int]($_ -split ' ')[1] })
+        $values[1] | Should -Be 600
+        $values[-1] | Should -BeGreaterThan 600
+        $values[-1] | Should -BeLessThan 700
     }
 
     It 'sem o protocolo não escreve ##PROGRESS e a etapa vira um Write-Step' {
@@ -989,7 +1040,7 @@ Describe 'Invoke-StemmaInstall' {
         Mock -ModuleName StemmaDeploy Test-SameVolume { $true }
         Mock -ModuleName StemmaDeploy Protect-StemmaDirectory { $script:calls.Add("protect:$(Split-Path -Leaf $Path)") }
         Mock -ModuleName StemmaDeploy Get-StemmaPackage { [pscustomobject]@{ Tag = 'v1.0.0'; Zip = 'x.zip' } }
-        Mock -ModuleName StemmaDeploy Expand-StemmaPackage { $script:calls.Add('package'); Join-Path $root 'releasesv1.0.0' }
+        Mock -ModuleName StemmaDeploy Expand-StemmaPackage { $script:calls.Add('package'); Join-Path $root 'releases\v1.0.0' }
         Mock -ModuleName StemmaDeploy Initialize-StemmaRuntime { $script:calls.Add('tools') }
         Mock -ModuleName StemmaDeploy Install-StemmaPython { $script:calls.Add('python') }
         Mock -ModuleName StemmaDeploy Copy-UvCacheSeed { $script:calls.Add("seed:$(Split-Path -Leaf $LockPath)") }

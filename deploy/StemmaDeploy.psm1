@@ -111,10 +111,26 @@ function Set-StemmaStageProgress {
 }
 
 function Set-StemmaStageWeight {
-    <# Repesa uma etapa que ainda não começou (ex.: componentes, quando se sabe se vai baixar). #>
+    <#
+      Repesa uma etapa (ex.: componentes, quando se sabe se vai baixar). As anteriores são
+      reescaladas por (novo + resto) / (antigo + resto), o que mantém exatamente o que a barra
+      já mostra: sem isso, um peso maior derrubaria o valor atual, e a barra (que nunca volta)
+      ficaria parada até o download alcançá-lo.
+    #>
     param([Parameter(Mandatory)][string]$Id, [Parameter(Mandatory)][double]$Weight)
     if (-not $script:Progress) { return }
-    foreach ($stage in $script:Progress.Stages) { if ($stage.Id -eq $Id) { $stage.Weight = $Weight } }
+    $stages = $script:Progress.Stages
+    $index = -1
+    for ($i = 0; $i -lt $stages.Count; $i++) { if ($stages[$i].Id -eq $Id) { $index = $i } }
+    if ($index -lt 0) { return }
+    $rest = 0.0
+    for ($i = $index + 1; $i -lt $stages.Count; $i++) { $rest += $stages[$i].Weight }
+    $old = $stages[$index].Weight
+    if ($old + $rest -gt 0) {
+        $scale = ($Weight + $rest) / ($old + $rest)
+        for ($i = 0; $i -lt $index; $i++) { $stages[$i].Weight *= $scale }
+    }
+    $stages[$index].Weight = $Weight
 }
 
 function Complete-StemmaProgress {
@@ -860,7 +876,12 @@ namespace Stemma {
             long total = files.Count, done = 0;
             foreach (string file in files) {
                 string target = dest + file.Substring(source.Length);
-                if (File.Exists(target)) { counts[2]++; }
+                if (File.Exists(target)) {
+                    // Já estava (nova tentativa, cache de uma versão anterior): protege de novo,
+                    // porque a ACL pode ter sido mudada pelo outro caminho do mesmo arquivo.
+                    Protect(target, setOwner);
+                    counts[2]++;
+                }
                 else if (CreateHardLink(target, file, IntPtr.Zero)) {
                     if (Protect(target, setOwner)) { counts[0]++; }
                     else {
@@ -891,7 +912,7 @@ function Test-IsAdmin {
 function ConvertTo-UvPackageKey {
     <# Chave nome|versão (nome normalizado como no PEP 503). #>
     param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][string]$Version)
-    return ($Name.ToLowerInvariant() -replace '[-_.]+', '-') + '|' + $Version
+    return (ConvertTo-UvPackageName $Name) + '|' + $Version
 }
 
 function Get-UvLockPackages {
@@ -973,7 +994,9 @@ function Get-BuildBackendNames {
     $names = @()
     if (Test-Path -LiteralPath $PyprojectPath) {
         $text = [IO.File]::ReadAllText($PyprojectPath)
-        if ($text -match '(?ms)^\[build-system\].*?^requires\s*=\s*\[([^\]]*)\]') {
+        # Só dentro da seção [build-system] (até o próximo cabeçalho), nunca de outra seção.
+        $section = if ($text -match '(?ms)^\[build-system\][ \t]*\r?\n(.*?)(?=^\[|\z)') { $Matches[1] } else { '' }
+        if ($section -match '(?ms)^requires\s*=\s*\[([^\]]*)\]') {
             foreach ($item in [regex]::Matches($Matches[1], '"([A-Za-z0-9._-]+)')) {
                 $names += ConvertTo-UvPackageName $item.Groups[1].Value
             }
@@ -1036,7 +1059,8 @@ function Get-UvCacheSeedPlan {
     <#
       O que semear do cache do usuário: as pastas pequenas inteiras (tudo menos `archive-v*`) e,
       dos archives, só os dos pacotes do uv.lock (o cache do usuário tem os de todos os projetos
-      dele: 225 mil arquivos contra ~22 mil do Stemma). Sem lock ou sem ponteiros: tudo.
+      dele: 225 mil arquivos contra ~25 mil do Stemma). Sem lock, ou num formato de cache que não
+      conhece (sem ponteiros): tudo.
     #>
     param([Parameter(Mandatory)][string]$Source, [string]$LockPath)
     $roots = [Collections.Generic.List[string]]::new()
@@ -1045,6 +1069,7 @@ function Get-UvCacheSeedPlan {
         if ($dir.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
         if ($dir.Name -match '^archive-v\d+$') { $archiveDirs += $dir.Name } else { $roots.Add($dir.Name) }
     }
+    $pointers = @{}
     $archives = @()
     if ($LockPath -and (Test-Path -LiteralPath $LockPath)) {
         $pointers = Get-UvCachePointers -Cache $Source
@@ -1057,7 +1082,9 @@ function Get-UvCacheSeedPlan {
         $fromBuild = @(Get-BuildBackendArchives -Cache $Source -Pointers $pointers -Names $build)
         $archives = @(@($fromLock + $fromBuild) | Sort-Object -Unique)
     }
-    $selective = $archives.Count -gt 0
+    # Seletivo sempre que o formato foi reconhecido (há ponteiros), mesmo sem nenhum pacote do
+    # Stemma no cache: aí semeia só as pastas pequenas, e não o cache inteiro do usuário.
+    $selective = $archives.Count -gt 0 -or $pointers.Count -gt 0
     if (-not $selective) { $archives = $archiveDirs }
     foreach ($archive in $archives) { $roots.Add($archive) }
     return [pscustomobject]@{ Roots = @($roots); Selective = $selective; Archives = @($archives).Count }
@@ -1094,13 +1121,15 @@ function Copy-UvCacheSeed {
 }
 
 function Get-StemmaCacheDirs {
-    <# Caches que a instalação vai usar: o dela (se já tiver algo) e o do usuário no mesmo volume. #>
+    <#
+      Caches que a instalação vai usar: o dela, se já tiver algo (a atualização só semeia de um
+      cache vazio); senão, o do usuário no mesmo volume, que será semeado.
+    #>
     param([Parameter(Mandatory)][string]$Root, [string]$UserCache)
-    $dirs = @()
     $own = (Get-StemmaPaths -Root $Root).UvCache
-    if (-not (Test-EmptyDirectory $own)) { $dirs += $own }
-    if ($UserCache -and (Test-SameVolume $UserCache $Root)) { $dirs += $UserCache }
-    return $dirs
+    if (-not (Test-EmptyDirectory $own)) { return @($own) }
+    if ($UserCache -and (Test-SameVolume $UserCache $Root)) { return @($UserCache) }
+    return @()
 }
 
 # Wheels sem tamanho no uv.lock (o índice do PyTorch não informa).
@@ -1546,9 +1575,14 @@ function Invoke-StemmaInstall {
     if (Test-StemmaService $ServiceId) { throw "O serviço '$ServiceId' já existe. Use a atualização." }
     if (-not $DataRoot) { $DataRoot = Get-DefaultDataRoot }
     Assert-StemmaDataRoot $DataRoot
+    # A porta vem livre do assistente, mas pode ter sido tomada até aqui: passa para a próxima
+    # livre (não há tela de porta para o usuário escolher outra).
     $usage = Get-PortUsage -Port $Port
     if ($usage) {
-        throw "A porta $Port está $usage. Escolha outra (a próxima livre é a $(Find-FreePort -Start ($Port + 1)))."
+        $free = Find-FreePort -Start ($Port + 1)
+        if (-not $free) { throw "A porta $Port está $usage, e não achei outra livre até a $($Port + 200)." }
+        Write-Host "    A porta $Port está $($usage): usando a $free."
+        $Port = $free
     }
     if (-not $SkipTailscale) {
         # Antes de tudo: sem isto, a instalação iria até o fim e falharia no último passo.

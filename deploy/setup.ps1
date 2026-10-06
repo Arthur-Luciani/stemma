@@ -159,7 +159,6 @@ try {
                     $estimate = Get-StemmaSpaceEstimate -Root $Root -LockPath $LockPath -CacheDirs $caches
                     Write-Result 'downloadmb' ([long][Math]::Ceiling($estimate.DownloadBytes / 1MB))
                     Write-Result 'needrootmb' ([long][Math]::Ceiling($estimate.NeedRootBytes / 1MB))
-                    Write-Result 'missing' "$($estimate.Missing)/$($estimate.Needed)"
                 }
                 catch { Write-Warning "Estimativa de espaço: $($_.Exception.Message)" }
             }

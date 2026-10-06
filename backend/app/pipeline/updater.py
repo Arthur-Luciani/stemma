@@ -99,8 +99,17 @@ class GitHubReleases:
         if not isinstance(data, list):
             logger.warning("Resposta inesperada do GitHub: %r", type(data))
             return None
-        releases = [r for r in (_parse_release(item) for item in data) if r is not None]
+        releases = [r for r in (_safe_parse(item) for item in data) if r is not None]
         return ReleaseList(releases, (self._now or utcnow)())
+
+
+def _safe_parse(item: Any) -> Release | None:
+    """Um item estranho (data inválida, campos trocados) é ignorado, não derruba a lista."""
+    try:
+        return _parse_release(item)
+    except (ValueError, TypeError, AttributeError) as exc:
+        logger.warning("Release ignorada (%s): %r", exc, item)
+        return None
 
 
 def _parse_release(item: Any) -> Release | None:

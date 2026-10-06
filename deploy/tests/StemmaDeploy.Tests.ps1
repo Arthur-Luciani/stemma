@@ -1162,6 +1162,7 @@ Describe 'Invoke-StemmaAppUpdate' {
         $script:AppRoot = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Force -Path $script:AppRoot | Out-Null
         $script:FakeExe = Join-Path $TestDrive 'Stemma-Setup-v9.9.9.exe'
+        Mock -ModuleName StemmaDeploy Get-StemmaUpdateTarget { '9.9.9' }
         Mock -ModuleName StemmaDeploy Get-StemmaInstaller { $script:FakeExe }
         Mock -ModuleName StemmaDeploy Get-CurrentRelease { 'C:\stemma\releases\v9.9.9' }
         Mock -ModuleName StemmaDeploy Set-StemmaToolEnv {}
@@ -1186,6 +1187,27 @@ Describe 'Invoke-StemmaAppUpdate' {
             $ReleaseDir -eq 'C:\stemma\releases\v9.9.9' -and ($Arguments -join ' ') -eq 'update-result --state succeeded'
         }
         Should -Invoke -ModuleName StemmaDeploy Start-ScheduledTask -Times 1 -ParameterFilter { $TaskName -eq 'Bandeja' }
+        # Exatamente a versão que o app gravou, e não a "latest" do GitHub.
+        Should -Invoke -ModuleName StemmaDeploy Get-StemmaInstaller -Times 1 -ParameterFilter { $Version -eq '9.9.9' }
+    }
+
+    It 'sem versão escolhida pelo app: não baixa nada e grava a falha' {
+        Mock -ModuleName StemmaDeploy Get-StemmaUpdateTarget { throw 'o app não registrou qual versão instalar' }
+        Mock -ModuleName StemmaDeploy Invoke-StemmaInstaller { 0 }
+        $outcome = Invoke-StemmaAppUpdate -Root $script:AppRoot -ServiceId 'stemma'
+        $outcome.Message | Should -Be 'A atualização não começou: o app não registrou qual versão instalar.'
+        Should -Invoke -ModuleName StemmaDeploy Get-StemmaInstaller -Times 0
+    }
+
+    It 'aspas duplas do motivo viram simples (o 5.1 quebraria o argumento)' {
+        Mock -ModuleName StemmaDeploy Invoke-StemmaInstaller {
+            [IO.File]::WriteAllText((Join-Path $script:AppRoot 'logs\app-update-result.txt'), 'erro|Falha ao copiar "C:\x y".')
+            1
+        }
+        Invoke-StemmaAppUpdate -Root $script:AppRoot -ServiceId 'stemma' | Out-Null
+        Should -Invoke -ModuleName StemmaDeploy Invoke-StemmaCli -Times 1 -ParameterFilter {
+            $Arguments[-1] -eq "Falha ao copiar 'C:\x y'."
+        }
     }
 
     It 'falha do instalador: grava o motivo que ele deu' {
@@ -1230,5 +1252,41 @@ Describe 'Invoke-StemmaAppUpdate' {
         Mock -ModuleName StemmaDeploy Invoke-StemmaInstaller { 0 }
         Mock -ModuleName StemmaDeploy Get-CurrentRelease { $null }
         { Invoke-StemmaAppUpdate -Root $script:AppRoot -ServiceId 'stemma' -WarningAction SilentlyContinue } | Should -Not -Throw
+    }
+}
+
+Describe 'Get-ReleaseAssets' {
+    BeforeAll {
+        $script:Release = [pscustomobject]@{
+            tag_name = 'v1.5.1'
+            assets   = @(
+                [pscustomobject]@{ name = 'stemma-v1.5.1.zip'; browser_download_url = 'https://x/zip' }
+                [pscustomobject]@{ name = 'stemma-v1.5.1.zip.sha256'; browser_download_url = 'https://x/zip.sha256' }
+                [pscustomobject]@{ name = 'Stemma-Setup-v1.5.1.exe'; browser_download_url = 'https://x/exe' }
+                [pscustomobject]@{ name = 'Stemma-Setup-v1.5.1.exe.sha256'; browser_download_url = 'https://x/exe.sha256' }
+            )
+        }
+    }
+
+    It 'instalador de uma tag escolhida (o que o app mostrou)' {
+        Mock -ModuleName StemmaDeploy Invoke-RestMethod { $script:Release }
+        $asset = Get-ReleaseAssets -Version '1.5.1' -Kind 'installer'
+        $asset.Tag | Should -Be 'v1.5.1'
+        $asset.Url | Should -Be 'https://x/exe'
+        $asset.ShaUrl | Should -Be 'https://x/exe.sha256'
+        Should -Invoke -ModuleName StemmaDeploy Invoke-RestMethod -Times 1 -ParameterFilter { $Uri -like '*/releases/tags/v1.5.1' }
+    }
+
+    It 'zip da última release (padrão)' {
+        Mock -ModuleName StemmaDeploy Invoke-RestMethod { $script:Release }
+        (Get-ReleaseAssets).ZipUrl | Should -Be 'https://x/zip'
+        Should -Invoke -ModuleName StemmaDeploy Invoke-RestMethod -Times 1 -ParameterFilter { $Uri -like '*/releases/latest' }
+    }
+
+    It 'release ainda sem o instalador' {
+        Mock -ModuleName StemmaDeploy Invoke-RestMethod {
+            [pscustomobject]@{ tag_name = 'v1.6.0'; assets = @([pscustomobject]@{ name = 'stemma-v1.6.0.zip' }) }
+        }
+        { Get-ReleaseAssets -Version 'v1.6.0' -Kind 'installer' } | Should -Throw '*Stemma-Setup-v1.6.0.exe*'
     }
 }

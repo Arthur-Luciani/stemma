@@ -261,8 +261,8 @@ function Invoke-Download {
 }
 
 function Get-ReleaseAssets {
-    <# URLs do zip e do .sha256 de uma tag (ou da última release). #>
-    param([string]$Version)
+    <# URLs do pacote (zip) ou do instalador (.exe), e do .sha256, de uma tag (ou da última release). #>
+    param([string]$Version, [ValidateSet('zip', 'installer')][string]$Kind = 'zip')
     $api = "https://api.github.com/repos/$script:Repo/releases"
     if ($Version) {
         $tag = if ($Version.StartsWith('v')) { $Version } else { "v$Version" }
@@ -272,10 +272,11 @@ function Get-ReleaseAssets {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $release = Invoke-RestMethod -Uri $url -Headers @{ 'User-Agent' = 'stemma-deploy' }
     $tagName = $release.tag_name
-    $zip = $release.assets | Where-Object { $_.name -eq "stemma-$tagName.zip" }
-    $sha = $release.assets | Where-Object { $_.name -eq "stemma-$tagName.zip.sha256" }
-    if (-not $zip -or -not $sha) { throw "A release $tagName não tem o pacote stemma-$tagName.zip e o .sha256." }
-    return [pscustomobject]@{ Tag = $tagName; ZipUrl = $zip.browser_download_url; ShaUrl = $sha.browser_download_url }
+    $name = if ($Kind -eq 'zip') { "stemma-$tagName.zip" } else { "Stemma-Setup-$tagName.exe" }
+    $file = $release.assets | Where-Object { $_.name -eq $name }
+    $sha = $release.assets | Where-Object { $_.name -eq "$name.sha256" }
+    if (-not $file -or -not $sha) { throw "A release $tagName não tem o $name e o .sha256." }
+    return [pscustomobject]@{ Tag = $tagName; Url = $file.browser_download_url; ZipUrl = $file.browser_download_url; ShaUrl = $sha.browser_download_url }
 }
 
 function Get-StemmaPackage {
@@ -1934,28 +1935,15 @@ function Unregister-StemmaTasks {
     }
 }
 
-function Get-ReleaseInstaller {
-    <# URLs do Stemma-Setup-<tag>.exe e do .sha256 da última release. #>
-    $url = "https://api.github.com/repos/$script:Repo/releases/latest"
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    $release = Invoke-RestMethod -Uri $url -Headers @{ 'User-Agent' = 'stemma-deploy' }
-    $tag = $release.tag_name
-    $name = "Stemma-Setup-$tag.exe"
-    $exe = $release.assets | Where-Object { $_.name -eq $name }
-    $sha = $release.assets | Where-Object { $_.name -eq "$name.sha256" }
-    if (-not $exe -or -not $sha) { throw "A release $tag ainda não tem o instalador ($name)." }
-    return [pscustomobject]@{ Tag = $tag; ExeUrl = $exe.browser_download_url; ShaUrl = $sha.browser_download_url }
-}
-
 function Get-StemmaInstaller {
-    <# Baixa o instalador da última release para <raiz>\downloads e confere o SHA256 (ou usa -InstallerPath, ensaio). #>
-    param([Parameter(Mandatory)][string]$Root, [string]$InstallerPath)
+    <# Baixa o instalador da versão escolhida pelo app para <raiz>\downloads e confere o SHA256 (ou usa -InstallerPath, ensaio). #>
+    param([Parameter(Mandatory)][string]$Root, [string]$Version, [string]$InstallerPath)
     if ($InstallerPath) {
         $exe = (Resolve-Path -LiteralPath $InstallerPath).Path
         if (Test-Path -LiteralPath "$exe.sha256") { Assert-Sha256 -Path $exe -Expected (Get-Sha256FromFile "$exe.sha256") }
         return $exe
     }
-    $asset = Get-ReleaseInstaller
+    $asset = Get-ReleaseAssets -Version $Version -Kind 'installer'
     $downloads = Join-Path $Root 'downloads'
     New-Item -ItemType Directory -Force -Path $downloads | Out-Null
     # Instaladores de atualizações anteriores não servem mais.
@@ -1963,7 +1951,7 @@ function Get-StemmaInstaller {
     $exe = Join-Path $downloads "Stemma-Setup-$($asset.Tag).exe"
     Write-Step "Baixando o instalador $($asset.Tag)"
     Invoke-Download -Url $asset.ShaUrl -Dest "$exe.sha256"
-    Invoke-Download -Url $asset.ExeUrl -Dest $exe
+    Invoke-Download -Url $asset.Url -Dest $exe
     Assert-Sha256 -Path $exe -Expected (Get-Sha256FromFile "$exe.sha256")
     return $exe
 }
@@ -1976,6 +1964,24 @@ function ConvertFrom-InstallerResult {
     if ($bar -lt 0) { return [pscustomobject]@{ Ok = $false; Text = $null } }
     $value = $line.Substring($bar + 1).Trim()
     return [pscustomobject]@{ Ok = ($line.Substring(0, $bar) -eq 'ok'); Text = $(if ($value) { $value } else { $null }) }
+}
+
+function Get-StemmaUpdateTarget {
+    <# Versão que o app escolheu (CLI `update-target` da release no ar), ex.: 1.5.1. #>
+    param([Parameter(Mandatory)][string]$Root)
+    $current = Get-CurrentRelease -Root $Root
+    if (-not $current) { throw "nenhuma release em $Root\current" }
+    $found = [Collections.Generic.List[string]]::new()
+    Invoke-Native -FilePath (Get-ReleasePython $current) -Arguments @('-m', 'app.cli', 'update-target') `
+        -WorkingDirectory (Join-Path $current 'backend') -OnLine { param($line) if ($line -match '^\d+\.\d+\.\d+$') { $found.Add($line) } }
+    if ($found.Count -eq 0) { throw 'o app não registrou qual versão instalar' }
+    return $found[0]
+}
+
+function ConvertTo-CliText {
+    <# O Windows PowerShell 5.1 não escapa aspas duplas em argumentos de executáveis: viram simples. #>
+    param([AllowEmptyString()][string]$Text)
+    return "$Text".Replace('"', "'")
 }
 
 function Invoke-StemmaInstaller {
@@ -2006,7 +2012,11 @@ function Invoke-StemmaAppUpdate {
     $state = 'failed'
     $message = $null
     try {
-        $exe = Get-StemmaInstaller -Root $Root -InstallerPath $InstallerPath
+        Set-StemmaToolEnv -Root $Root
+        Import-DotEnv -Path (Join-Path $Root '.env') | Out-Null
+        # Exatamente a versão que o app mostrou e gravou (não a "latest" do GitHub agora).
+        $target = if ($InstallerPath) { $null } else { Get-StemmaUpdateTarget -Root $Root }
+        $exe = Get-StemmaInstaller -Root $Root -Version $target -InstallerPath $InstallerPath
         if (Test-Path -LiteralPath $resultFile) { Remove-Item -LiteralPath $resultFile -Force }
         $tag = [IO.Path]::GetFileNameWithoutExtension($exe) -replace '^Stemma-Setup-', ''
         $installerLog = Join-Path $logs "update-$tag.log"
@@ -2028,10 +2038,8 @@ function Invoke-StemmaAppUpdate {
     try {
         $current = Get-CurrentRelease -Root $Root
         if (-not $current) { throw "nenhuma release em $Root\current" }
-        Set-StemmaToolEnv -Root $Root
-        Import-DotEnv -Path (Join-Path $Root '.env') | Out-Null
         $cliArgs = @('update-result', '--state', $state)
-        if ($message) { $cliArgs += @('--message', $message) }
+        if ($message) { $cliArgs += @('--message', (ConvertTo-CliText $message)) }
         Invoke-StemmaCli -ReleaseDir $current -Arguments $cliArgs
     }
     catch { Write-Warning "Não deu para gravar o resultado no banco: $($_.Exception.Message)" }

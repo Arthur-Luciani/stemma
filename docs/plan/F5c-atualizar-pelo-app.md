@@ -46,17 +46,29 @@ Ensaio no PC (o `stemma-ensaio` que tinha sobrado do PR #27, na v1.4.3, porta 80
   - `pipeline/updater.py`: releases do GitHub por `urllib`, com `User-Agent`, timeout de 5 s, cache de 6 h (5 min na falha) e só releases com o instalador anexado. O disparo é `schtasks /run` pelo `run_process`;
   - CLI `update-result`;
   - recusas 409 (`update_running`, `jobs_active`, `update_unavailable`, `update_not_supported`), 503 sem GitHub e 502 se o `schtasks` falhar (grava `failed`);
-  - um `running` com mais de 2 h vira `failed`;
+  - um `running` com mais de 3 h 30 vira `failed` (mais que o limite de 3 h da tarefa);
+  - com atualização `running`, processar e exportar respondem 409 `update_running`;
+  - CLI `update-target`: a tarefa instala exatamente a versão que o app mostrou;
   - notas do release-please em PT-BR, sem links e hashes, acumuladas entre a versão atual e a última.
 - **Deploy**:
   - `Register-StemmaTasks` / `Unregister-StemmaTasks`. Install e Update do instalador recriam as tarefas antes de subir o serviço; o desinstalador remove;
-  - `Invoke-StemmaAppUpdate` (`setup.ps1 -Mode AppUpdate`): baixa e confere o `.exe`, roda em modo silencioso, lê o `/RESULTFILE`, grava pelo CLI da release no ar e reabre a bandeja.
+  - `Invoke-StemmaAppUpdate` (`setup.ps1 -Mode AppUpdate`): lê a versão alvo do banco, baixa e confere o `.exe` daquela tag (`Get-ReleaseAssets -Kind installer`), roda em modo silencioso, lê o `/RESULTFILE`, grava pelo CLI da release no ar (aspas duplas viram simples) e reabre a bandeja.
 - **Instalador**: `/NOTRAY`, `/RESULTFILE=`, código de saída 1 na falha (`GetCustomSetupExitCode`), e o Tailscale fora do ar não trava a atualização silenciosa.
 - **Frontend** (`features/update`):
   - chip na topbar (desktop) e faixa no Descobrir/Biblioteca (celular);
   - Dialog/BottomSheet em `?atualizacao=1`;
   - estados: atualizando (polling de 5 s que tolera o servidor fora), atualizado, falha com motivo, job ativo e instalação sem tarefa.
-- **Testes**: pytest +27 (service, rotas, CLI, notas, `GitHubReleases`, `UpdateTask`); Pester 70 → 111 (tarefas, resultado do instalador, fluxo do `AppUpdate`); Vitest +13.
+- **Testes**: pytest +32 (service, rotas, CLI, notas, `GitHubReleases`, `UpdateTask`, trava de jobs); Pester 70 → 116 (tarefas, resultado do instalador, fluxo do `AppUpdate`, `Get-ReleaseAssets`); Vitest +13.
+- **`/code-review`**: 9 achados, 8 corrigidos:
+  - backend e tarefa podiam escolher versões diferentes: agora a tarefa usa o `update-target`;
+  - o resultado caía numa linha já encerrada;
+  - o timeout era menor que o limite da tarefa;
+  - jobs novos durante a atualização;
+  - release malformada derrubava o GET (500);
+  - aspas no motivo quebravam o argumento do CLI;
+  - `Get-ReleaseInstaller` duplicado;
+  - keys repetidas nas notas.
+  - Descartado: "re-registrar a tarefa enquanto ela roda". O ensaio 9.0.0 → 9.0.1 fez exatamente isso e gravou o resultado.
 - **Docs**: ADR 0015, nota na ADR 0014, `operacao.md` (seção "Atualizar pelo app", layout, logs) e Desvios de design.
 
 ### Pendente

@@ -15,6 +15,7 @@ from app.schemas.exports import ExportCreate, ExportOut
 from app.services.events import EventPublisher, build_export_out
 from app.services.mix import MixService
 from app.services.sessions import SessionService
+from app.services.update_guard import ensure_not_updating
 from app.storage import Storage
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ class ExportService:
 
     def create(self, session_id: uuid.UUID, data: ExportCreate) -> ExportOut:
         session = self.sessions.get(session_id)
+        ensure_not_updating(self.db)
         if session.state is not SessionState.READY or not session.stems:
             raise ConflictError(
                 "session_not_ready", "A sessão ainda não está pronta para exportar."

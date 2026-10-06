@@ -7,9 +7,8 @@ fora do serviço. O estado fica no banco: `running` gravado aqui; o resultado, p
 
 import logging
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import __version__
@@ -26,12 +25,10 @@ from app.schemas.system import (
     UpdateRunOut,
 )
 from app.services.jobs import JobService
+from app.services.update_guard import RUNNING_TIMEOUT, is_running, latest_update
 
 logger = logging.getLogger(__name__)
 
-# Uma atualização `running` há mais tempo que isso não vai terminar (PC desligou no meio,
-# tarefa morta). Folga para baixar ~3 GB se o torch mudar de versão.
-RUNNING_TIMEOUT = timedelta(hours=2)
 STALE_MESSAGE = (
     "A atualização não terminou (o PC pode ter desligado no meio). "
     "Veja os logs na pasta logs da instalação."
@@ -132,11 +129,11 @@ class SystemUpdateService:
         return _run_out(row)
 
     def _last_run(self) -> SystemUpdateModel | None:
-        run = _latest_row(self.db)
+        run = latest_update(self.db)
         if (
             run is not None
             and run.state == UpdateState.RUNNING
-            and self.clock() - run.created_at > RUNNING_TIMEOUT
+            and not is_running(run, self.clock())
         ):
             logger.warning("Atualização %s sem resultado há mais de %s", run.id, RUNNING_TIMEOUT)
             run.state = UpdateState.FAILED
@@ -153,13 +150,13 @@ def record_update_result(
     *,
     clock: Callable[[], datetime] = utcnow,
 ) -> bool:
-    """Grava o resultado na última atualização pedida (usado pelo CLI, no fim da tarefa).
-    False se não houver nenhuma (tarefa rodada à mão)."""
+    """Grava o resultado na última atualização pedida, se ela ainda estiver `running` (usado
+    pelo CLI, no fim da tarefa). False se não houver (tarefa rodada à mão): nada muda."""
     if state == UpdateState.RUNNING:
         raise ValueError("o resultado precisa ser succeeded ou failed")
-    run = _latest_row(db)
-    if run is None:
-        logger.warning("Resultado de atualização sem pedido no banco: %s", state)
+    run = latest_update(db)
+    if run is None or run.state != UpdateState.RUNNING:
+        logger.warning("Resultado de atualização sem pedido em andamento: %s", state)
         return False
     run.state = state
     run.message = message or None
@@ -167,10 +164,6 @@ def record_update_result(
     db.commit()
     logger.info("Atualização %s → %s: %s", run.from_version, run.target_version, state)
     return True
-
-
-def _latest_row(db: Session) -> SystemUpdateModel | None:
-    return db.scalar(select(SystemUpdateModel).order_by(SystemUpdateModel.id.desc()).limit(1))
 
 
 def _latest_installable(releases: list[Release]) -> Release | None:

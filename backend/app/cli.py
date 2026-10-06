@@ -5,6 +5,8 @@
   `deploy/update.ps1`)
 - `uv run python -m app.cli update-result --state succeeded|failed [--message <texto>]` (usado
   pela tarefa agendada no fim da atualização pelo app, ADR 0015)
+- `uv run python -m app.cli update-target`: imprime a versão escolhida pelo app (`1.5.1`) da
+  atualização em andamento; sai com 1 se não houver (a tarefa instala exatamente essa)
 """
 
 import argparse
@@ -14,12 +16,14 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.db.engine import make_engine, make_sessionmaker
+from app.db.types import utcnow
 from app.domain.enums import UpdateState
 from app.domain.errors import AppError
 from app.logging_setup import configure_logging
 from app.services.backup import backup_database, restore_database
 from app.services.cleanup import CleanupService
 from app.services.system_update import record_update_result
+from app.services.update_guard import is_running, latest_update
 from app.storage import Storage
 
 logger = logging.getLogger("app.cli")
@@ -40,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     backup.add_argument("--dest", type=Path, required=True, help="arquivo de destino (novo)")
     restore = commands.add_parser("restore", help="sobrescreve o banco com um backup (app parado)")
     restore.add_argument("--src", type=Path, required=True, help="arquivo de backup")
+    commands.add_parser("update-target", help="versão da atualização em andamento")
     result = commands.add_parser(
         "update-result", help="grava o resultado da atualização pedida pelo app"
     )
@@ -58,12 +63,30 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "restore":
             restore_database(settings.database_url, args.src)
             return 0
+        if args.command == "update-target":
+            return _update_target(settings.database_url)
         if args.command == "update-result":
             return _update_result(settings.database_url, UpdateState(args.state), args.message)
     except AppError as exc:
         logger.error("%s", exc.message)
         return 1
     return _cleanup(settings.database_url, settings.storage_root, args)
+
+
+def _update_target(database_url: str) -> int:
+    engine = make_engine(database_url)
+    try:
+        with make_sessionmaker(engine)() as db:
+            run = latest_update(db)
+            if not is_running(run, utcnow()):
+                logger.error("Nenhuma atualização em andamento")
+                return 1
+            assert run is not None
+            # stdout: lido pelo motor (Invoke-StemmaAppUpdate); o log vai para o stderr.
+            sys.stdout.write(f"{run.target_version}\n")
+    finally:
+        engine.dispose()
+    return 0
 
 
 def _update_result(database_url: str, state: UpdateState, message: str | None) -> int:

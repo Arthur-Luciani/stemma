@@ -19,7 +19,7 @@ from app.domain.enums import UpdateState
 from app.domain.releases import format_version, parse_version
 from app.pipeline.updater import FAILURE_TTL_S, GitHubReleases, UpdateTask, UpdateTaskError
 from app.services.system_update import RUNNING_TIMEOUT, record_update_result
-from tests.conftest import open_db, process_session
+from tests.conftest import create_session, open_db, process_session
 
 CURRENT = parse_version(__version__)
 assert CURRENT is not None
@@ -392,3 +392,45 @@ def test_releases_de_um_arquivo_local(tmp_path: Path) -> None:
 
     assert result is not None
     assert [format_version(r.version) for r in result.releases] == [NEXT]
+
+
+def test_cli_update_target_imprime_a_versao_escolhida(
+    client: TestClient, task: FakeTask, cli_env: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["update-target"]) == 1
+    use_releases(client, [release(NEXT)])
+    client.post("/api/system/update")
+    capsys.readouterr()
+
+    assert main(["update-target"]) == 0
+
+    assert capsys.readouterr().out == f"{NEXT}\n"
+
+
+def test_resultado_nao_reescreve_atualizacao_ja_encerrada(
+    client: TestClient, task: FakeTask
+) -> None:
+    use_releases(client, [release(NEXT)])
+    client.post("/api/system/update")
+    with open_db(client) as db:
+        assert record_update_result(db, UpdateState.SUCCEEDED, None) is True
+        assert record_update_result(db, UpdateState.FAILED, "rodada à mão") is False
+    assert last_row(client).state == UpdateState.SUCCEEDED  # type: ignore[union-attr]
+
+
+def test_atualizando_recusa_processar_e_exportar(client: TestClient, task: FakeTask) -> None:
+    use_releases(client, [release(NEXT)])
+    session = create_session(client)
+    client.post("/api/system/update")
+
+    response = client.post(f"/api/sessions/{session['id']}/process")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "update_running"
+
+
+def test_release_com_data_invalida_e_ignorada() -> None:
+    listing = releases_of([release(NEXT, published_at="ontem"), release(OLDER)]).list()
+
+    assert listing is not None
+    assert [format_version(r.version) for r in listing.releases] == [OLDER]

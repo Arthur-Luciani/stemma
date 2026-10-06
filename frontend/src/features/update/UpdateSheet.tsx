@@ -147,12 +147,13 @@ function Notes({ data }: { data: SystemUpdate }) {
         data.notes.map((release) => (
           <div key={release.version} className={styles.release}>
             {several && <h4 className={styles.releaseVersion}>v{release.version}</h4>}
-            {release.sections.map((section) => (
-              <div key={section.title}>
+            {release.sections.map((section, sectionIndex) => (
+              // Títulos e itens podem se repetir (dois commits iguais): a posição entra na key.
+              <div key={`${String(sectionIndex)}-${section.title}`}>
                 <p className={styles.sectionTitle}>{section.title}</p>
                 <ul className={styles.items}>
-                  {section.items.map((item) => (
-                    <li key={item}>{item}</li>
+                  {section.items.map((item, itemIndex) => (
+                    <li key={`${String(itemIndex)}-${item}`}>{item}</li>
                   ))}
                 </ul>
               </div>

@@ -1551,7 +1551,9 @@ function Invoke-StemmaInstall {
         [string]$ZipPath,
         [switch]$SkipTailscale,
         [int]$HttpsPort = 443,
-        [int]$HealthTimeoutSec = 180
+        [int]$HealthTimeoutSec = 180,
+        # Pasta do setup.ps1 do instalador: cria as tarefas da atualização pelo app (ADR 0015).
+        [string]$EngineDir
     )
     $userCache = Find-UserUvCache  # antes do Set-StemmaToolEnv, que troca o UV_CACHE_DIR
     $seed = $userCache -and (Test-SameVolume $userCache $Root)
@@ -1638,6 +1640,8 @@ function Invoke-StemmaInstall {
     Set-CurrentRelease -Root $Root -ReleaseDir $release
 
     Enter-StemmaStage 'service'
+    # Antes de subir o serviço: ele lê o UPDATE_TASK do .env ao iniciar.
+    if ($EngineDir) { Register-StemmaTasks -Root $Root -ServiceId $ServiceId -EngineDir $EngineDir }
     Register-StemmaService -Root $Root -ServiceId $ServiceId -ReleaseDir $release
     Set-StemmaInstallInfo -Root $Root -ServiceId $ServiceId -TailscaleServe (-not $SkipTailscale) -HttpsPort $HttpsPort
     Start-StemmaService -ServiceId $ServiceId
@@ -1680,7 +1684,9 @@ function Invoke-StemmaUpdate {
         [string]$Version,
         [string]$ZipPath,
         [switch]$SimulateFailure,
-        [int]$HealthTimeoutSec = 180
+        [int]$HealthTimeoutSec = 180,
+        # Pasta do setup.ps1 do instalador: (re)cria as tarefas da atualização pelo app (ADR 0015).
+        [string]$EngineDir
     )
     $context = Get-StemmaContext -Root $Root
     if (-not $context.Current) { throw "Nenhuma release em $Root\current. Faça a instalação primeiro." }
@@ -1712,6 +1718,9 @@ function Invoke-StemmaUpdate {
     Enter-StemmaStage 'tools'
     # Com o serviço no ar, só o uv e o Python (o serviço usa FFmpeg e Deno; eles vêm depois de parar).
     Initialize-StemmaRuntime -Root $Root -Names @('uv')
+    # Antes de reiniciar o serviço (ele lê o UPDATE_TASK do .env ao iniciar). Instalações
+    # anteriores à F5c ganham as tarefas aqui.
+    if ($EngineDir) { Register-StemmaTasks -Root $Root -ServiceId $ServiceId -EngineDir $EngineDir }
     $context = Get-StemmaContext -Root $Root  # o .env pode ter ganhado chaves
 
     Enter-StemmaStage 'package'
@@ -1864,6 +1873,174 @@ function Update-StemmaYtDlp {
     }
 }
 
+# --- atualização pelo app (ADR 0015) ---------------------------------------------------
+
+function Get-StemmaTaskNames {
+    <#
+      Tarefas agendadas da instalação: `\Stemma\Atualizar` (SYSTEM, roda o instalador da versão
+      nova) e `\Stemma\Bandeja` (abre o Stemma.exe na sessão de quem está logado). Um ensaio
+      paralelo (outro ServiceId) leva o id no nome.
+    #>
+    param([Parameter(Mandatory)][string]$ServiceId)
+    $suffix = if ($ServiceId -eq 'stemma') { '' } else { "-$ServiceId" }
+    return [pscustomobject]@{
+        Path       = '\Stemma\'
+        Update     = "Atualizar$suffix"
+        Tray       = "Bandeja$suffix"
+        UpdateFull = "\Stemma\Atualizar$suffix"
+    }
+}
+
+function Get-AppUpdateArguments {
+    <# Linha de comando da tarefa `Atualizar`: o setup.ps1 que o instalador deixou em <raiz>\setup\engine. #>
+    param([Parameter(Mandatory)][string]$EngineDir, [Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$ServiceId)
+    $setup = Join-Path $EngineDir 'setup.ps1'
+    return "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$setup`" -Mode AppUpdate -Root `"$Root`" -ServiceId `"$ServiceId`""
+}
+
+function Register-StemmaTasks {
+    <#
+      Cria (ou recria) as tarefas e grava `UPDATE_TASK` no .env, para o backend saber que pode
+      atualizar. Chamado pelo instalador antes de (re)iniciar o serviço.
+    #>
+    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$ServiceId, [Parameter(Mandatory)][string]$EngineDir)
+    $names = Get-StemmaTaskNames -ServiceId $ServiceId
+    $update = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument (Get-AppUpdateArguments -EngineDir $EngineDir -Root $Root -ServiceId $ServiceId)
+    $system = New-ScheduledTaskPrincipal -UserId 'S-1-5-18' -LogonType ServiceAccount -RunLevel Highest
+    # Sem limite de bateria; até 3 h (download do torch se ele mudar de versão); uma de cada vez.
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -ExecutionTimeLimit (New-TimeSpan -Hours 3) -MultipleInstances IgnoreNew
+    Register-ScheduledTask -TaskPath $names.Path -TaskName $names.Update -Action $update -Principal $system `
+        -Settings $settings -Description 'Atualiza o Stemma para a última versão (pedido pelo app).' -Force | Out-Null
+
+    $tray = Join-Path $Root 'setup\Stemma.exe'
+    $trayAction = New-ScheduledTaskAction -Execute $tray -Argument "--root `"$Root`" --service `"$ServiceId`""
+    # Grupo Usuários (SID, para não depender do idioma do Windows): roda na sessão de quem está logado.
+    $users = New-ScheduledTaskPrincipal -GroupId 'S-1-5-32-545' -RunLevel Limited
+    $traySettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
+    Register-ScheduledTask -TaskPath $names.Path -TaskName $names.Tray -Action $trayAction -Principal $users `
+        -Settings $traySettings -Description 'Abre o ícone do Stemma na bandeja depois de atualizar pelo app.' -Force | Out-Null
+
+    Set-DotEnvValue -Path (Get-StemmaPaths -Root $Root).EnvFile -Key 'UPDATE_TASK' -Value $names.UpdateFull
+}
+
+function Unregister-StemmaTasks {
+    param([Parameter(Mandatory)][string]$ServiceId)
+    $names = Get-StemmaTaskNames -ServiceId $ServiceId
+    foreach ($name in $names.Update, $names.Tray) {
+        $task = Get-ScheduledTask -TaskPath $names.Path -TaskName $name -ErrorAction SilentlyContinue
+        if ($task) { Unregister-ScheduledTask -TaskPath $names.Path -TaskName $name -Confirm:$false }
+    }
+}
+
+function Get-ReleaseInstaller {
+    <# URLs do Stemma-Setup-<tag>.exe e do .sha256 da última release. #>
+    $url = "https://api.github.com/repos/$script:Repo/releases/latest"
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $release = Invoke-RestMethod -Uri $url -Headers @{ 'User-Agent' = 'stemma-deploy' }
+    $tag = $release.tag_name
+    $name = "Stemma-Setup-$tag.exe"
+    $exe = $release.assets | Where-Object { $_.name -eq $name }
+    $sha = $release.assets | Where-Object { $_.name -eq "$name.sha256" }
+    if (-not $exe -or -not $sha) { throw "A release $tag ainda não tem o instalador ($name)." }
+    return [pscustomobject]@{ Tag = $tag; ExeUrl = $exe.browser_download_url; ShaUrl = $sha.browser_download_url }
+}
+
+function Get-StemmaInstaller {
+    <# Baixa o instalador da última release para <raiz>\downloads e confere o SHA256 (ou usa -InstallerPath, ensaio). #>
+    param([Parameter(Mandatory)][string]$Root, [string]$InstallerPath)
+    if ($InstallerPath) {
+        $exe = (Resolve-Path -LiteralPath $InstallerPath).Path
+        if (Test-Path -LiteralPath "$exe.sha256") { Assert-Sha256 -Path $exe -Expected (Get-Sha256FromFile "$exe.sha256") }
+        return $exe
+    }
+    $asset = Get-ReleaseInstaller
+    $downloads = Join-Path $Root 'downloads'
+    New-Item -ItemType Directory -Force -Path $downloads | Out-Null
+    # Instaladores de atualizações anteriores não servem mais.
+    Get-ChildItem -LiteralPath $downloads -Filter 'Stemma-Setup-*' -ErrorAction SilentlyContinue | Remove-Item -Force
+    $exe = Join-Path $downloads "Stemma-Setup-$($asset.Tag).exe"
+    Write-Step "Baixando o instalador $($asset.Tag)"
+    Invoke-Download -Url $asset.ShaUrl -Dest "$exe.sha256"
+    Invoke-Download -Url $asset.ExeUrl -Dest $exe
+    Assert-Sha256 -Path $exe -Expected (Get-Sha256FromFile "$exe.sha256")
+    return $exe
+}
+
+function ConvertFrom-InstallerResult {
+    <# Arquivo do /RESULTFILE= do instalador: `ok|v1.5.1` ou `erro|motivo`. #>
+    param([AllowEmptyString()][string]$Text)
+    $line = "$Text".Trim()
+    $bar = $line.IndexOf('|')
+    if ($bar -lt 0) { return [pscustomobject]@{ Ok = $false; Text = $null } }
+    $value = $line.Substring($bar + 1).Trim()
+    return [pscustomobject]@{ Ok = ($line.Substring(0, $bar) -eq 'ok'); Text = $(if ($value) { $value } else { $null }) }
+}
+
+function Invoke-StemmaInstaller {
+    <# Roda o instalador e devolve o código de saída. #>
+    param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string[]]$Arguments)
+    $process = Start-Process -FilePath $Path -ArgumentList $Arguments -PassThru
+    # WaitForExit, e não -Wait: o -Wait do 5.1 espera também os processos que sobram.
+    $process.WaitForExit()
+    return $process.ExitCode
+}
+
+function Invoke-StemmaAppUpdate {
+    <#
+      Tarefa `\Stemma\Atualizar` (ADR 0015): baixa o instalador da última release, roda em modo
+      silencioso (backup, migrations e rollback são dele) e grava o resultado no banco com o CLI
+      da release que ficou no ar. Por fim reabre o ícone da bandeja. Não lança: o resultado vai
+      para o banco, que o app lê.
+    #>
+    param(
+        [string]$Root = 'C:\stemma',
+        [string]$ServiceId = 'stemma',
+        [string]$InstallerPath,
+        [switch]$SimulateFailure
+    )
+    $logs = Join-Path $Root 'logs'
+    New-Item -ItemType Directory -Force -Path $logs | Out-Null
+    $resultFile = Join-Path $logs 'app-update-result.txt'
+    $state = 'failed'
+    $message = $null
+    try {
+        $exe = Get-StemmaInstaller -Root $Root -InstallerPath $InstallerPath
+        if (Test-Path -LiteralPath $resultFile) { Remove-Item -LiteralPath $resultFile -Force }
+        $tag = [IO.Path]::GetFileNameWithoutExtension($exe) -replace '^Stemma-Setup-', ''
+        $installerLog = Join-Path $logs "update-$tag.log"
+        $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOTRAY',
+            "/ROOT=`"$Root`"", "/SERVICEID=$ServiceId", "/RESULTFILE=`"$resultFile`"", "/LOG=`"$installerLog`"")
+        if ($SimulateFailure) { $arguments += '/SIMULATEFAILURE' }
+        Write-Step "Rodando o instalador $tag"
+        $code = Invoke-StemmaInstaller -Path $exe -Arguments $arguments
+        $text = if (Test-Path -LiteralPath $resultFile) { Get-Content -LiteralPath $resultFile -Raw -Encoding UTF8 } else { '' }
+        $result = ConvertFrom-InstallerResult $text
+        if ($code -eq 0 -and $result.Ok) { $state = 'succeeded' }
+        elseif ($result.Text -and -not $result.Ok) { $message = $result.Text }
+        else { $message = "O instalador da $tag parou com código $code. Veja $installerLog." }
+    }
+    catch { $message = "A atualização não começou: $($_.Exception.Message.TrimEnd('.'))." }
+    Write-Step "Resultado: $state $message"
+
+    # Grava com a release no ar agora (a nova, ou a anterior depois do rollback).
+    try {
+        $current = Get-CurrentRelease -Root $Root
+        if (-not $current) { throw "nenhuma release em $Root\current" }
+        Set-StemmaToolEnv -Root $Root
+        Import-DotEnv -Path (Join-Path $Root '.env') | Out-Null
+        $cliArgs = @('update-result', '--state', $state)
+        if ($message) { $cliArgs += @('--message', $message) }
+        Invoke-StemmaCli -ReleaseDir $current -Arguments $cliArgs
+    }
+    catch { Write-Warning "Não deu para gravar o resultado no banco: $($_.Exception.Message)" }
+
+    try { Start-ScheduledTask -TaskPath '\Stemma\' -TaskName (Get-StemmaTaskNames -ServiceId $ServiceId).Tray }
+    catch { Write-Warning "Ícone da bandeja: $($_.Exception.Message)" }
+    return [pscustomobject]@{ State = $state; Message = $message }
+}
+
 function Remove-StemmaTree {
     <# Apaga uma pasta grande (o cache tem centenas de milhares de arquivos); junctions só como link. #>
     param([Parameter(Mandatory)][string]$Path)
@@ -1891,6 +2068,8 @@ function Invoke-StemmaUninstall {
     $info = Get-StemmaInstallInfo -Root $Root
     if (-not $ServiceId) { $ServiceId = if ($info) { $info.serviceId } else { 'stemma' } }
     Unregister-StemmaService -Root $Root -ServiceId $ServiceId
+    try { Unregister-StemmaTasks -ServiceId $ServiceId }
+    catch { Write-Warning "Tarefas agendadas: $($_.Exception.Message)" }
     if ($info -and $info.tailscaleServe) {
         try { Remove-TailscaleServe -Port $context.Port -HttpsPort $info.httpsPort }
         catch { Write-Warning "tailscale serve: $($_.Exception.Message)" }

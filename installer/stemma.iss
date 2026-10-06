@@ -6,6 +6,9 @@
 ; Linha de comando (além das do Inno):
 ;   /SIMULATEFAILURE   na atualização, faz o /health da versão nova falhar (teste do rollback)
 ;   /ROOT=, /SERVICEID=, /PORT=, /DATAROOT=, /SKIPTAILSCALE   ensaio numa instalação paralela
+;   /NOTRAY            não abre o ícone da bandeja no fim (atualização pelo app, que roda como SYSTEM)
+;   /RESULTFILE=<arq>  grava "ok|<versão>" ou "erro|<motivo>" (atualização pelo app, ADR 0015)
+; Na falha, o instalador termina com código de saída 1 (útil com /VERYSILENT).
 
 #ifndef AppVersion
   #error Defina AppVersion (ex.: /DAppVersion=1.4.0)
@@ -150,6 +153,11 @@ end;
 function SkipTailscale: Boolean;
 begin
   Result := HasFlag('SKIPTAILSCALE');
+end;
+
+function NoTray: Boolean;
+begin
+  Result := HasFlag('NOTRAY');
 end;
 
 function IsUpdate: Boolean;
@@ -513,7 +521,8 @@ begin
   end
   else if CurPageID = TailscalePage.ID then
   begin
-    if TsState <> 'ready' then
+    { Atualização pelo app (silenciosa): o Tailscale fora do ar não impede atualizar. }
+    if (TsState <> 'ready') and not (WizardSilent and IsUpdate) then
     begin
       SuppressibleMsgBox('Termine a configuração do Tailscale antes de continuar.', mbInformation, MB_OK, IDOK);
       Result := False;
@@ -649,6 +658,31 @@ begin
     '--root ' + Quote(GetRoot('')) + ' --service ' + Quote(ServiceId), '', SW_SHOWNORMAL, ewNoWait, ResultCode);
 end;
 
+{ /RESULTFILE= (atualização pelo app): o resultado numa linha, para a tarefa agendada gravar no banco. }
+procedure WriteResultFile;
+var
+  Path: String;
+  Lines: TArrayOfString;
+begin
+  Path := ExpandConstant('{param:RESULTFILE|}');
+  if Path = '' then
+    Exit;
+  SetArrayLength(Lines, 1);
+  if Succeeded then
+    Lines[0] := 'ok|' + ResultVersion
+  else
+    Lines[0] := 'erro|' + ErrorText;
+  SaveStringsToUTF8File(Path, Lines, False);
+end;
+
+{ Código de saída 1 quando o motor falhou (o assistente chega ao fim mostrando o erro). }
+function GetCustomSetupExitCode: Integer;
+begin
+  Result := 0;
+  if not Succeeded then
+    Result := 1;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   CloseTray;
@@ -664,8 +698,9 @@ begin
     if Succeeded and (ResultUrl <> '') then
       SaveStringToFile(ExpandConstant('{app}\Stemma.url'),
         '[InternetShortcut]' + #13#10 + 'URL=' + ResultUrl + #13#10, False);
+    WriteResultFile;
     { Ícone na bandeja, como o usuário (não elevado). Numa falha também: ele mostra o estado. }
-    if Installed + ResultVersion <> '' then
+    if (Installed + ResultVersion <> '') and not NoTray then
       StartTray;
   end;
 end;

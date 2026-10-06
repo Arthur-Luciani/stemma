@@ -89,6 +89,9 @@ var
   QrImage: TBitmapImage;
   { Resultado do motor (linhas ##RESULT). }
   Installed, HasService, CheckPort, CheckDataRoot, TsState, TsHost, Gpu: String;
+  FreePort, PortUse, Serve443, Serve8443: String;
+  { Porta HTTPS do Tailscale escolhida (443, ou 8443 se a 443 publica outro app). }
+  HttpsPort: Integer;
   ResultUrl, ResultQr, ResultVersion, ResultLog, ErrorText, LastStep: String;
   Succeeded: Boolean;
 
@@ -192,6 +195,10 @@ begin
     else if Key = 'tailscale' then TsState := Value
     else if Key = 'host' then TsHost := Value
     else if Key = 'gpu' then Gpu := Value
+    else if Key = 'freeport' then FreePort := Value
+    else if Key = 'portuse' then PortUse := Value
+    else if Key = 'serve443' then Serve443 := Value
+    else if Key = 'serve8443' then Serve8443 := Value
     else if Key = 'url' then ResultUrl := Value
     else if Key = 'qr' then ResultQr := Value
     else if Key = 'version' then ResultVersion := Value
@@ -339,7 +346,11 @@ begin
     'Porta local do Stemma neste PC.',
     'O Tailscale publica o Stemma em HTTPS a partir desta porta. Mude só se a 8000 já estiver em uso.');
   PortPage.Add('Porta:', False);
-  PortPage.Values[0] := ExpandConstant('{param:PORT|8000}');
+  { Sugestão: a primeira porta livre a partir da 8000 (conferida de novo ao avançar). }
+  if FreePort = '' then
+    FreePort := '8000';
+  PortPage.Values[0] := ExpandConstant('{param:PORT|' + FreePort + '}');
+  HttpsPort := 443;
 
   TailscalePage := CreateCustomPage(PortPage.ID, 'Tailscale',
     'Acesso pelo celular, com HTTPS, sem abrir portas no roteador.');
@@ -413,12 +424,53 @@ begin
     begin
       MsgBox('Use uma porta entre 1024 e 65535.', mbError, MB_OK);
       Result := False;
+      Exit;
+    end;
+    { Porta em uso (outro app, outra instalação) ou reservada pelo Windows: sugere a próxima livre. }
+    PortUse := '';
+    FreePort := '';
+    RunEngineQuick('CheckPort', '-Port ' + IntToStr(Port));
+    if PortUse <> '' then
+    begin
+      if FreePort <> '' then
+      begin
+        MsgBox('A porta ' + IntToStr(Port) + ' está ' + PortUse + '.' + #13#10#13#10 +
+          'Preenchi a próxima livre: ' + FreePort + '.', mbInformation, MB_OK);
+        PortPage.Values[0] := FreePort;
+      end
+      else
+        MsgBox('A porta ' + IntToStr(Port) + ' está ' + PortUse + '. Escolha outra.', mbError, MB_OK);
+      Result := False;
     end;
   end
-  else if (CurPageID = TailscalePage.ID) and (TsState <> 'ready') then
+  else if CurPageID = TailscalePage.ID then
   begin
-    MsgBox('Termine a configuração do Tailscale antes de continuar.', mbInformation, MB_OK);
-    Result := False;
+    if TsState <> 'ready' then
+    begin
+      MsgBox('Termine a configuração do Tailscale antes de continuar.', mbInformation, MB_OK);
+      Result := False;
+      Exit;
+    end;
+    { A 443 já publica outro app? Pergunta antes de tomar; senão usa a 8443. }
+    HttpsPort := 443;
+    if (Serve443 <> '') and (Serve443 <> 'http://127.0.0.1:' + Trim(PortPage.Values[0])) then
+    begin
+      if MsgBox('O endereço https://' + TsHost + ' (porta 443 do Tailscale) já publica outro app:' + #13#10 +
+        Serve443 + #13#10#13#10 + 'Substituir pelo Stemma?' + #13#10#13#10 +
+        'Sim: o Stemma fica em https://' + TsHost + ' e o outro app sai dali.' + #13#10 +
+        'Não: o Stemma fica em https://' + TsHost + ':8443 e o outro app continua.',
+        mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDNO then
+      begin
+        if (Serve8443 <> '') and (Serve8443 <> 'http://127.0.0.1:' + Trim(PortPage.Values[0])) then
+        begin
+          MsgBox('A 8443 do Tailscale também publica outro app (' + Serve8443 + '). ' +
+            'Libere uma delas (tailscale serve --https=8443 off) e clique em Verificar de novo.', mbError, MB_OK);
+          Result := False;
+          Exit;
+        end;
+        HttpsPort := 8443;
+      end;
+    end;
   end;
 end;
 
@@ -445,7 +497,8 @@ begin
   end
   else
     Params := EngineParams(ExpandConstant('{app}\engine\setup.ps1'), 'Install',
-      Params + ' -DataRoot ' + Quote(Trim(DataPage.Values[0])) + ' -Port ' + Trim(PortPage.Values[0]));
+      Params + ' -DataRoot ' + Quote(Trim(DataPage.Values[0])) + ' -Port ' + Trim(PortPage.Values[0]) +
+      ' -HttpsPort ' + IntToStr(HttpsPort));
 
   WizardForm.ProgressGauge.Style := npbstMarquee;
   ErrorText := '';

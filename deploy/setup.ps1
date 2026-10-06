@@ -9,7 +9,9 @@
     ##RESULT k=v     resultado para o instalador
     ##ERROR texto    falha (com exit code 1)
   Modos:
-    Check             estado do PC: release instalada, porta, pasta de dados, Tailscale, GPU
+    Check             estado do PC: release instalada, porta, pasta de dados, Tailscale, GPU,
+                      porta livre sugerida e o que a 443/8443 do Tailscale já publicam
+    CheckPort         -Port N: se está livre (portuse=motivo) e a próxima livre (freeport)
     TailscaleInstall  instala o Tailscale (MSI oficial)
     TailscaleLogin    abre o login do Tailscale no navegador
     Install           instalação nova (ferramentas, release, serviço, tailscale serve)
@@ -20,12 +22,13 @@
 #>
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('Check', 'TailscaleInstall', 'TailscaleLogin', 'Install', 'Update', 'Uninstall', 'Start', 'Stop')]
+    [ValidateSet('Check', 'CheckPort', 'TailscaleInstall', 'TailscaleLogin', 'Install', 'Update', 'Uninstall', 'Start', 'Stop')]
     [string]$Mode,
     [string]$Root = 'C:\stemma',
     [string]$ServiceId = 'stemma',
     [string]$DataRoot,
     [int]$Port = 8000,
+    [int]$HttpsPort = 443,
     [string]$ZipPath,
     [string]$QrPath,
     [string]$Keep,
@@ -41,10 +44,10 @@ Import-Module (Join-Path $PSScriptRoot 'StemmaDeploy.psm1') -Force
 
 function Write-Result([string]$Key, [string]$Value) { Write-Host "##RESULT $Key=$Value" }
 
-function Get-StemmaUrl([int]$PortNumber, [bool]$UseTailscale) {
+function Get-StemmaUrl([int]$PortNumber, [bool]$UseTailscale, [int]$Https = 443) {
     if ($UseTailscale) {
         $state = Get-TailscaleState
-        if ($state.Host) { return "https://$($state.Host)" }
+        if ($state.Host) { return $(if ($Https -eq 443) { "https://$($state.Host)" } else { "https://$($state.Host):$Https" }) }
     }
     return "http://127.0.0.1:$PortNumber"
 }
@@ -93,7 +96,8 @@ if ($Mode -in 'Start', 'Stop') {
                 throw "o serviço subiu, mas não respondeu. Veja os logs em $Root\logs."
             }
             $useTailscale = if ($info) { [bool]$info.tailscaleServe } else { $true }
-            Show-Popup "O Stemma está no ar e volta a subir sozinho com o Windows.`n`n$(Get-StemmaUrl -PortNumber $context.Port -UseTailscale $useTailscale)" 64
+            $https = if ($info) { [int]$info.httpsPort } else { 443 }
+            Show-Popup "O Stemma está no ar e volta a subir sozinho com o Windows.`n`n$(Get-StemmaUrl -PortNumber $context.Port -UseTailscale $useTailscale -Https $https)" 64
         }
         exit 0
     }
@@ -126,6 +130,16 @@ try {
             Write-Result 'tailscale' $tailscale.State
             Write-Result 'host' $tailscale.Host
             Write-Result 'gpu' $(if (Test-NvidiaGpu) { 'ok' } else { 'missing' })
+            # Instalação nova: sugere a primeira porta livre a partir da 8000.
+            if (-not $context.CurrentTag) { Write-Result 'freeport' "$(Find-FreePort -Start 8000)" }
+            # O que as portas HTTPS do Tailscale já publicam (vazio = livre).
+            Write-Result 'serve443' "$(Get-TailscaleServeTarget -HttpsPort 443)"
+            Write-Result 'serve8443' "$(Get-TailscaleServeTarget -HttpsPort 8443)"
+        }
+        'CheckPort' {
+            $usage = Get-PortUsage -Port $Port
+            Write-Result 'portuse' "$usage"
+            if ($usage) { Write-Result 'freeport' "$(Find-FreePort -Start ($Port + 1))" }
         }
         'TailscaleInstall' {
             Assert-Admin
@@ -139,8 +153,8 @@ try {
         'Install' {
             Assert-Admin
             $tag = Invoke-StemmaInstall -Root $Root -DataRoot $DataRoot -Port $Port -ServiceId $ServiceId `
-                -ZipPath $ZipPath -SkipTailscale:$SkipTailscale
-            $url = Get-StemmaUrl -PortNumber (Get-StemmaContext -Root $Root).Port -UseTailscale (-not $SkipTailscale)
+                -ZipPath $ZipPath -SkipTailscale:$SkipTailscale -HttpsPort $HttpsPort
+            $url = Get-StemmaUrl -PortNumber (Get-StemmaContext -Root $Root).Port -UseTailscale (-not $SkipTailscale) -Https $HttpsPort
             Write-Result 'version' $tag
             Write-Result 'url' $url
             Write-StemmaQr $url
@@ -151,13 +165,19 @@ try {
             if ($info) { $ServiceId = $info.serviceId }
             $tag = Invoke-StemmaUpdate -Root $Root -ServiceId $ServiceId -ZipPath $ZipPath -SimulateFailure:$SimulateFailure
             $useTailscale = if ($info) { [bool]$info.tailscaleServe } else { -not $SkipTailscale }
+            $https = if ($info) { [int]$info.httpsPort } else { $HttpsPort }
             $port = (Get-StemmaContext -Root $Root).Port
-            # Idempotente: refaz o serve se uma instalação anterior falhou antes dele.
+            # Refaz o serve se ele sumiu (instalação que falhou antes dele, outro desinstalador),
+            # mas nunca toma a porta HTTPS de outro app.
             if ($useTailscale) {
-                try { Set-TailscaleServe -Port $port }
-                catch { Write-Warning "tailscale serve: $($_.Exception.Message)" }
+                $target = Get-TailscaleServeTarget -HttpsPort $https
+                if (-not $target -or $target -eq (Get-StemmaServeTarget $port)) {
+                    try { Set-TailscaleServe -Port $port -HttpsPort $https }
+                    catch { Write-Warning "tailscale serve: $($_.Exception.Message)" }
+                }
+                else { Write-Warning "A $https do Tailscale publica '$target', não o Stemma: não mexi nela." }
             }
-            $url = Get-StemmaUrl -PortNumber $port -UseTailscale $useTailscale
+            $url = Get-StemmaUrl -PortNumber $port -UseTailscale $useTailscale -Https $https
             Write-Result 'version' $tag
             Write-Result 'url' $url
             Write-StemmaQr $url

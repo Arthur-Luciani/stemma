@@ -81,17 +81,41 @@ if ($Rollback) {
     $previous = Get-PreviousRelease -Root $Root -Current $currentTag
     if (-not $previous) { throw "Não há release instalada anterior a $currentTag." }
     $targetHead = Get-AlembicHead -ReleaseDir $previous.Path
+    $currentHead = Get-AlembicHead -ReleaseDir $current
     Stop-StemmaService -ServiceId $ServiceId
-    Write-Step 'Backup do banco'
-    Invoke-StemmaCli -ReleaseDir $current -Arguments @('backup', '--dest', (New-BackupPath "$currentTag-rollback"))
-    if ($targetHead -ne (Get-AlembicHead -ReleaseDir $current)) {
-        Write-Step "Desfazendo migrations até $targetHead"
-        Invoke-Alembic -ReleaseDir $current -Arguments @('downgrade', $targetHead)
+    $backup = $null
+    try {
+        $customDb = $envValues.Contains('DATABASE_URL') -and $envValues['DATABASE_URL']
+        if ($customDb -or (Test-Path -LiteralPath (Join-Path $storageRoot 'stemma.db'))) {
+            Write-Step 'Backup do banco'
+            $dest = New-BackupPath "$currentTag-rollback"
+            Invoke-StemmaCli -ReleaseDir $current -Arguments @('backup', '--dest', $dest)
+            $backup = $dest
+        }
+        if ($targetHead -ne $currentHead) {
+            Write-Step "Desfazendo migrations até $targetHead"
+            Invoke-Alembic -ReleaseDir $current -Arguments @('downgrade', $targetHead)
+        }
+        Set-CurrentRelease -Root $Root -ReleaseDir $previous.Path
+        Start-StemmaService -ServiceId $ServiceId
+        if (-not (Wait-StemmaHealth -Port $port -ExpectedVersion $previous.Name -TimeoutSec $HealthTimeoutSec)) {
+            throw "A $($previous.Name) não confirmou a versão no /health."
+        }
     }
-    Set-CurrentRelease -Root $Root -ReleaseDir $previous.Path
-    Start-StemmaService -ServiceId $ServiceId
-    if (-not (Wait-StemmaHealth -Port $port -ExpectedVersion $previous.Name -TimeoutSec $HealthTimeoutSec)) {
-        throw "Rollback para $($previous.Name) feito, mas o /health não confirmou. Veja os logs em $Root\logs."
+    catch {
+        # Desfaz o rollback: banco e `current` como estavam, e a versão atual no ar de novo.
+        $reason = $_.Exception.Message
+        Write-Warning "Rollback falhou: $reason"
+        Stop-StemmaService -ServiceId $ServiceId
+        if ($backup -and (Test-Path -LiteralPath $backup)) {
+            Invoke-StemmaCli -ReleaseDir $current -Arguments @('restore', '--src', $backup)
+        }
+        Set-CurrentRelease -Root $Root -ReleaseDir $current
+        Start-StemmaService -ServiceId $ServiceId
+        $back = Wait-StemmaHealth -Port $port -ExpectedVersion $currentTag -TimeoutSec $HealthTimeoutSec
+        $state = if ($back) { "Continua na $currentTag." } else { "E a $currentTag não confirmou no /health; veja $Root\logs." }
+        Write-Error "Rollback para $($previous.Name) falhou ($reason). $state" -ErrorAction Continue
+        exit 1
     }
     Write-Step "Voltou para $($previous.Name)"
     return
@@ -118,8 +142,10 @@ try {
     }
     else {
         Write-Step 'Backup do banco'
-        $backup = New-BackupPath "$currentTag-to-$target"
-        Invoke-StemmaCli -ReleaseDir $release -Arguments @('backup', '--dest', $backup)
+        $dest = New-BackupPath "$currentTag-to-$target"
+        Invoke-StemmaCli -ReleaseDir $release -Arguments @('backup', '--dest', $dest)
+        # Só depois do sucesso: o rollback restaura deste arquivo.
+        $backup = $dest
     }
     Write-Step 'Migrations'
     Invoke-Alembic -ReleaseDir $release -Arguments @('upgrade', 'head')

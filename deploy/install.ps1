@@ -90,7 +90,10 @@ New-ServiceXml -Template (Join-Path $release 'deploy\stemma-service.xml') -Servi
     -Dest (Join-Path $winswDir "$ServiceId.xml")
 Write-Host '    O WinSW vai pedir a conta do Windows que roda o serviço (a sua, ex.: .\Dell)'
 Write-Host '    e a senha, e se pode conceder "logon como serviço" (responda y).'
-Invoke-Native -FilePath $exe -Arguments @('install', '/p')
+# Direto, sem o Invoke-Native: os prompts do WinSW não terminam em quebra de linha e
+# ficariam presos no pipe.
+& $exe install /p
+if ($LASTEXITCODE -ne 0) { throw "WinSW install falhou (código $LASTEXITCODE)." }
 Start-StemmaService -ServiceId $ServiceId
 
 if (-not (Wait-StemmaHealth -Port $port -ExpectedVersion $package.Tag)) {

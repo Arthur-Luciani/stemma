@@ -50,6 +50,22 @@ def test_backup_nao_sobrescreve(migrated: Settings, tmp_path: Path) -> None:
         backup_database(migrated.database_url, dest)
 
 
+def test_backup_que_falha_nao_deixa_arquivo(
+    migrated: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def copy_quebrado(_src: Path, dest: Path) -> None:
+        dest.write_bytes(b"pela metade")
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr("app.services.backup._copy", copy_quebrado)
+    dest = tmp_path / "backups" / "stemma.db"
+
+    with pytest.raises(sqlite3.OperationalError):
+        backup_database(migrated.database_url, dest)
+
+    assert list(dest.parent.iterdir()) == []
+
+
 def test_restore_volta_o_banco(migrated: Settings, tmp_path: Path) -> None:
     dest = tmp_path / "antes.db"
     backup_database(migrated.database_url, dest)

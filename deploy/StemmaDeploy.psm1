@@ -67,7 +67,8 @@ function ConvertTo-StemmaVersion {
 
 function Get-VersionFromZipName {
     param([Parameter(Mandatory)][string]$Path)
-    $name = [IO.Path]::GetFileName($Path)
+    # Separa por \ e / (no pwsh do Linux, o GetFileName não entende \).
+    $name = ($Path -split '[\\/]')[-1]
     if ($name -match '^stemma-(v\d+\.\d+\.\d+)\.zip$') { return $Matches[1] }
     throw "Nome de pacote inesperado: '$name' (esperado stemma-vX.Y.Z.zip)."
 }

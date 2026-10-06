@@ -36,7 +36,16 @@ def backup_database(database_url: str, dest: Path) -> Path:
     if dest.exists():
         raise AppError("backup_exists", f"O destino do backup já existe: {dest}")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    _copy(src, dest)
+    # Copia num temporário e só renomeia no fim: um backup que falha no meio nunca fica
+    # no destino (o rollback do update.ps1 restauraria um arquivo vazio por cima do banco).
+    partial = dest.with_name(dest.name + ".partial")
+    partial.unlink(missing_ok=True)
+    try:
+        _copy(src, partial)
+        partial.replace(dest)
+    except BaseException:
+        partial.unlink(missing_ok=True)
+        raise
     logger.info("Backup de %s em %s", src, dest)
     return dest
 

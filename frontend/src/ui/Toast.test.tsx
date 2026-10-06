@@ -76,4 +76,44 @@ describe('Toast', () => {
       vi.useRealTimers();
     }
   });
+
+  it('persistente não sai quando chegam outros toasts', async () => {
+    function Many() {
+      const toast = useToast();
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              toast.show({ message: 'Nova versão', persistent: true });
+            }}
+          >
+            fixo
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              toast.show({ message: 'Outro' });
+            }}
+          >
+            outro
+          </button>
+        </>
+      );
+    }
+    render(
+      <MemoryRouter>
+        <ToastProvider>
+          <Many />
+        </ToastProvider>
+      </MemoryRouter>,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'fixo' }));
+    for (let i = 0; i < 4; i++)
+      await userEvent.click(screen.getByRole('button', { name: 'outro' }));
+
+    expect(screen.getAllByRole('status')).toHaveLength(3);
+    expect(screen.getByText('Nova versão')).toBeInTheDocument();
+  });
 });

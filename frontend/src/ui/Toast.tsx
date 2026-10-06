@@ -76,12 +76,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const show = useCallback((input: ToastInput) => {
     const id = nextId.current++;
-    setToasts((list) =>
-      [
+    setToasts((list) => {
+      const next = [
         ...list,
         { ...input, tone: input.tone ?? 'info', persistent: input.persistent ?? false, id },
-      ].slice(-MAX_TOASTS),
-    );
+      ];
+      // Passou do limite: sai o mais antigo que não é persistente (o aviso de versão nova fica).
+      while (next.length > MAX_TOASTS) {
+        const oldest = next.findIndex((t) => !t.persistent);
+        next.splice(oldest === -1 ? 0 : oldest, 1);
+      }
+      return next;
+    });
   }, []);
 
   const api = useMemo(() => ({ show }), [show]);

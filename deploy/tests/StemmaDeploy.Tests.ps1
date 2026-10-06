@@ -55,6 +55,7 @@ Describe 'Versões' {
 
     It 'tira a tag do nome do zip' {
         Get-VersionFromZipName 'C:\x\stemma-v1.3.0.zip' | Should -Be 'v1.3.0'
+        Get-VersionFromZipName '/tmp/x/stemma-v1.3.0.zip' | Should -Be 'v1.3.0'
         { Get-VersionFromZipName 'outra-coisa.zip' } | Should -Throw
     }
 }

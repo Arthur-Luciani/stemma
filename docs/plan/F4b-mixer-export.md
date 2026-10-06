@@ -33,7 +33,7 @@ PWA, serviço, update (F5).
 No celular e no desktop: abrir uma sessão, mixar, usar loop A–B, aplicar preset, recarregar a página e encontrar o mix salvo, exportar MP3 e baixar; CI verde.
 
 ## Handoff
-**Status:** PR aberto (2026-10-05). Falta a conferência no celular real e no desktop, que é sua (ver "Pendente").
+**Status:** PR #14 aberto (2026-10-05). Falta a conferência no celular real e no desktop, que é sua (ver "Pendente").
 
 ### Feito
 - **Rota `/sessions/:id/mix`** (`features/mixer/MixerPage.tsx`) no lugar do placeholder da F3. Sessão que não está pronta mostra um estado vazio com "Abrir sessão".

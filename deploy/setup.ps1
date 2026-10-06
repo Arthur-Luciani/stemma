@@ -151,7 +151,13 @@ try {
             if ($info) { $ServiceId = $info.serviceId }
             $tag = Invoke-StemmaUpdate -Root $Root -ServiceId $ServiceId -ZipPath $ZipPath -SimulateFailure:$SimulateFailure
             $useTailscale = if ($info) { [bool]$info.tailscaleServe } else { -not $SkipTailscale }
-            $url = Get-StemmaUrl -PortNumber (Get-StemmaContext -Root $Root).Port -UseTailscale $useTailscale
+            $port = (Get-StemmaContext -Root $Root).Port
+            # Idempotente: refaz o serve se uma instalação anterior falhou antes dele.
+            if ($useTailscale) {
+                try { Set-TailscaleServe -Port $port }
+                catch { Write-Warning "tailscale serve: $($_.Exception.Message)" }
+            }
+            $url = Get-StemmaUrl -PortNumber $port -UseTailscale $useTailscale
             Write-Result 'version' $tag
             Write-Result 'url' $url
             Write-StemmaQr $url

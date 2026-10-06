@@ -197,8 +197,15 @@ namespace Stemma
         private void Refresh()
         {
             // Síncrono: o /health é local (porta fechada recusa na hora; timeout curto).
-            string status = ServiceStatus();
-            string version = status == "Running" ? HealthVersion() : null;
+            // Nada aqui pode derrubar o ícone: um erro inesperado conta como "sem resposta".
+            string status = null;
+            string version = null;
+            try
+            {
+                status = ServiceStatus();
+                version = status == "Running" ? HealthVersion() : null;
+            }
+            catch (Exception) { version = null; }
             Apply(status, version);
         }
 
@@ -272,20 +279,29 @@ namespace Stemma
             }
             catch (WebException) { return null; }
             catch (IOException) { return null; }
+            catch (UriFormatException) { return null; } // PORT inválido no .env
         }
 
         private string ReadPort()
         {
-            string env = Path.Combine(root, ".env");
-            if (File.Exists(env))
+            int port;
+            foreach (string line in ReadLines(Path.Combine(root, ".env")))
             {
-                foreach (string line in File.ReadAllLines(env))
+                string trimmed = line.Trim();
+                if (trimmed.StartsWith("PORT=") && int.TryParse(trimmed.Substring(5).Trim().Trim('"', '\''), out port))
                 {
-                    string trimmed = line.Trim();
-                    if (trimmed.StartsWith("PORT=")) return trimmed.Substring(5).Trim().Trim('"', '\'');
+                    return port.ToString();
                 }
             }
             return "8000";
+        }
+
+        /// <summary>Linhas de um arquivo, ou nenhuma se ele não existe ou não pode ser lido.</summary>
+        private static string[] ReadLines(string file)
+        {
+            try { return File.Exists(file) ? File.ReadAllLines(file) : new string[0]; }
+            catch (IOException) { return new string[0]; }
+            catch (UnauthorizedAccessException) { return new string[0]; }
         }
 
         // --- ações -------------------------------------------------------------------
@@ -293,13 +309,9 @@ namespace Stemma
         internal static string ReadUrl(string root)
         {
             // Gravado pelo instalador (Stemma.url): https://<pc>.<tailnet>.ts.net ou o local.
-            string file = Path.Combine(Path.Combine(root, "setup"), "Stemma.url");
-            if (File.Exists(file))
+            foreach (string line in ReadLines(Path.Combine(Path.Combine(root, "setup"), "Stemma.url")))
             {
-                foreach (string line in File.ReadAllLines(file))
-                {
-                    if (line.StartsWith("URL=")) return line.Substring(4).Trim();
-                }
+                if (line.StartsWith("URL=")) return line.Substring(4).Trim();
             }
             return "http://127.0.0.1:8000";
         }

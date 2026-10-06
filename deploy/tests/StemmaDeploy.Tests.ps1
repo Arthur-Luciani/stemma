@@ -224,6 +224,17 @@ Describe 'Scripts' {
         $bytes[0..2] | Should -Be @(0xEF, 0xBB, 0xBF)
     }
 
+    It 'sem caracteres de controle (um "\b" vira backspace e quebra caminhos)' {
+        $repo = Join-Path $PSScriptRoot '..\..'
+        $files = @(Get-ChildItem -LiteralPath (Join-Path $repo 'deploy'), (Join-Path $repo 'installer'), (Join-Path $repo '.github\workflows') -Recurse -File |
+                Where-Object { $_.Extension -in '.ps1', '.psm1', '.iss', '.cs', '.yml', '.xml' })
+        $files.Count | Should -BeGreaterThan 5
+        foreach ($file in $files) {
+            $bad = @([IO.File]::ReadAllBytes($file.FullName) | Where-Object { $_ -lt 32 -and $_ -notin 9, 10, 13 })
+            $bad.Count | Should -Be 0 -Because $file.FullName
+        }
+    }
+
     It 'o .iss tem BOM (o Inno lê sem BOM como ANSI)' {
         $bytes = [IO.File]::ReadAllBytes((Join-Path $PSScriptRoot '..\..\installer\stemma.iss'))
         $bytes[0..2] | Should -Be @(0xEF, 0xBB, 0xBF)
@@ -286,6 +297,13 @@ Describe 'Install-StemmaTool' {
         Get-Content -LiteralPath (Join-Path $root 'tools\ferramenta\.stemma-tool') | Should -Match '^1\.1 '
     }
 
+    It 'marcador vazio (escrita interrompida) reinstala em vez de quebrar' {
+        $tool = @{ Version = '1.0'; Url = 'https://x/ferramenta-1.0.zip'; Sha256 = $script:FakeSha; Strip = $true; Exe = 'bin\tool.exe' }
+        Install-StemmaTool -Root $root -Name 'ferramenta' -Tool $tool | Out-Null
+        Set-Content -LiteralPath (Join-Path $root 'tools\ferramenta\.stemma-tool') -Value '' -NoNewline
+        Test-StemmaToolInstalled -Dir (Join-Path $root 'tools\ferramenta') -Tool $tool | Should -BeFalse
+    }
+
     It 'SHA256 errado falha e não instala' {
         $tool = @{ Version = '1.0'; Url = 'https://x/ferramenta-1.0.zip'; Sha256 = ('0' * 64); Strip = $true; Exe = 'bin\tool.exe' }
         { Install-StemmaTool -Root $root -Name 'ferramenta' -Tool $tool } | Should -Throw '*não confere*'
@@ -316,6 +334,41 @@ Describe 'Set-StemmaToolEnv' {
         # Nada no perfil do usuário (~\.local\bin, HKCU).
         $env:UV_PYTHON_INSTALL_BIN | Should -Be '0'
         $env:UV_PYTHON_INSTALL_REGISTRY | Should -Be '0'
+    }
+}
+
+Describe 'Assert-StemmaDataRoot' {
+    It 'recusa a raiz de um drive (o desinstalador apagaria o drive)' {
+        { Assert-StemmaDataRoot 'D:\' } | Should -Throw '*raiz do drive*'
+        { Assert-StemmaDataRoot 'D:' } | Should -Throw '*raiz do drive*'
+    }
+
+    It 'aceita uma pasta' {
+        { Assert-StemmaDataRoot 'D:\stemma-data' } | Should -Not -Throw
+        { Assert-StemmaDataRoot 'D:\stemma-data\' } | Should -Not -Throw
+    }
+}
+
+Describe 'Protect-StemmaDirectory' {
+    BeforeDiscovery {
+        $IsAdmin = $OnWindows -and ([Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    }
+
+    It 'tira a herança, deixa Usuários só com leitura e Administradores como dono' -Skip:(-not $IsAdmin) {
+        $dir = Join-Path $TestDrive 'protegida'
+        New-Item -ItemType Directory -Force -Path (Join-Path $dir 'sub') | Out-Null
+        Set-Content -LiteralPath (Join-Path $dir 'sub\a.txt') -Value 'x'
+        Mock -ModuleName StemmaDeploy Write-Step {}
+
+        Protect-StemmaDirectory -Path $dir
+
+        $acl = Get-Acl -LiteralPath (Join-Path $dir 'sub\a.txt')
+        $acl.Owner | Should -Match 'Administra'
+        $users = @($acl.Access | Where-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-5-32-545' })
+        $users.Count | Should -BeGreaterThan 0
+        $users | ForEach-Object { $_.FileSystemRights.ToString() | Should -Not -Match 'Write|Modify|FullControl' }
+        @($acl.Access | Where-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-5-11' }).Count | Should -Be 0
+        (Get-Acl -LiteralPath $dir).AreAccessRulesProtected | Should -BeTrue
     }
 }
 
@@ -439,11 +492,14 @@ Describe 'Invoke-StemmaUpdate' {
         $script:next = Join-Path $root 'releases\v1.1.0'
         New-Item -ItemType Directory -Force -Path $script:current, $script:next | Out-Null
         Mock -ModuleName StemmaDeploy Get-CurrentRelease { $script:current }
-        Mock -ModuleName StemmaDeploy Initialize-StemmaRuntime {}
+        $script:calls = [Collections.Generic.List[string]]::new()
+        Mock -ModuleName StemmaDeploy Initialize-StemmaRuntime { $script:calls.Add("tools:$($Names -join ',')") }
+        Mock -ModuleName StemmaDeploy Find-UserUvCache { $null }
+        Mock -ModuleName StemmaDeploy Protect-StemmaDirectory {}
         Mock -ModuleName StemmaDeploy Get-StemmaPackage { [pscustomobject]@{ Tag = 'v1.1.0'; Zip = 'x.zip' } }
         Mock -ModuleName StemmaDeploy Expand-StemmaPackage { $script:next }
         Mock -ModuleName StemmaDeploy Sync-ReleaseEnvironment { 'cache' }
-        Mock -ModuleName StemmaDeploy Stop-StemmaService {}
+        Mock -ModuleName StemmaDeploy Stop-StemmaService { $script:calls.Add('stop') }
         Mock -ModuleName StemmaDeploy Start-StemmaService {}
         # O backup de verdade cria o arquivo; o rollback só restaura se ele existir.
         Mock -ModuleName StemmaDeploy Invoke-StemmaCli {
@@ -471,10 +527,39 @@ Describe 'Invoke-StemmaUpdate' {
         Should -Invoke -ModuleName StemmaDeploy Set-CurrentRelease -Times 1 -Exactly -ParameterFilter { $ReleaseDir -eq $script:current }
     }
 
-    It 'mesma versão não para o serviço' {
+    It 'troca FFmpeg e Deno só com o serviço parado (o uv antes)' {
+        Mock -ModuleName StemmaDeploy Wait-StemmaHealth { $true }
+        Invoke-StemmaUpdate -Root $root -ServiceId 'teste' 6>$null | Out-Null
+        $script:calls | Should -Be @('tools:uv', 'stop', 'tools:ffmpeg,deno')
+    }
+
+    It 'mesma versão não para o serviço, mas confere o /health (instalação que falhou no meio)' {
         Mock -ModuleName StemmaDeploy Get-StemmaPackage { [pscustomobject]@{ Tag = 'v1.0.0'; Zip = 'x.zip' } }
+        Mock -ModuleName StemmaDeploy Get-Service { [pscustomobject]@{ Status = 'Stopped' } }
+        Mock -ModuleName StemmaDeploy Wait-StemmaHealth { $true }
         Invoke-StemmaUpdate -Root $root -ServiceId 'teste' 6>$null | Should -Be 'v1.0.0'
         Should -Invoke -ModuleName StemmaDeploy Stop-StemmaService -Times 0 -Exactly
+        Should -Invoke -ModuleName StemmaDeploy Start-StemmaService -Times 1 -Exactly
+        Should -Invoke -ModuleName StemmaDeploy Wait-StemmaHealth -Times 1 -Exactly -ParameterFilter { $ExpectedVersion -eq 'v1.0.0' }
+    }
+
+    It 'mesma versão sem /health falha' {
+        Mock -ModuleName StemmaDeploy Get-StemmaPackage { [pscustomobject]@{ Tag = 'v1.0.0'; Zip = 'x.zip' } }
+        Mock -ModuleName StemmaDeploy Get-Service { [pscustomobject]@{ Status = 'Running' } }
+        Mock -ModuleName StemmaDeploy Wait-StemmaHealth { $false }
+        { Invoke-StemmaUpdate -Root $root -ServiceId 'teste' 6>$null } | Should -Throw '*não respondeu*'
+    }
+}
+
+Describe 'Invoke-StemmaInstall' {
+    It 'sem o Tailscale pronto falha antes de mexer em qualquer coisa' {
+        Mock -ModuleName StemmaDeploy Test-StemmaService { $false }
+        Mock -ModuleName StemmaDeploy Get-TailscaleState { [pscustomobject]@{ State = 'needslogin'; Host = ''; AuthUrl = '' } }
+        Mock -ModuleName StemmaDeploy Initialize-StemmaRuntime {}
+        $root = Join-Path $TestDrive 'nada'
+        { Invoke-StemmaInstall -Root $root -DataRoot (Join-Path $TestDrive 'dados') } | Should -Throw '*Tailscale não está pronto*'
+        Should -Invoke -ModuleName StemmaDeploy Initialize-StemmaRuntime -Times 0 -Exactly
+        Test-Path -LiteralPath $root | Should -BeFalse
     }
 }
 

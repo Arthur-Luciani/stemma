@@ -21,6 +21,10 @@ Na F5, instalar era rodar `install.ps1` num PowerShell de administrador, com uv,
 - **Desinstalador**: remove o serviço, o `tailscale serve` da 443 (se foi o instalador que ligou), os atalhos e `<raiz>`. A pasta de dados só é apagada se o usuário confirmar (padrão: manter).
 - **CI**: o Pester passa a rodar no Windows PowerShell 5.1 (job `installer`, só quando `deploy/`, `installer/`, `scripts/package.sh` ou os workflows mudam), que também compila o instalador com um pacote de teste. O job Pester no pwsh do Linux saiu: junction, hardlink e serviço só existem no Windows. O empacotamento foi para `scripts/package.sh` (usado pelo CI e pelo `release.yml`).
 
+- **Pastas protegidas** (`Protect-StemmaDirectory`, achado do `/code-review`): como o serviço roda como SYSTEM e executa o que está em `<raiz>` (scripts, `tools\`, venvs) e carrega o que está nos dados (modelos do torch), `C:\stemma` e a pasta de dados ficam sem herança. Só SYSTEM e Administradores alteram; Usuários só leem (o ícone da bandeja lê o `.env` e o `setup\`). Os filhos são resetados para só herdar, e o dono passa a ser Administradores (o dono reescreve a ACL sem elevação). Sem isso, valeria o "Usuários autenticados: Modificar" da raiz do drive, e qualquer processo sem elevação ganharia SYSTEM editando um arquivo.
+  - **Efeito no cache do uv do usuário**: os arquivos ligados por hardlink são os mesmos. Eles passam a ser de Administradores e só leitura para o usuário. O cache do uv é imutável, e apagar continua funcionando (a permissão vem da pasta dele), então `uv sync` e `uv cache clean` do usuário seguem normais.
+  - Guardar algo na pasta de dados à mão (ex.: `cookies.txt`) exige administrador.
+
 ## Alternativas descartadas
 - **Conta do usuário** (como na F5): exige a senha no instalador e prende ferramentas e cache ao perfil.
 - **Conta virtual `NT SERVICE\stemma`**: não foi necessária, já que a GPU funciona como SYSTEM. Ainda exigiria ajustar ACLs de `D:\stemma-data` e de `tools\`.

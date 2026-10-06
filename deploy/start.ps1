@@ -17,7 +17,7 @@ Import-Module (Join-Path $PSScriptRoot 'StemmaDeploy.psm1') -Force
 
 # A release é a pasta deste script (current\deploy\.. ou releases\vX\deploy\..).
 $release = Split-Path -Parent $PSScriptRoot
-# uv, FFmpeg e Deno de <Root>	ools no PATH (o serviço roda como LocalSystem; ADR 0014).
+# uv, FFmpeg e Deno de <Root>\tools no PATH (o serviço roda como LocalSystem; ADR 0014).
 Set-StemmaToolEnv -Root $Root
 $envValues = Import-DotEnv -Path (Join-Path $Root '.env')
 $port = Get-StemmaPort $envValues

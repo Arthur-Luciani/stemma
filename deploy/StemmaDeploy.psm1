@@ -500,7 +500,10 @@ function Test-StemmaToolInstalled {
     param([Parameter(Mandatory)][string]$Dir, [Parameter(Mandatory)][hashtable]$Tool)
     $marker = Join-Path $Dir '.stemma-tool'
     if (-not (Test-Path -LiteralPath $marker) -or -not (Test-Path -LiteralPath (Join-Path $Dir $Tool.Exe))) { return $false }
-    return (Get-Content -LiteralPath $marker -TotalCount 1).Trim() -eq "$($Tool.Version) $($Tool.Sha256)"
+    # Marcador vazio (escrita interrompida) = reinstalar.
+    $line = Get-Content -LiteralPath $marker -TotalCount 1
+    if (-not $line) { return $false }
+    return "$line".Trim() -eq "$($Tool.Version) $($Tool.Sha256)"
 }
 
 function Install-StemmaTool {
@@ -539,13 +542,45 @@ function Install-StemmaTool {
 }
 
 function Install-StemmaTools {
-    <# Todas as ferramentas + Python gerenciado; deixa o ambiente do processo apontando para elas. #>
-    param([Parameter(Mandatory)][string]$Root)
-    foreach ($name in $script:Tools.Keys) { Install-StemmaTool -Root $Root -Name $name | Out-Null }
+    <#
+      Ferramentas (todas, ou só as de -Names) + Python gerenciado; deixa o ambiente do processo
+      apontando para elas. Na atualização, o FFmpeg e o Deno (usados pelo serviço) só são
+      trocados com o serviço parado: -Names uv antes, -Names ffmpeg,deno -SkipPython depois.
+    #>
+    param([Parameter(Mandatory)][string]$Root, [string[]]$Names, [switch]$SkipPython)
+    if (-not $Names) { $Names = @($script:Tools.Keys) }
+    foreach ($name in $Names) { Install-StemmaTool -Root $Root -Name $name | Out-Null }
     Set-StemmaToolEnv -Root $Root
+    if ($SkipPython) { return }
     Write-Step "Python $script:PythonVersion"
     # Sem executável no ~\.local\bin nem registro no HKCU: nada do Stemma no perfil do usuário.
     Invoke-Native -FilePath (Get-StemmaPaths -Root $Root).Uv -Arguments @('python', 'install', $script:PythonVersion, '--no-bin', '--no-registry')
+}
+
+function Protect-StemmaDirectory {
+    <#
+      O serviço roda como SYSTEM e executa o que está em <Root> (scripts, tools, venvs) e carrega
+      o que está nos dados (modelos do torch). Sem isto, a pasta herdaria "Usuários autenticados:
+      Modificar" da raiz do drive, e qualquer processo sem elevação ganharia SYSTEM editando um
+      arquivo. Fica: SYSTEM e Administradores com controle total, Usuários só leitura (o ícone
+      da bandeja lê o .env e o setup\). A troca propaga para os arquivos ligados por hardlink do
+      cache do usuário, que passam a ser só leitura para ele também (o cache do uv é imutável).
+    #>
+    param([Parameter(Mandatory)][string]$Path, [switch]$Force)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    if (-not $Force -and (Get-Acl -LiteralPath $Path).AreAccessRulesProtected) { return }
+    Write-Step "Protegendo $Path (só administradores alteram)"
+    # 1) a pasta: sem herança de cima, com entradas que os filhos herdam;
+    Invoke-Native -FilePath 'icacls.exe' -Arguments @(
+        $Path, '/inheritance:r', '/grant:r',
+        '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-32-545:(OI)(CI)RX', '/Q'
+    )
+    if (Get-ChildItem -LiteralPath $Path -Force | Select-Object -First 1) {
+        # 2) os filhos só herdam (some qualquer entrada explícita, como as do cache do usuário);
+        Invoke-Native -FilePath 'icacls.exe' -Arguments @((Join-Path $Path '*'), '/reset', '/T', '/C', '/Q')
+    }
+    # 3) o dono pode reescrever a ACL sem elevação, e os arquivos ligados do cache são do usuário.
+    Invoke-Native -FilePath 'icacls.exe' -Arguments @($Path, '/setowner', '*S-1-5-32-544', '/T', '/C', '/Q')
 }
 
 # --- cache do uv: semear a partir do cache do usuário ------------------------------
@@ -609,7 +644,10 @@ namespace Stemma {
                 }
                 catch (Exception) { counts[3]++; continue; }
                 foreach (string sub in dirs) {
-                    if ((File.GetAttributes(sub) & FileAttributes.ReparsePoint) != 0) { counts[2]++; continue; }
+                    try {
+                        if ((File.GetAttributes(sub) & FileAttributes.ReparsePoint) != 0) { counts[2]++; continue; }
+                    }
+                    catch (Exception) { counts[3]++; continue; }
                     pending.Push(sub);
                 }
                 foreach (string file in files) {
@@ -784,8 +822,10 @@ function Start-TailscaleLogin {
 
 function Set-TailscaleServe {
     param([Parameter(Mandatory)][int]$Port)
+    $exe = Get-TailscaleExe
+    if (-not $exe) { throw 'Tailscale não instalado: instale e faça login, ou use -SkipTailscale.' }
     Write-Step 'Publicando no Tailscale (HTTPS na 443)'
-    Invoke-Native -FilePath (Get-TailscaleExe) -Arguments @('serve', '--bg', '--https=443', "http://127.0.0.1:$Port")
+    Invoke-Native -FilePath $exe -Arguments @('serve', '--bg', '--https=443', "http://127.0.0.1:$Port")
 }
 
 function Remove-TailscaleServe {
@@ -832,10 +872,24 @@ function New-BackupPath([string]$StorageRoot, [string]$Label) {
     return Join-Path $StorageRoot "backups\stemma-$Label-$stamp.db"
 }
 
+function Assert-StemmaDataRoot {
+    <# A pasta de dados não pode ser a raiz de um drive: o desinstalador (-RemoveData) a apaga inteira. #>
+    param([Parameter(Mandatory)][string]$Path)
+    $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
+    if ($full.Length -le 2 -or [IO.Path]::GetPathRoot("$full\") -eq "$full\") {
+        throw "Escolha uma pasta para os dados (ex.: D:\stemma-data), não a raiz do drive ($Path)."
+    }
+}
+
+function Test-EmptyDirectory([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return $true }
+    return -not (Get-ChildItem -LiteralPath $Path -Force | Select-Object -First 1)
+}
+
 function Initialize-StemmaRuntime {
     <# Ferramentas em tools\, ambiente do processo e chaves novas no .env de uma instalação existente. #>
-    param([Parameter(Mandatory)][string]$Root)
-    Install-StemmaTools -Root $Root
+    param([Parameter(Mandatory)][string]$Root, [string[]]$Names, [switch]$SkipPython)
+    Install-StemmaTools -Root $Root -Names $Names -SkipPython:$SkipPython
     $paths = Get-StemmaPaths -Root $Root
     if (Test-Path -LiteralPath $paths.EnvFile) {
         $added = Update-StemmaEnvFile -Path $paths.EnvFile -Defaults ([ordered]@{ FFMPEG_BIN = $paths.Ffmpeg })
@@ -860,6 +914,14 @@ function Invoke-StemmaInstall {
     )
     if (Test-StemmaService $ServiceId) { throw "O serviço '$ServiceId' já existe. Use a atualização." }
     if (-not $DataRoot) { $DataRoot = Get-DefaultDataRoot }
+    Assert-StemmaDataRoot $DataRoot
+    if (-not $SkipTailscale) {
+        # Antes de tudo: sem isto, a instalação iria até o fim e falharia no último passo.
+        $tailscale = Get-TailscaleState
+        if ($tailscale.State -ne 'ready') {
+            throw "O Tailscale não está pronto ($($tailscale.State)): instale, faça login e ative o HTTPS, ou use -SkipTailscale."
+        }
+    }
     $userCache = Find-UserUvCache  # antes do Set-StemmaToolEnv, que troca o UV_CACHE_DIR
     foreach ($dir in $Root, (Join-Path $Root 'releases'), (Join-Path $Root 'logs'), $DataRoot) {
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -867,6 +929,9 @@ function Invoke-StemmaInstall {
     $paths = Get-StemmaPaths -Root $Root
     Initialize-StemmaRuntime -Root $Root
     if ($userCache) { Copy-UvCacheSeed -Source $userCache -Dest $paths.UvCache | Out-Null }
+    # Depois de semear: a proteção vale também para os arquivos ligados do cache.
+    Protect-StemmaDirectory -Path $Root
+    Protect-StemmaDirectory -Path $DataRoot
 
     if (-not (Test-Path -LiteralPath $paths.EnvFile)) {
         Write-Step "Criando $($paths.EnvFile)"
@@ -921,13 +986,32 @@ function Invoke-StemmaUpdate {
     if (-not $context.Current) { throw "Nenhuma release em $Root\current. Faça a instalação primeiro." }
     $current = $context.Current
     $currentTag = $context.CurrentTag
-    Initialize-StemmaRuntime -Root $Root
+    $paths = Get-StemmaPaths -Root $Root
+    $userCache = Find-UserUvCache  # antes do Set-StemmaToolEnv, que troca o UV_CACHE_DIR
+    # Com o serviço no ar, só o uv e o Python (o serviço usa FFmpeg e Deno; eles vêm depois de parar).
+    Initialize-StemmaRuntime -Root $Root -Names @('uv')
+    # Instalação feita pelos scripts da F5 (cache no perfil do usuário): semeia como na instalação.
+    if ($userCache -and (Test-EmptyDirectory $paths.UvCache)) {
+        Copy-UvCacheSeed -Source $userCache -Dest $paths.UvCache | Out-Null
+        Protect-StemmaDirectory -Path $paths.UvCache -Force
+    }
+    Protect-StemmaDirectory -Path $Root
+    Protect-StemmaDirectory -Path $context.StorageRoot
     $context = Get-StemmaContext -Root $Root  # o .env pode ter ganhado chaves
 
     $package = Get-StemmaPackage -Root $Root -Version $Version -ZipPath $ZipPath
     $target = $package.Tag
     if ($target -eq $currentTag) {
-        Write-Step "Já está na $target"
+        # Mesma versão (ex.: instalação que falhou no meio e foi rodada de novo): só confere
+        # ferramentas, serviço e /health.
+        Write-Step "Já está na $($target): conferindo"
+        Import-DotEnv -Path (Join-Path $Root '.env') | Out-Null
+        $running = (Get-Service -Name $ServiceId).Status -eq 'Running'
+        if (-not $running) { Initialize-StemmaRuntime -Root $Root -Names @('ffmpeg', 'deno') -SkipPython }
+        if (-not $running) { Start-StemmaService -ServiceId $ServiceId }
+        if (-not (Wait-StemmaHealth -Port $context.Port -ExpectedVersion $target -TimeoutSec $HealthTimeoutSec)) {
+            throw "A $target não respondeu no /health. Veja os logs em $Root\logs."
+        }
         return $target
     }
 
@@ -939,6 +1023,8 @@ function Invoke-StemmaUpdate {
     Stop-StemmaService -ServiceId $ServiceId
     $backup = $null
     try {
+        # Com o serviço parado: FFmpeg e Deno podem ser trocados (nenhum processo os usa).
+        Initialize-StemmaRuntime -Root $Root -Names @('ffmpeg', 'deno') -SkipPython
         if (Test-StemmaDatabase $context) {
             Write-Step 'Backup do banco'
             $dest = New-BackupPath $context.StorageRoot "$currentTag-to-$target"
@@ -1085,6 +1171,7 @@ function Invoke-StemmaUninstall {
         Remove-StemmaTree -Path $child.FullName
     }
     if ($RemoveData -and $context.StorageRoot -and (Test-Path -LiteralPath $context.StorageRoot)) {
+        Assert-StemmaDataRoot $context.StorageRoot  # nunca apagar um drive inteiro
         Write-Step "Apagando os dados em $($context.StorageRoot)"
         Remove-StemmaTree -Path $context.StorageRoot
     }

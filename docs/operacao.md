@@ -92,9 +92,8 @@ Atualiza o yt-dlp no venv da versão atual e reinicia o serviço. O `/health` mo
 Se o download falhar com "YouTube pediu login. Atualize os cookies.":
 
 1. Exporte os cookies do youtube.com no formato Netscape (extensão "Get cookies.txt LOCALLY", logado numa conta).
-2. Salve em `D:\stemma-data\cookies.txt`.
-3. No `C:\stemma\.env`: `YTDLP_COOKIE_FILE=D:\stemma-data\cookies.txt`.
-4. Reinicie: ícone da bandeja → Parar o Stemma e depois Iniciar o Stemma (ou `Restart-Service stemma`).
+2. Copie para `D:\stemma-data\cookies.txt` e, no `C:\stemma\.env`, ponha `YTDLP_COOKIE_FILE=D:\stemma-data\cookies.txt`. As duas pastas são protegidas (só administradores alteram; ADR 0014): use o Explorer e confirme o pedido de administrador, ou um editor aberto como administrador.
+3. Reinicie: ícone da bandeja → Parar o Stemma e depois Iniciar o Stemma (ou `Restart-Service stemma`).
 
 ## Logs e diagnóstico
 

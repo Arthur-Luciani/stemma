@@ -121,7 +121,7 @@ jobs:
           if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
       - name: Compilar o instalador
         shell: powershell
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File installeruild.ps1 -ZipPath build\stemma-v0.0.0.zip
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File installer\build.ps1 -ZipPath build\stemma-v0.0.0.zip
 
   pr-title:
     if: github.event_name == 'pull_request'

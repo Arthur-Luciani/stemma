@@ -153,10 +153,19 @@ begin
   Result := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
 end;
 
+{ Argumento entre aspas para a linha de comando: uma barra no fim (ex.: "D:\") escaparia a aspa. }
+function Quote(const S: String): String;
+begin
+  Result := S;
+  if (Result <> '') and (Result[Length(Result)] = '\') then
+    Result := Result + '\';
+  Result := '"' + Result + '"';
+end;
+
 function EngineParams(const Script, Mode, Extra: String): String;
 begin
-  Result := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + Script + '" -Mode ' + Mode +
-    ' -Root "' + GetRoot('') + '" -ServiceId "' + ServiceId + '"';
+  Result := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + Quote(Script) + ' -Mode ' + Mode +
+    ' -Root ' + Quote(GetRoot('')) + ' -ServiceId ' + Quote(ServiceId);
   if SkipTailscale then
     Result := Result + ' -SkipTailscale';
   if Extra <> '' then
@@ -388,7 +397,16 @@ var
   Port: Integer;
 begin
   Result := True;
-  if CurPageID = PortPage.ID then
+  if CurPageID = DataPage.ID then
+  begin
+    { A raiz de um drive não: o desinstalador apagaria o drive inteiro com "apagar os dados". }
+    if RemoveBackslash(Trim(DataPage.Values[0])) = RemoveBackslash(ExtractFileDrive(Trim(DataPage.Values[0]))) then
+    begin
+      MsgBox('Escolha uma pasta para os dados (ex.: D:\stemma-data), não a raiz do drive.', mbError, MB_OK);
+      Result := False;
+    end;
+  end
+  else if CurPageID = PortPage.ID then
   begin
     Port := StrToIntDef(Trim(PortPage.Values[0]), 0);
     if (Port < 1024) or (Port > 65535) then
@@ -418,7 +436,7 @@ var
   ResultCode: Integer;
 begin
   Zip := ExpandConstant('{app}\payload\{#ZipName}');
-  Params := '-ZipPath "' + Zip + '" -QrPath "' + ExpandConstant('{app}\qr.bmp') + '"';
+  Params := '-ZipPath ' + Quote(Zip) + ' -QrPath ' + Quote(ExpandConstant('{app}\qr.bmp'));
   if IsUpdate then
   begin
     if HasFlag('SIMULATEFAILURE') then
@@ -427,7 +445,7 @@ begin
   end
   else
     Params := EngineParams(ExpandConstant('{app}\engine\setup.ps1'), 'Install',
-      Params + ' -DataRoot "' + Trim(DataPage.Values[0]) + '" -Port ' + Trim(PortPage.Values[0]));
+      Params + ' -DataRoot ' + Quote(Trim(DataPage.Values[0])) + ' -Port ' + Trim(PortPage.Values[0]));
 
   WizardForm.ProgressGauge.Style := npbstMarquee;
   ErrorText := '';
@@ -459,7 +477,7 @@ var
   ResultCode: Integer;
 begin
   ExecAsOriginalUser(ExpandConstant('{app}\Stemma.exe'),
-    '--root "' + GetRoot('') + '" --service "' + ServiceId + '"', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
+    '--root ' + Quote(GetRoot('')) + ' --service ' + Quote(ServiceId), '', SW_SHOWNORMAL, ewNoWait, ResultCode);
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -558,8 +576,8 @@ begin
   CloseTray;
   Root := ExtractFileDir(ExpandConstant('{app}'));
   DataRoot := ReadDataRoot(Root);
-  Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}\engine\setup.ps1') +
-    '" -Mode Uninstall -Root "' + Root + '" -Keep setup';
+  Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + Quote(ExpandConstant('{app}\engine\setup.ps1')) +
+    ' -Mode Uninstall -Root ' + Quote(Root) + ' -Keep setup';
   if (DataRoot <> '') and DirExists(DataRoot) then
     if SuppressibleMsgBox('Apagar também os dados do Stemma (músicas, stems, exportações e banco)?' + #13#10#13#10 +
       DataRoot + #13#10#13#10 + 'Escolha Não para manter (padrão).', mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES then

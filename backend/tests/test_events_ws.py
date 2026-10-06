@@ -105,7 +105,12 @@ def test_descartar_publica_job_com_dismissed_at(fake_client: TestClient) -> None
 
     with fake_client.websocket_connect("/ws") as ws:
         fake_client.post(f"/api/jobs/{job['id']}/discard")
-        event = ws.receive_json()
+        # O evento da falha pode ser publicado logo depois de o banco já dizer `failed` e
+        # chegar antes do descarte: pula o que vier antes do evento com `dismissed_at`.
+        for _ in range(5):
+            event = ws.receive_json()
+            if event["type"] == "job.updated" and event["data"]["job"]["dismissed_at"]:
+                break
 
     assert event["type"] == "job.updated"
     assert event["data"]["job"]["id"] == job["id"]

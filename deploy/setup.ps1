@@ -8,9 +8,12 @@
     ==> texto        etapa (vira o texto da tela de progresso)
     ##RESULT k=v     resultado para o instalador
     ##ERROR texto    falha (com exit code 1)
+    ##STAGE texto    etapa numerada de Install/Update ("Etapa 3 de 9: …")
+    ##PROGRESS n     avanço total de Install/Update, de 0 a 1000
   Modos:
     Check             estado do PC: release instalada, porta, pasta de dados, Tailscale, GPU,
-                      porta livre sugerida e o que a 443/8443 do Tailscale já publicam
+                      porta livre sugerida e o que a 443/8443 do Tailscale já publicam; com
+                      -LockPath, quanto vai ser baixado e o espaço no drive da raiz (MB)
     CheckPort         -Port N: se está livre (portuse=motivo) e a próxima livre (freeport)
     TailscaleInstall  instala o Tailscale (MSI oficial)
     TailscaleLogin    abre o login do Tailscale no navegador
@@ -31,6 +34,7 @@ param(
     [int]$HttpsPort = 443,
     [string]$ZipPath,
     [string]$QrPath,
+    [string]$LockPath,
     [string]$Keep,
     [switch]$SkipTailscale,
     [switch]$SimulateFailure,
@@ -118,6 +122,7 @@ if ($Mode -in 'Start', 'Stop') {
 }
 
 $transcript = $null
+if ($Mode -in 'Install', 'Update') { Set-StemmaProgressProtocol $true }
 if ($Mode -in 'Install', 'Update', 'Uninstall') {
     $logDir = if ($Mode -eq 'Uninstall') { $env:TEMP } else { Join-Path $Root 'logs' }
     New-Item -ItemType Directory -Force -Path $logDir | Out-Null
@@ -141,11 +146,23 @@ try {
             Write-Result 'host' $tailscale.Host
             Write-Result 'gpu' $(if (Test-NvidiaGpu) { 'ok' } else { 'missing' })
             # Instalação nova: sugere a primeira porta livre a partir da 8000.
-            if (-not $context.CurrentTag) { Write-Result 'freeport' "$(Find-FreePort -Start 8000)" }
+            $freePort = $null
+            if (-not $context.CurrentTag) { $freePort = Find-FreePort -Start 8000; Write-Result 'freeport' "$freePort" }
             # O que as portas HTTPS do Tailscale publicam, e se é este Stemma (pela porta local:
-            # a instalada, ou a -Port que o assistente está usando).
-            $localPort = if ($context.CurrentTag) { $context.Port } else { $Port }
+            # a instalada, a -Port que o assistente está usando ou a livre que ele vai usar).
+            $localPort = if ($context.CurrentTag) { $context.Port } elseif ($PSBoundParameters.ContainsKey('Port') -or -not $freePort) { $Port } else { $freePort }
             Write-ServeResults -LocalPort $localPort
+            # Página "Pronto para instalar": download previsto e espaço no drive da raiz.
+            if ($LockPath -and (Test-Path -LiteralPath $LockPath)) {
+                try {
+                    $caches = Get-StemmaCacheDirs -Root $Root -UserCache (Find-UserUvCache)
+                    $estimate = Get-StemmaSpaceEstimate -Root $Root -LockPath $LockPath -CacheDirs $caches
+                    Write-Result 'downloadmb' ([long][Math]::Ceiling($estimate.DownloadBytes / 1MB))
+                    Write-Result 'needrootmb' ([long][Math]::Ceiling($estimate.NeedRootBytes / 1MB))
+                    Write-Result 'missing' "$($estimate.Missing)/$($estimate.Needed)"
+                }
+                catch { Write-Warning "Estimativa de espaço: $($_.Exception.Message)" }
+            }
         }
         'CheckPort' {
             $usage = Get-PortUsage -Port $Port

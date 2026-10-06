@@ -32,6 +32,19 @@ Na F5, instalar era rodar `install.ps1` num PowerShell de administrador, com uv,
   - a atualização refaz o `serve` só se ele sumiu, nunca por cima de outro app.
   Regras gerais de portas para vários apps no PC: `docs/operacao.md#portas`.
 
+- **Instalador rápido e sem perguntas técnicas** (v1.4.2, pedido do usuário depois da instalação real: "bem lento e fica meio cego"; "selecionar portas daquele jeito é estranho, pense num usuário comum"). Muda os itens de cache, pastas protegidas e portas acima:
+  - **Semeadura seletiva**: do cache do usuário só entram as pastas pequenas (tudo menos `archive-v*`) e os archives dos pacotes do `uv.lock` da versão. Eles são achados pelos ponteiros `wheels-v*\…\<pacote>\<versão>-<tags>`, um texto com `archive-v0/<id>`. Entram também o build backend do `[build-system]` e as dependências dele, lidas do `METADATA` no cache. No PC de referência: ~25 mil arquivos (5,5 GB) em vez de 225 mil (17,6 GB).
+    - Isso depende do formato interno do uv. Se não achar ponteiros, semeia o `archive-v0` inteiro. Se faltar algo, o `--offline` falha e o download pega só o que falta: nunca quebra.
+  - **ACL por arquivo, ao ligar**:
+    - a raiz e os dados são protegidos **antes** de criar qualquer coisa dentro, então tudo o que vem depois já herda a ACL certa;
+    - os arquivos ligados por hardlink não herdam (o descritor é do arquivo, compartilhado com o cache do usuário); o seeder grava em cada um uma **ACL própria e protegida** (SYSTEM e Administradores com controle total, Usuários só leitura, dono Administradores);
+    - "protegida", e não "herdada", porque uma propagação de herança pelo outro caminho do arquivo (o perfil do usuário) não a desfaz;
+    - acabaram o `icacls /reset /T` e o `/setowner /T` sobre o cache (4–5 min). Aplicar a ACL protegida arquivo a arquivo cobre 228 mil arquivos em 39 s.
+  - **Protocolo de progresso**: `##STAGE Etapa i de n: …` e `##PROGRESS 0..1000`, com pesos por etapa. A etapa dos componentes é repesada pelo download estimado, e o progresso do download vem das linhas `Downloading`/`Downloaded` do uv.
+  - **Tela "Pronto para instalar"**: endereço, download estimado (pacotes do lock que faltam nos caches; o torch, sem tamanho no índice, conta ~2,9 GB) e espaço necessário e livre. Sem espaço no drive da raiz, não começa. O `build.ps1` põe o `uv.lock` da versão no `.exe`.
+  - **Portas sem perguntas**: sai a tela da porta (a primeira livre a partir da 8000; `/PORT=` para forçar) e sai a pergunta da 443 (se ela já é de outro app, usa a 8443 e nunca derruba o outro). A tela do Tailscale só aparece quando há o que fazer.
+  - Resultado no PC de referência: instalação nova em ~1 min (era ~8 min) e atualização em ~20 s.
+
 ## Alternativas descartadas
 - **Conta do usuário** (como na F5): exige a senha no instalador e prende ferramentas e cache ao perfil.
 - **Conta virtual `NT SERVICE\stemma`**: não foi necessária, já que a GPU funciona como SYSTEM. Ainda exigiria ajustar ACLs de `D:\stemma-data` e de `tools\`.
@@ -43,3 +56,4 @@ Na F5, instalar era rodar `install.ps1` num PowerShell de administrador, com uv,
 - Trocar a versão de uma ferramenta = trocar versão + SHA256 no `StemmaDeploy.psm1` (o `Install-StemmaTool` reinstala quando a marca `.stemma-tool` não bate).
 - O `.exe` precisa de Inno Setup ≥ 6.3 (`ExecAndLogOutput`/`ExecAndCaptureOutput`).
 - Ensaio sem tocar na instalação real: `/ROOT=… /SERVICEID=… /PORT=… /DATAROOT=… /SKIPTAILSCALE` (outro `AppId`, outra pasta no Menu Iniciar).
+- **Nunca rode o seeder (`Copy-UvCacheSeed` ou `[Stemma.UvCacheSeeder]::Seed`) contra o cache do usuário fora do instalador**. Os arquivos ligados são os mesmos da instalação: com outro destino, ou sem elevação, a ACL deles muda também em `C:\stemma\cache\uv`. Os testes usam caches falsos no `TestDrive`.

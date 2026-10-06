@@ -120,7 +120,7 @@ Critério de pronto, no PC:
   - Pergunta antes de tomar a 443 de outro app (a alternativa é a 8443).
   - O desinstalador só desliga a porta HTTPS se ela publica este Stemma e ninguém mais escuta na porta local.
   - Seção "Portas" no `operacao.md`.
-- **UX do instalador** (pedido do usuário depois da instalação real: "bem lento e fica meio cego"):
+- ~~**UX do instalador**~~: feito no PR `perf:` do instalador (2026-10-06; ADR 0014, item "Instalador rápido e sem perguntas técnicas"). Instalação nova em ~1 min com etapas numeradas, barra de percentual e tela "Pronto para instalar" com download e espaço; portas sem perguntas. Registro original (pedido do usuário depois da instalação real: "bem lento e fica meio cego"):
   - **Otimizar**: a proteção das pastas é o gargalo, ~4–5 min de `icacls` sobre os ~230 mil arquivos do cache ligados por hardlink. Ideias:
     - aplicar a ACL no próprio seeder (C#), arquivo a arquivo, ao ligar;
     - semear só os buckets que o uv usa (`archive-v0`, `wheels-v6`) e não os formatos antigos;
@@ -159,3 +159,5 @@ Critério de pronto, no PC:
 - **O PWA já instalado no celular abre mesmo com o Tailscale do celular desligado** (o service worker serve a casca), e então dá erro de conexão. Confira `tailscale status`: o celular aparece `offline`.
 - **WinForms sem manifesto de DPI** fica borrado com escala acima de 100%: use `Stemma.manifest` (`PerMonitorV2`) no `csc /win32manifest`.
 - O ícone `.ico` com só 16/32/192 px fica feio na bandeja a 125%: gere todos os tamanhos (`gen:icons`).
+- **Hardlink compartilha a ACL**: mexer na ACL de um arquivo do cache do usuário muda também o de `C:\stemma\cache\uv` (é o mesmo arquivo). Num teste do PR `perf:` do instalador, o seeder rodado sem elevação contra o cache real deixou ~3,4 mil arquivos da instalação graváveis pelo usuário. Foram reparados com a ACL protegida, em todo o cache: 228 mil arquivos em 39 s. Nunca rode o seeder fora do instalador; nos testes, use caches falsos.
+- **O build backend não está no `uv.lock`**: o `uv sync` constrói o próprio projeto com o `hatchling`, e o `--offline` falha se ele (ou o `tomlkit`, dependência dele) não estiver no cache. A semeadura seletiva lê essas dependências do `METADATA` no cache.

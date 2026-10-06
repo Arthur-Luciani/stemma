@@ -55,6 +55,16 @@ if (Test-Path -LiteralPath $payload) { Remove-Item -LiteralPath $payload -Recurs
 New-Item -ItemType Directory -Force -Path $payload | Out-Null
 Copy-Item -LiteralPath $zip, "$zip.sha256" -Destination $payload
 
+# uv.lock da release: a tela "Pronto para instalar" estima o download e o espaço por ele.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$archive = [IO.Compression.ZipFile]::OpenRead($zip)
+try {
+    $entry = $archive.GetEntry("stemma-$tag/backend/uv.lock")
+    if (-not $entry) { throw "O pacote não tem stemma-$tag/backend/uv.lock." }
+    [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, (Join-Path $payload 'uv.lock'), $true)
+}
+finally { $archive.Dispose() }
+
 # Ícone da bandeja (Stemma.exe), com o csc do .NET Framework 4 que vem em todo Windows.
 Write-Step 'Compilando o Stemma.exe (bandeja)'
 $csc = Join-Path $env:windir 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'

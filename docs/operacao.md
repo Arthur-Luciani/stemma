@@ -6,20 +6,25 @@ Como instalar, atualizar, parar, voltar versão e conferir o Stemma rodando como
 
 1. Baixe `Stemma-Setup-vX.Y.Z.exe` da [GitHub Release](https://github.com/Arthur-Luciani/stemma/releases/latest).
 2. Abra. O Windows avisa "O Windows protegeu o computador" (o instalador não tem assinatura de código): **Mais informações → Executar assim mesmo**. Aceite o pedido de administrador.
-3. O assistente pergunta:
-   - **pasta de dados** (padrão `D:\stemma-data`): músicas, stems, exportações e banco;
-   - **porta** local (já vem preenchida com a primeira livre a partir da 8000; uma porta em uso ou reservada é recusada, ver [Portas](#portas));
-   - **Tailscale**: se não estiver instalado, o botão instala; se não estiver logado, **Entrar** abre o login no navegador; se o tailnet não tiver HTTPS, **Abrir o painel** leva a DNS → *HTTPS Certificates* (ative e clique em **Verificar de novo**). Se a 443 do Tailscale já publica outro app, ele pergunta se substitui ou usa a 8443.
-4. Progresso: ferramentas (uv, FFmpeg, Deno, Python), reaproveitamento do cache do uv do PC, ambiente da versão, banco, serviço, `tailscale serve`.
-5. No fim: o endereço `https://<pc>.<tailnet>.ts.net`, um **QR code** para abrir no celular e o botão **Abrir o Stemma**.
+3. O assistente pergunta só a **pasta de dados** (padrão `D:\stemma-data`): músicas, stems, exportações e banco. O resto é automático:
+   - **porta local**: a primeira livre a partir da 8000 (ver [Portas](#portas); `/PORT=` força outra);
+   - **endereço HTTPS**: `https://<pc>.<tailnet>.ts.net` (443) ou, se esse endereço já for de outro app do PC, `:8443`, sem mexer no outro app;
+   - **Tailscale**: a tela só aparece quando há o que fazer. Se não estiver instalado, o botão instala; se não estiver logado, **Entrar** abre o login no navegador; se o tailnet não tiver HTTPS, **Abrir o painel** leva a DNS → *HTTPS Certificates* (ative e clique em **Verificar de novo**).
+4. **Pronto para instalar**: o endereço, quanto vai baixar (quase nada se o torch já estiver no cache do uv do PC; ~3 GB se não estiver) e o espaço em disco necessário e livre. Sem espaço no drive de `C:\stemma`, não começa.
+5. Progresso em etapas numeradas ("Etapa 6 de 9: Reaproveitando os componentes deste PC"), com barra de percentual: conferir o PC, proteger as pastas, extrair, ferramentas (uv, FFmpeg, Deno), Python, reaproveitar o cache do uv, componentes, banco e serviço (com o `tailscale serve`).
+6. No fim: o endereço, um **QR code** para abrir no celular e o botão **Abrir o Stemma**.
+
+Tempos no PC de referência (2026-10-06): **~1 min** com o torch já no cache do uv do PC (antes: ~8 min); atualização em ~20 s.
+
+**Espaço:** ferramentas + Python ~0,5 GB; componentes ~5,5 GB descompactados (~3 GB de download) se não estiverem no PC; cada música ~50 MB (de 40 a 100 MB), mais 80 MB do modelo de separação, uma vez.
 
 Pré-requisito que o instalador só confere: driver da NVIDIA (`nvidia-smi`). Sem ele, a separação roda na CPU (bem mais lenta).
 
-**Torch (~3 GB):** na primeira instalação o instalador liga por hardlink o cache do uv do seu usuário (`uv cache dir`) em `C:\stemma\cache\uv` e tenta montar o ambiente só com ele (`uv sync --offline`). Se faltar algo, baixa só o que falta. O log diz qual caso foi ("Componentes encontrados no PC" ou "Baixando componentes").
+**Torch (~3 GB):** na primeira instalação, o instalador liga por hardlink, do cache do uv do seu usuário (`uv cache dir`) para `C:\stemma\cache\uv`, **só os pacotes que o `uv.lock` da versão usa**, mais o build backend (`hatchling`) e as dependências dele. Cada arquivo ligado ganha uma ACL protegida: só administradores alteram, inclusive no seu cache, porque é o mesmo arquivo. Depois o instalador tenta montar o ambiente só com isso (`uv sync --offline`); se faltar algo, baixa só o que falta. O log diz qual caso foi ("Componentes encontrados no PC" ou "Baixando o que falta").
 
 ## Atualizar
 
-Baixe e rode o `Stemma-Setup-vX.Y.Z.exe` da versão nova. Ele detecta a instalação e vai direto ao progresso:
+Baixe e rode o `Stemma-Setup-vX.Y.Z.exe` da versão nova. Ele detecta a instalação, mostra a tela **Pronto para instalar** (versão atual → nova, download e espaço) com o botão **Atualizar** e segue em etapas numeradas:
 
 download conferido (já vem dentro do `.exe`) → ambiente da versão nova (com o serviço ainda no ar) → para o serviço → **backup do banco** em `<dados>\backups\` → migrations → `current` aponta para a nova → sobe → espera o `/health` responder com a versão nova (até 3 min). Ficam as 3 versões mais novas.
 
@@ -64,9 +69,9 @@ netsh int ipv4 show excludedportrange protocol=tcp                              
 tailscale serve status                                                                                             # o que o Tailscale publica
 ```
 
-O instalador do Stemma já aplica isso:
-- recusa uma porta em uso ou reservada e sugere a próxima livre;
-- pergunta antes de tomar a 443 de outro app (a alternativa é a 8443);
+O instalador do Stemma já aplica isso, sem perguntar nada:
+- usa a primeira porta livre (nem em uso, nem reservada) a partir da 8000;
+- nunca toma a 443 de outro app: nesse caso usa a 8443 (se as duas forem de outros apps, pede para liberar uma);
 - só desliga a porta HTTPS na desinstalação se ela ainda aponta para ele;
 - na atualização, refaz o `serve` só se ele sumiu, nunca por cima de outro app.
 

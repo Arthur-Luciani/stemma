@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.0](https://github.com/Arthur-Luciani/stemma/compare/v1.1.0...v1.2.0) (2026-10-06)
+
+
+### Features
+
+* frontend de descobrir, processamento e biblioteca (F3) ([#10](https://github.com/Arthur-Luciani/stemma/issues/10)) ([d998744](https://github.com/Arthur-Luciani/stemma/commit/d998744bee06bb308a27aac086af62ffdbd3ce7c))
+* mixer e export (F4b) ([#14](https://github.com/Arthur-Luciani/stemma/issues/14)) ([7b0abcf](https://github.com/Arthur-Luciani/stemma/commit/7b0abcfddf7399650bf03e3f1d05fbbf1f8c54f6))
+* protótipo do AudioEngine (F4a) ([#12](https://github.com/Arthur-Luciani/stemma/issues/12)) ([e588c79](https://github.com/Arthur-Luciani/stemma/commit/e588c794e2e92dbbae4692ad49b64ba477db512e))
+
 ## [1.1.0](https://github.com/Arthur-Luciani/stemma/compare/v1.0.0...v1.1.0) (2026-10-05)
 
 

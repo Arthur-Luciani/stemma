@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 
-import type { Job, LiveEvent, Session } from '../api/types';
+import type { Export, Job, LiveEvent, Session } from '../api/types';
 import { queryKeys } from './queryKeys';
 
 /** Jobs que o `GET /api/jobs` lista (ver contrato da F2a/F2b). */
@@ -18,6 +18,12 @@ function upsertJob(jobs: Job[], job: Job): Job[] {
 function patchEmbeddedSession(jobs: Job[], session: Session): Job[] {
   if (!jobs.some((job) => job.session_id === session.id)) return jobs;
   return jobs.map((job) => (job.session_id === session.id ? { ...job, session } : job));
+}
+
+/** Lista de exports da sessão, mais recentes primeiro (como o `GET` devolve). */
+function upsertExport(exports: Export[], item: Export): Export[] {
+  const rest = exports.filter((e) => e.id !== item.id);
+  return [item, ...rest].sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 export interface LiveEventHandler {
@@ -72,9 +78,14 @@ export function createLiveEventHandler(
         );
         setSession(event.data.job.session);
         break;
-      case 'export.updated':
-        // Exports entram na F4.
+      case 'export.updated': {
+        const item = event.data.export;
+        // Só atualiza a lista que já foi carregada; quem abrir depois faz o GET.
+        queryClient.setQueryData<Export[]>(queryKeys.exports(item.session_id), (exports) =>
+          exports ? upsertExport(exports, item) : exports,
+        );
         break;
+      }
     }
   };
 

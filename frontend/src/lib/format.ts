@@ -20,6 +20,12 @@ export function formatClock(seconds: number): string {
   return `${String(m)}:${pad(s)}.${String(tenths % 10)}`;
 }
 
+/** Loudness/pico: `-10.64` → `−10.6`; com `signed`, `0.9` → `+0.9`. */
+export function formatDb(value: number, signed = false): string {
+  const sign = value < 0 ? '−' : signed && value > 0 ? '+' : '';
+  return `${sign}${Math.abs(value).toFixed(1)}`;
+}
+
 /** ETA curta: `~40s`, `~2 min`, `~1 h 5 min`. */
 export function formatEta(seconds: number | null | undefined): string | null {
   if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return null;
@@ -50,6 +56,21 @@ export function formatShortDate(iso: string, now: Date = new Date()): string {
   if (sameDay(date, yesterday)) return strings.time.yesterday;
   const dm = `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`;
   return date.getFullYear() === now.getFullYear() ? dm : `${dm}/${pad(date.getFullYear() % 100)}`;
+}
+
+/** Data de um export: `hoje 21:14` no mesmo dia; senão a data curta. */
+export function formatStampDate(iso: string, now: Date = new Date()): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  if (!sameDay(date, now)) return formatShortDate(iso, now);
+  return `${strings.time.today} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** Tamanho de arquivo: `7100000` → `7,1 MB`; abaixo de 1 MB, em kB. */
+export function formatBytes(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes)) return '—';
+  if (bytes < 1_000_000) return `${String(Math.max(1, Math.round(bytes / 1000)))} kB`;
+  return `${(bytes / 1_000_000).toFixed(1).replace('.', ',')} MB`;
 }
 
 /** Tempo relativo curto: `agora há pouco`, `há 3 min`, `há 2 h`, depois a data curta. */

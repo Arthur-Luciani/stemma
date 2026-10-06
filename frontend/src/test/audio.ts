@@ -133,3 +133,35 @@ export function fakeAudio() {
     },
   };
 }
+
+/**
+ * Troca `AudioContext` e `Audio` globais por falsos (o `useAudioEngine` cria o engine sem
+ * opções). Sem `vi.unstubAllGlobals()` depois: desfaria o WebSocket falso do setup.
+ */
+export function stubAudioGlobals() {
+  const media: FakeMedia[] = [];
+  const contexts: FakeAudioContext[] = [];
+  vi.stubGlobal(
+    'AudioContext',
+    class extends FakeAudioContext {
+      constructor() {
+        super();
+        contexts.push(this);
+      }
+    },
+  );
+  vi.stubGlobal(
+    'Audio',
+    class extends FakeMedia {
+      constructor() {
+        super();
+        media.push(this);
+      }
+    },
+  );
+  /** Metadados dos 4 stems chegando (o engine fica pronto). */
+  const load = (duration: number) => {
+    for (const el of media) el.loaded(duration);
+  };
+  return { media, contexts, load };
+}

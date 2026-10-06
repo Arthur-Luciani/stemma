@@ -1,0 +1,17 @@
+.metrics {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono-size);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.value {
+  color: var(--text-strong);
+}
+
+.clip {
+  color: var(--bad-text);
+}

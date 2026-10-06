@@ -1,6 +1,10 @@
 import { useSyncExternalStore } from 'react';
 
-export const DESKTOP_QUERY = '(min-width: 900px)';
+/**
+ * Desktop: 900px de largura **e** 600px de altura. O celular deitado (~950×420) fica no
+ * layout de celular. Os `@media` dos CSS Modules repetem esta mesma query: mude junto.
+ */
+export const DESKTOP_QUERY = '(min-width: 900px) and (min-height: 600px)';
 
 export function useMediaQuery(query: string): boolean {
   return useSyncExternalStore(
@@ -16,7 +20,7 @@ export function useMediaQuery(query: string): boolean {
   );
 }
 
-/** Desktop = 900px ou mais (topbar, tabela, card de identidade, dock). */
+/** Desktop (topbar, tabela, card de identidade, dock); ver `DESKTOP_QUERY`. */
 export function useIsDesktop(): boolean {
   return useMediaQuery(DESKTOP_QUERY);
 }

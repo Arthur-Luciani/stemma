@@ -15,3 +15,28 @@ export function resamplePeaks(peaks: readonly number[], count: number): number[]
   }
   return out;
 }
+
+/**
+ * Waveform única do mix (celular): soma dos peaks de cada stem × ganho efetivo, na escala
+ * em que o mix com tudo em 100% enche a altura. Stem mudo ou baixo encolhe a forma.
+ */
+export function mixPeaks<K extends string>(
+  peaks: Partial<Record<K, readonly number[]>>,
+  gains: Readonly<Record<K, number>>,
+): number[] {
+  const stems = Object.keys(gains) as K[];
+  const length = Math.max(0, ...stems.map((stem) => peaks[stem]?.length ?? 0));
+  if (length === 0) return [];
+  const resampled = stems.map((stem) => resamplePeaks(peaks[stem] ?? [], length));
+  const full = new Array<number>(length).fill(0);
+  const mixed = new Array<number>(length).fill(0);
+  stems.forEach((stem, s) => {
+    const row = resampled[s] ?? [];
+    row.forEach((peak, i) => {
+      full[i] = (full[i] ?? 0) + peak;
+      mixed[i] = (mixed[i] ?? 0) + peak * gains[stem];
+    });
+  });
+  const max = Math.max(...full);
+  return max > 0 ? mixed.map((v) => Math.min(v / max, 1)) : mixed;
+}

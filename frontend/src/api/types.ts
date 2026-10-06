@@ -15,6 +15,11 @@ export type LiveEvent = Schemas['LiveEvent'];
 export type Stem = Schemas['Stem'];
 export type StemMix = Schemas['StemMix'];
 export type MixState = Schemas['MixStateOut'];
+export type MixStateIn = Schemas['MixStateIn'];
+export type MixPreset = Schemas['MixPreset'];
+export type Export = Schemas['ExportOut'];
+export type ExportFormat = Schemas['ExportFormat'];
+export type ExportState = Schemas['ExportState'];
 
 /** `GET /peaks/{stem}.json` (o OpenAPI não tipa: é um arquivo servido como está). */
 export interface StemPeaks {

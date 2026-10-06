@@ -186,7 +186,7 @@
   }
 }
 
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   .columns {
     max-width: var(--content-max);
     margin: 0 auto;

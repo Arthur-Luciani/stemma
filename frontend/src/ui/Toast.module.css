@@ -82,7 +82,7 @@
   }
 }
 
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   .region {
     left: var(--space-5);
     right: auto;

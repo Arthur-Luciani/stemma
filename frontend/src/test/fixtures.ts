@@ -1,4 +1,12 @@
-import type { Job, SearchResult, Session, SessionList, SessionState } from '../api/types';
+import type {
+  Export,
+  Job,
+  MixState,
+  SearchResult,
+  Session,
+  SessionList,
+  SessionState,
+} from '../api/types';
 
 let seq = 0;
 const uuid = () => {
@@ -84,4 +92,42 @@ export function sessionList(
   const all = { ...ZERO };
   for (const s of items) all[s.state] += 1;
   return { items, total: items.length, counts: { ...all, ...counts } };
+}
+
+const STEM_DEFAULT = { volume: 100, pan: 0, mute: false, solo: false };
+
+export function makeMix(overrides: Partial<MixState> = {}): MixState {
+  return {
+    stems: {
+      vocals: { ...STEM_DEFAULT },
+      drums: { ...STEM_DEFAULT },
+      bass: { ...STEM_DEFAULT },
+      other: { ...STEM_DEFAULT },
+    },
+    preset: 'original',
+    loop_a_s: null,
+    loop_b_s: null,
+    updated_at: null,
+    ...overrides,
+  };
+}
+
+export function makeExport(overrides: Partial<Export> = {}): Export {
+  return {
+    id: uuid(),
+    session_id: uuid(),
+    format: 'mp3',
+    preset: 'original',
+    stems: makeMix().stems,
+    state: 'done',
+    progress: 100,
+    size_bytes: 7_100_000,
+    lufs: -10.6,
+    error_code: null,
+    error_message: null,
+    file_name: 'Green Day - Basket Case (Original).mp3',
+    created_at: new Date().toISOString(),
+    finished_at: new Date().toISOString(),
+    ...overrides,
+  };
 }

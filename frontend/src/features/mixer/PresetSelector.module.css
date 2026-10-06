@@ -1,0 +1,134 @@
+.group {
+  display: flex;
+  gap: 2px;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-body);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 1px;
+}
+
+.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+/* "Personalizado": borda tracejada; com o mix fora dos presets, accent e ponto. */
+.custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  border: 1px dashed var(--line-strong);
+  color: var(--text-muted);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.customActive {
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* Segmented (desktop) */
+.segmented {
+  align-items: center;
+  padding: 3px;
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.segmented .item,
+.segmented .custom {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+}
+
+/* Pílulas (celular, 1e e paisagem): roláveis, 44px de alvo. */
+.pills {
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.pills::-webkit-scrollbar {
+  display: none;
+}
+
+.pills .item,
+.pills .custom {
+  height: var(--touch-min);
+  padding: 0 14px;
+  border-radius: 22px;
+}
+
+.pills .item:not(.active) {
+  background: var(--bg-soft);
+}
+
+/* Grade do Modo prática (1f): botões de 72px. */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.grid .item,
+.grid .custom {
+  height: 72px;
+  padding: 0 var(--space-4);
+  border-radius: 16px;
+  font-size: 18px;
+}
+
+.grid .item {
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.grid .item:not(.active) {
+  background: var(--bg-surface);
+  border-color: var(--line);
+  color: var(--text-strong);
+}
+
+.grid .active {
+  font-weight: 700;
+}
+
+.grid .custom {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+@media (hover: hover) {
+  .segmented .item:not(.active):hover {
+    color: var(--text-strong);
+    background: var(--bg-soft);
+  }
+}

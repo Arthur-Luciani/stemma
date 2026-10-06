@@ -1,5 +1,5 @@
-import type { Job, SessionList } from '../api/types';
-import { makeJob, makeSession, sessionList } from '../test/fixtures';
+import type { Export, Job, SessionList } from '../api/types';
+import { makeExport, makeJob, makeSession, sessionList } from '../test/fixtures';
 import { testQueryClient } from '../test/render';
 import { createLiveEventHandler } from './applyLiveEvent';
 import { queryKeys } from './queryKeys';
@@ -79,6 +79,36 @@ describe('applyLiveEvent', () => {
     expect(client.getQueryData(queryKeys.session(session.id))).toBeUndefined();
     expect(client.getQueryData<Job[]>(queryKeys.jobs)).toEqual([]);
     handler.dispose();
+  });
+
+  it('export.updated atualiza a lista de exports da sessão já carregada', () => {
+    const { client, handler } = setup();
+    const sessionId = makeSession().id;
+    const old = makeExport({ session_id: sessionId, created_at: '2026-10-01T10:00:00Z' });
+    client.setQueryData(queryKeys.exports(sessionId), [old]);
+
+    const running = makeExport({
+      session_id: sessionId,
+      state: 'running',
+      progress: 10,
+      created_at: '2026-10-05T10:00:00Z',
+    });
+    handler.handle({ type: 'export.updated', data: { export: running } });
+    handler.handle({
+      type: 'export.updated',
+      data: { export: { ...running, state: 'done', progress: 100 } },
+    });
+
+    const list = client.getQueryData<Export[]>(queryKeys.exports(sessionId));
+    expect(list?.map((e) => [e.id, e.state])).toEqual([
+      [running.id, 'done'],
+      [old.id, 'done'],
+    ]);
+
+    // Lista não carregada: não cria cache (quem abrir faz o GET).
+    const other = makeExport();
+    handler.handle({ type: 'export.updated', data: { export: other } });
+    expect(client.getQueryData(queryKeys.exports(other.session_id))).toBeUndefined();
   });
 
   it('resync invalida tudo (eventos perdidos na queda)', () => {

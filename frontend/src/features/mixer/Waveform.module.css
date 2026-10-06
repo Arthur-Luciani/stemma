@@ -25,6 +25,15 @@
   --wave-color: var(--stem-other);
 }
 
+.mix .rest {
+  color: var(--line-strong);
+  opacity: 1;
+}
+
+.mix .played {
+  color: var(--accent-wave);
+}
+
 .rest,
 .played {
   position: absolute;

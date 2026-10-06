@@ -1,0 +1,94 @@
+.pan {
+  position: relative;
+  cursor: pointer;
+  outline: none;
+}
+
+.pan:focus-visible .thumb,
+.pan:focus-visible .dial {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+.track,
+.center,
+.fill,
+.thumb {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* Slider centrado (desktop) */
+.slider {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  touch-action: pan-y;
+}
+
+.track {
+  top: calc(50% - 2px);
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.center {
+  top: calc(50% - 5px);
+  left: 50%;
+  width: 1px;
+  height: 10px;
+  background: var(--line-strong);
+}
+
+/* Do centro até o valor, para qualquer lado. */
+.fill {
+  top: calc(50% - 2px);
+  height: 4px;
+  left: calc(50% + min(var(--pan), 0) * 50%);
+  width: calc(max(var(--pan), -1 * var(--pan)) * 50%);
+  background: var(--text-muted);
+}
+
+.thumb {
+  top: calc(50% - 6px);
+  left: calc(50% + var(--pan) * 50% - 6px);
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--text-strong);
+}
+
+/* Knob (celular): alvo de 44px, arrasto vertical. */
+.knob {
+  display: grid;
+  place-items: center;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  flex: none;
+  touch-action: none;
+}
+
+.dial {
+  position: relative;
+  box-sizing: border-box;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg-soft);
+  border: 1px solid var(--line-strong);
+  transform: rotate(calc(var(--pan) * 135deg));
+  pointer-events: none;
+}
+
+.notch {
+  position: absolute;
+  left: calc(50% - 1.5px);
+  top: 2px;
+  width: 3px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--text-strong);
+}

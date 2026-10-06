@@ -1,0 +1,16 @@
+.ruler {
+  position: relative;
+  height: 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.tick {
+  position: absolute;
+  top: 0;
+  padding-left: 4px;
+  border-left: 1px solid var(--line);
+  line-height: 18px;
+  white-space: nowrap;
+}

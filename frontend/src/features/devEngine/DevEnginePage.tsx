@@ -266,7 +266,7 @@ export function DevEnginePage() {
                   </div>
                   <Waveform
                     className={styles.wave}
-                    stem={stem}
+                    tone={stem}
                     peaks={peaks[stem]?.peaks}
                     muted={control.mute}
                     duration={duration}

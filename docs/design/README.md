@@ -141,3 +141,15 @@ Feitos na F3 (frontend fora do mixer), de propósito:
 - **Ordenação no celular**: o M5 não mostra ordenação. Ela aparece como um menu "Mais recentes ▾" abaixo dos filtros.
 - **Logo no celular**: só aparece no Descobrir vazio (M1). As outras telas começam pelo título.
 - **"Colar link"** é um botão (ícone + texto no desktop) no lugar da dica `⌘V`. No Windows o atalho seria Ctrl+V, e o botão funciona igual nos dois.
+
+Feitos na F4b (mixer e export), de propósito:
+
+- **Mixer no celular é tela cheia**: sem bottom nav e sem a pílula de processamento, como no 1e/1f/1g/M6. Para sair, use o "‹" do cabeçalho (ou o back do Android).
+- **1e: ícone de editar no lugar do ⋯.** O menu só teria "Editar artista e título", então o atalho vai direto.
+- **Desktop: botões A e B (e ×) ao lado do chip de loop.** O design só mostra o chip. Os botões deixam marcar o loop sem teclado. Arrastar nas lanes também marca o loop, como na timeline do celular.
+- **1f: sem botões A/B.** O loop é marcado arrastando na waveform. Sem loop, o chip fica apagado e o texto ao lado ensina o gesto.
+- **Export**: o formato começa em **MP3 320** (o design mostra WAV): é o arquivo mais leve para baixar no celular. O popover e o M6 ganharam um botão explícito "Exportar MP3 320". O design mostra só o seletor e o progresso.
+- **LUFS/dBTP do transport e do resumo do M6 são do áudio original** (medidos no processamento). O LUFS da mixagem aparece em cada export pronto, na lista "Anteriores".
+- **1g (paisagem)**: nome do stem numa linha e knob de pan com o valor na de baixo (no design ficam lado a lado e o nome não cabe). Os presets quebram linha em vez de rolar, para todos e o "Personalizado" ficarem à vista. Há uma linha de loop A–B (o design não tem) e a waveform ocupa o espaço livre.
+- **Stem mudo no celular**: apaga nome, valor e fader, mas não os botões M/S (no design o card inteiro fica a 55%). Assim o M ativo continua legível.
+- **Desktop = 900px de largura e 600px de altura.** O celular deitado fica no layout de celular (no mixer, o 1g), e não no desktop espremido. Abaixo de 1180px de largura, o transport do desktop esconde LUFS/dBTP.

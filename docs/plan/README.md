@@ -12,8 +12,8 @@ Reescrita do `music-analyzer` sem o inspetor de bateria ([ADR 0001](../decisions
 | F2a Fila e eventos | [F2a-fila-e-eventos.md](F2a-fila-e-eventos.md) | F1 | ✅ concluída — PR #7 (mergeado) |
 | F2b Pipeline de áudio | [F2b-pipeline-audio.md](F2b-pipeline-audio.md) | F2a | ✅ concluída — PR #8 (mergeado), release v1.1.0 |
 | F3 Frontend: Descobrir, Processamento, Biblioteca | [F3-frontend-fluxos.md](F3-frontend-fluxos.md) | F0 (+ contrato da F1) | ✅ concluída — PR #10 (mergeado) |
-| F4a Protótipo do AudioEngine | [F4a-audio-engine.md](F4a-audio-engine.md) | F2b, F3 | 🟡 em andamento |
-| F4b Mixer e Export | [F4b-mixer-export.md](F4b-mixer-export.md) | F4a | ⬜ |
+| F4a Protótipo do AudioEngine | [F4a-audio-engine.md](F4a-audio-engine.md) | F2b, F3 | ✅ concluída — PR #12 (mergeado); medição no Android passou para a F4b |
+| F4b Mixer e Export | [F4b-mixer-export.md](F4b-mixer-export.md) | F4a | 🟡 PR #14 aberto; falta conferir no celular real |
 | F5 Runtime, PWA e update | [F5-runtime-pwa.md](F5-runtime-pwa.md) | F4b | ⬜ |
 | F6 Corte | [F6-corte.md](F6-corte.md) | F5 | ⬜ |
 

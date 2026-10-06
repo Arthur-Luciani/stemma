@@ -15,6 +15,11 @@ Instalar e atualizar o Stemma no PC por um **instalador `.exe`**, sem rodar scri
 ## Escopo
 - **Instalador com Inno Setup 6**, gerado no CI (`release.yml`, job em `windows-latest`) e anexado à GitHub Release como `Stemma-Setup-vX.Y.Z.exe` + `.sha256`. Sem assinatura de código (aviso do SmartScreen documentado).
 - **Ferramentas portáteis com SHA256 fixado** em `C:\stemma\tools` (sem winget, que instala no perfil do usuário e não é determinístico): uv, FFmpeg e Deno. Python 3.12 via `uv python install` com `UV_PYTHON_INSTALL_DIR` em `tools\python`. O cache do uv vai para `C:\stemma\cache\uv`, no mesmo volume dos venvs, para o hardlink funcionar.
+- **Reaproveitar o torch já baixado (evitar ~3 GB de novo)**:
+  - **Cache fixo**: `UV_CACHE_DIR=C:\stemma\cache\uv` em todo uso do uv (instalador, `update.ps1`, tarefa da F5c). Tudo que roda como sistema usa o mesmo cache, e o torch só é baixado de novo quando a versão dele mudar no `uv.lock`.
+  - **Semear na primeira instalação**: o instalador roda elevado, mas no perfil do usuário, então acha o cache dele com `uv cache dir`, rodado como o usuário (no PC atual, `%LOCALAPPDATA%\uv\cache`). No mesmo volume, cria **hardlinks** dos arquivos para `C:\stemma\cache\uv`: segundos e sem espaço extra, e um `uv cache clean` do usuário não afeta. Em outro volume, faz uma cópia comum.
+  - **Detecção sem depender do formato interno do cache**: tenta `uv sync --frozen --offline`. Se falhar, roda o `uv sync` normal, que baixa só o que falta. O progresso diz qual caso foi ("Componentes encontrados no PC" / "Baixando ~3 GB").
+  - **uv em `tools\` na mesma versão do uv do usuário**, quando possível: com formatos de cache diferentes, a semeadura não ajuda e o passo anterior cai no download (mais lento, nunca quebra).
 - **Tailscale**: se não estiver instalado, baixa e instala o MSI oficial (silencioso). Se não estiver logado, roda `tailscale up` (abre o navegador) e espera o login. Confere se o tailnet tem HTTPS (cert domains no `tailscale status --json`); se não tiver, mostra o passo no painel e espera. Depois roda `tailscale serve --bg --https=443 http://127.0.0.1:<porta>`.
 - **Telas do assistente (PT-BR)**: boas-vindas → pasta de dados (padrão `D:\stemma-data`) e porta (padrão 8000) → Tailscale (estado e login) → progresso (etapas com texto: "Baixando componentes (~3 GB na primeira vez)…") → concluído, com o endereço `https://<pc>.<tailnet>.ts.net`, um **QR code** para abrir no celular e o botão "Abrir o Stemma".
 - **Instalação nova e atualização no mesmo `.exe`**: detecta a instalação existente e roda o fluxo do `update.ps1` (backup, migrations, junction, `/health`, rollback automático). Sem a tela de pasta e porta na atualização.
@@ -32,6 +37,7 @@ Instalar e atualizar o Stemma no PC por um **instalador `.exe`**, sem rodar scri
 ## Checklist
 - [ ] CUDA funciona como LocalSystem (verificado antes de tudo)
 - [ ] ferramentas portáteis com SHA256 em `C:\stemma\tools`
+- [ ] cache do uv fixo em `C:\stemma\cache\uv`, semeado do cache do usuário (hardlink), com `--offline` primeiro: instalar no PC atual não baixa o torch de novo
 - [ ] Tailscale: instalar, login, checagem de HTTPS e `serve`
 - [ ] assistente Inno Setup em PT-BR com QR code no fim
 - [ ] mesma `.exe` instala e atualiza (backup, migrations, rollback)
@@ -40,7 +46,7 @@ Instalar e atualizar o Stemma no PC por um **instalador `.exe`**, sem rodar scri
 - [ ] docs/operacao.md, ADR nova, ADR 0007 e CLAUDE.md
 
 ## Critério de pronto
-No PC (sem nada do Stemma instalado): baixar `Stemma-Setup-vX.Y.Z.exe` da GitHub Release, instalar pelo assistente e abrir o endereço do QR code no celular. Publicar a release seguinte e rodar o instalador novo: o `/health` mostra a versão nova sem passo manual. Simular falha na atualização e ver o rollback (`-SimulateFailure` exposto como parâmetro de linha de comando do instalador, só para teste). App instalado na tela inicial do celular com ícone e splash corretos e sem seleção de texto ao segurar. CI verde.
+No PC (sem nada do Stemma instalado): baixar `Stemma-Setup-vX.Y.Z.exe` da GitHub Release, instalar pelo assistente (**sem baixar o torch de novo**, porque ele já está no cache do usuário) e abrir o endereço do QR code no celular. Publicar a release seguinte e rodar o instalador novo: o `/health` mostra a versão nova sem passo manual. Simular falha na atualização e ver o rollback (`-SimulateFailure` exposto como parâmetro de linha de comando do instalador, só para teste). App instalado na tela inicial do celular com ícone e splash corretos e sem seleção de texto ao segurar. CI verde.
 
 ## Handoff
 _Preencher ao final._

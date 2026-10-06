@@ -8,8 +8,8 @@ Como instalar, atualizar, parar, voltar versão e conferir o Stemma rodando como
 2. Abra. O Windows avisa "O Windows protegeu o computador" (o instalador não tem assinatura de código): **Mais informações → Executar assim mesmo**. Aceite o pedido de administrador.
 3. O assistente pergunta:
    - **pasta de dados** (padrão `D:\stemma-data`): músicas, stems, exportações e banco;
-   - **porta** local (padrão 8000);
-   - **Tailscale**: se não estiver instalado, o botão instala; se não estiver logado, **Entrar** abre o login no navegador; se o tailnet não tiver HTTPS, **Abrir o painel** leva a DNS → *HTTPS Certificates* (ative e clique em **Verificar de novo**).
+   - **porta** local (já vem preenchida com a primeira livre a partir da 8000; uma porta em uso ou reservada é recusada, ver [Portas](#portas));
+   - **Tailscale**: se não estiver instalado, o botão instala; se não estiver logado, **Entrar** abre o login no navegador; se o tailnet não tiver HTTPS, **Abrir o painel** leva a DNS → *HTTPS Certificates* (ative e clique em **Verificar de novo**). Se a 443 do Tailscale já publica outro app, ele pergunta se substitui ou usa a 8443.
 4. Progresso: ferramentas (uv, FFmpeg, Deno, Python), reaproveitamento do cache do uv do PC, ambiente da versão, banco, serviço, `tailscale serve`.
 5. No fim: o endereço `https://<pc>.<tailnet>.ts.net`, um **QR code** para abrir no celular e o botão **Abrir o Stemma**.
 
@@ -47,7 +47,33 @@ Equivalente em linha de comando (administrador): `Stop-Service stemma`, `Start-S
 
 ## Desinstalar
 
-**Configurações → Aplicativos → Stemma → Desinstalar.** Para e remove o serviço, desliga o `tailscale serve` da 443, remove os atalhos e apaga `C:\stemma` (ferramentas, versões, cache, logs). Pergunta se apaga também a pasta de dados (padrão: **não**). O Tailscale continua instalado.
+**Configurações → Aplicativos → Stemma → Desinstalar.** Para e remove o serviço, desliga o `tailscale serve` da 443 (ou 8443) **se ela ainda publica este Stemma**, remove os atalhos e apaga `C:\stemma` (ferramentas, versões, cache, logs). Pergunta se apaga também a pasta de dados (padrão: **não**). O Tailscale continua instalado.
+
+## Portas
+
+Cada app escuta só em `127.0.0.1:<porta>`, e o `tailscale serve` publica em HTTPS. Para vários apps no mesmo PC:
+
+- **Escolha portas entre 1024 e 49151.** Abaixo disso são do sistema; acima, o Windows sorteia para conexões de saída.
+- **Um bloco por app, produção e dev separados**, numa tabelinha sua. Ex.: Stemma 8000 (dev 8010 + Vite 5183); próximo app 8100 (dev 8110 + 5283).
+- **No Tailscale, uma porta HTTPS por app**: `https://<pc>.ts.net` (443) para um, `:8443` para outro, e assim por diante. Separar por caminho (`/app2`) costuma quebrar SPAs.
+- **Portas reservadas pelo Windows** (Hyper-V, WSL, Docker) falham com "acesso negado" mesmo parecendo livres.
+
+```powershell
+Get-NetTCPConnection -State Listen | Sort-Object LocalPort | Select-Object LocalAddress, LocalPort, OwningProcess   # quem escuta
+netsh int ipv4 show excludedportrange protocol=tcp                                                                 # reservadas
+tailscale serve status                                                                                             # o que o Tailscale publica
+```
+
+O instalador do Stemma já aplica isso:
+- recusa uma porta em uso ou reservada e sugere a próxima livre;
+- pergunta antes de tomar a 443 de outro app (a alternativa é a 8443);
+- só desliga a porta HTTPS na desinstalação se ela ainda aponta para ele;
+- na atualização, refaz o `serve` só se ele sumiu, nunca por cima de outro app.
+
+Para mudar a porta de uma instalação existente:
+1. Edite `PORT` no `C:\stemma\.env` como administrador.
+2. Veja a porta HTTPS dela em `C:\stemma\install.json` (`httpsPort`: 443 ou 8443) e rode `tailscale serve --bg --https=<httpsPort> http://127.0.0.1:<nova>`.
+3. Reinicie o Stemma (ícone da bandeja → Parar e depois Iniciar).
 
 ## Layout
 

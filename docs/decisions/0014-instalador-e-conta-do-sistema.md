@@ -25,6 +25,13 @@ Na F5, instalar era rodar `install.ps1` num PowerShell de administrador, com uv,
   - **Efeito no cache do uv do usuário**: os arquivos ligados por hardlink são os mesmos. Eles passam a ser de Administradores e só leitura para o usuário. O cache do uv é imutável, e apagar continua funcionando (a permissão vem da pasta dele), então `uv sync` e `uv cache clean` do usuário seguem normais.
   - Guardar algo na pasta de dados à mão (ex.: `cookies.txt`) exige administrador.
 
+- **Portas** (v1.4.1, achado na instalação real: o usuário digitou a porta do ensaio, e duas instalações ficaram na mesma porta; o desinstalador do ensaio derrubaria a 443 da real):
+  - a tela da porta recusa uma porta em uso (`Get-NetTCPConnection`) ou reservada pelo Windows (`netsh … excludedportrange`) e sugere a próxima livre;
+  - se a 443 do Tailscale já publica outro app, o instalador pergunta se substitui ou usa a 8443 (gravada no `install.json` como `httpsPort`);
+  - o desinstalador só desliga a porta HTTPS se ela ainda aponta para a porta deste Stemma;
+  - a atualização refaz o `serve` só se ele sumiu, nunca por cima de outro app.
+  Regras gerais de portas para vários apps no PC: `docs/operacao.md#portas`.
+
 ## Alternativas descartadas
 - **Conta do usuário** (como na F5): exige a senha no instalador e prende ferramentas e cache ao perfil.
 - **Conta virtual `NT SERVICE\stemma`**: não foi necessária, já que a GPU funciona como SYSTEM. Ainda exigiria ajustar ACLs de `D:\stemma-data` e de `tools\`.

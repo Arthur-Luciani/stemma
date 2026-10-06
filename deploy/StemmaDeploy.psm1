@@ -715,6 +715,19 @@ function New-StemmaEnvFile {
     )
 }
 
+function Set-DotEnvValue {
+    <# Troca (ou acrescenta) `CHAVE=valor`, mantendo o resto do arquivo. #>
+    param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Key, [Parameter(Mandatory)][string]$Value)
+    $lines = @()
+    if (Test-Path -LiteralPath $Path) { $lines = @(Get-Content -LiteralPath $Path -Encoding UTF8) }
+    $found = $false
+    $lines = @(foreach ($line in $lines) {
+            if ($line -match "^\s*$([regex]::Escape($Key))\s*=") { $found = $true; "$Key=$Value" } else { $line }
+        })
+    if (-not $found) { $lines += "$Key=$Value" }
+    Write-DotEnvLines $Path $lines
+}
+
 function Update-StemmaEnvFile {
     <# Acrescenta as chaves que faltam (ex.: FFMPEG_BIN de uma instalação antiga), sem mexer nas outras. #>
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][System.Collections.IDictionary]$Defaults)
@@ -733,12 +746,20 @@ function Get-StemmaInstallInfo {
     param([Parameter(Mandatory)][string]$Root)
     $path = (Get-StemmaPaths -Root $Root).InstallInfo
     if (-not (Test-Path -LiteralPath $path)) { return $null }
-    return Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+    $info = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+    # Instalações da v1.4.0 não gravavam a porta HTTPS: era sempre a 443.
+    if (-not $info.PSObject.Properties['httpsPort']) { $info | Add-Member -NotePropertyName httpsPort -NotePropertyValue 443 }
+    return $info
 }
 
 function Set-StemmaInstallInfo {
-    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$ServiceId, [bool]$TailscaleServe)
-    $info = [ordered]@{ serviceId = $ServiceId; tailscaleServe = $TailscaleServe }
+    param(
+        [Parameter(Mandatory)][string]$Root,
+        [Parameter(Mandatory)][string]$ServiceId,
+        [bool]$TailscaleServe,
+        [int]$HttpsPort = 443
+    )
+    $info = [ordered]@{ serviceId = $ServiceId; tailscaleServe = $TailscaleServe; httpsPort = $HttpsPort }
     [IO.File]::WriteAllText((Get-StemmaPaths -Root $Root).InstallInfo, ($info | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
 }
 
@@ -820,19 +841,156 @@ function Start-TailscaleLogin {
     return Get-TailscaleState
 }
 
+function Get-StemmaServeTarget([int]$Port) {
+    <# O que o tailscale serve aponta quando publica o Stemma desta porta. #>
+    return "http://127.0.0.1:$Port"
+}
+
+function ConvertFrom-TailscaleServeStatus {
+    <#
+      `tailscale serve status --json` → o que a porta HTTPS `$HttpsPort` publica: o proxy do
+      "/", '(outro)' (site que não é um proxy simples), '(outro: TCP)' (serve --tcp ou
+      --tls-terminated-tcp), '(desconhecido)' (saída que não é JSON) ou $null se está livre.
+    #>
+    param([AllowEmptyString()][string]$Json, [Parameter(Mandatory)][int]$HttpsPort)
+    if (-not $Json -or -not $Json.Trim()) { return $null }
+    try { $status = $Json | ConvertFrom-Json }
+    catch { return '(desconhecido)' }
+    if (-not $status) { return $null }
+    if ($status.PSObject.Properties['Web'] -and $status.Web) {
+        foreach ($site in $status.Web.PSObject.Properties) {
+            if ($site.Name -notmatch ":$HttpsPort$") { continue }
+            $handlers = $site.Value.Handlers
+            if ($handlers -and $handlers.PSObject.Properties['/'] -and $handlers.'/'.PSObject.Properties['Proxy']) {
+                return "$($handlers.'/'.Proxy)"
+            }
+            return '(outro)'
+        }
+    }
+    # Sem site web nessa porta, ela ainda pode estar num encaminhamento TCP.
+    if ($status.PSObject.Properties['TCP'] -and $status.TCP -and $status.TCP.PSObject.Properties["$HttpsPort"]) {
+        return '(outro: TCP)'
+    }
+    return $null
+}
+
+function Get-TailscaleServeJson {
+    <# Saída de `tailscale serve status --json` (vazia sem Tailscale). Leia uma vez e consulte várias portas. #>
+    $exe = Get-TailscaleExe
+    if (-not $exe) { return '' }
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { return (& $exe serve status --json 2>$null) -join "`n" }
+    finally { $ErrorActionPreference = $previous }
+}
+
+function Get-TailscaleServeTarget {
+    param([int]$HttpsPort = 443, [AllowEmptyString()][string]$Json)
+    if (-not $PSBoundParameters.ContainsKey('Json')) { $Json = Get-TailscaleServeJson }
+    return ConvertFrom-TailscaleServeStatus -Json $Json -HttpsPort $HttpsPort
+}
+
+function Get-ServePortState {
+    <#
+      Regra única (instalador, atualização e desinstalador): a porta HTTPS do Tailscale está
+      'free', já publica este Stemma ('ours', pela porta local) ou publica outro app ('other').
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Target, [Parameter(Mandatory)][int]$Port)
+    if (-not $Target) { return 'free' }
+    if ($Target -eq (Get-StemmaServeTarget $Port)) { return 'ours' }
+    return 'other'
+}
+
 function Set-TailscaleServe {
-    param([Parameter(Mandatory)][int]$Port)
+    param([Parameter(Mandatory)][int]$Port, [int]$HttpsPort = 443)
     $exe = Get-TailscaleExe
     if (-not $exe) { throw 'Tailscale não instalado: instale e faça login, ou use -SkipTailscale.' }
-    Write-Step 'Publicando no Tailscale (HTTPS na 443)'
-    Invoke-Native -FilePath $exe -Arguments @('serve', '--bg', '--https=443', "http://127.0.0.1:$Port")
+    Write-Step "Publicando no Tailscale (HTTPS na $HttpsPort)"
+    Invoke-Native -FilePath $exe -Arguments @('serve', '--bg', "--https=$HttpsPort", (Get-StemmaServeTarget $Port))
 }
 
 function Remove-TailscaleServe {
+    <#
+      Desliga a porta HTTPS só se ela ainda publica este Stemma. Chame depois de remover o
+      serviço: se ainda há alguém escutando na porta local, outra instalação usa o mesmo
+      endereço (ex.: um ensaio na mesma porta), e a porta HTTPS é dela.
+    #>
+    param([Parameter(Mandatory)][int]$Port, [int]$HttpsPort = 443)
     $exe = Get-TailscaleExe
     if (-not $exe) { return }
-    Write-Step 'Desligando o tailscale serve da 443'
-    Invoke-Native -FilePath $exe -Arguments @('serve', '--https=443', 'off')
+    $target = Get-TailscaleServeTarget -HttpsPort $HttpsPort
+    switch (Get-ServePortState -Target $target -Port $Port) {
+        'free' { return }
+        'other' {
+            Write-Host "    A $HttpsPort do Tailscale publica '$target', não este Stemma: fica como está."
+            return
+        }
+    }
+    $usage = Get-PortUsage -Port $Port
+    if ($usage) {
+        Write-Host "    A porta $Port continua $($usage): outro app usa a $HttpsPort do Tailscale, fica como está."
+        return
+    }
+    Write-Step "Desligando o tailscale serve da $HttpsPort"
+    Invoke-Native -FilePath $exe -Arguments @('serve', "--https=$HttpsPort", 'off')
+}
+
+# --- portas locais ------------------------------------------------------------------
+
+function ConvertFrom-ExcludedPortRanges {
+    <# Saída do `netsh int ipv4 show excludedportrange protocol=tcp` → faixas {Start, End}. #>
+    param([AllowEmptyCollection()][string[]]$Lines)
+    return @(foreach ($line in $Lines) {
+            if ($line -match '^\s*(\d+)\s+(\d+)') { [pscustomobject]@{ Start = [int]$Matches[1]; End = [int]$Matches[2] } }
+        })
+}
+
+function Get-ExcludedPortRanges {
+    <# Faixas que o Windows reserva (Hyper-V, WSL, Docker): escutar nelas falha com "acesso negado". #>
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { $lines = & netsh.exe int ipv4 show excludedportrange protocol=tcp 2>$null }
+    finally { $ErrorActionPreference = $previous }
+    return ConvertFrom-ExcludedPortRanges $lines
+}
+
+function Get-ListeningPorts {
+    <# Porta → PID de quem escuta (uma consulta só; para varrer muitas portas). #>
+    $map = @{}
+    foreach ($connection in @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue)) {
+        if ($connection) { $map[[int]$connection.LocalPort] = $connection.OwningProcess }
+    }
+    return $map
+}
+
+function Get-PortUsage {
+    <# Por que a porta não serve ("em uso por python (PID 123)", "reservada pelo Windows…") ou $null se está livre. #>
+    param([Parameter(Mandatory)][int]$Port, [object[]]$ExcludedRanges, [hashtable]$Listening)
+    if ($null -eq $ExcludedRanges) { $ExcludedRanges = Get-ExcludedPortRanges }
+    if ($null -eq $Listening) { $Listening = Get-ListeningPorts }
+    if ($Listening.ContainsKey($Port)) {
+        $owner = $Listening[$Port]
+        $process = Get-Process -Id $owner -ErrorAction SilentlyContinue
+        $name = if ($process) { $process.ProcessName } else { 'outro programa' }
+        return "em uso por $name (PID $owner)"
+    }
+    foreach ($range in $ExcludedRanges) {
+        if ($Port -ge $range.Start -and $Port -le $range.End) {
+            return "reservada pelo Windows ($($range.Start)–$($range.End): Hyper-V, WSL ou Docker)"
+        }
+    }
+    return $null
+}
+
+function Find-FreePort {
+    <# A primeira porta livre a partir de `$Start` (até 200 adiante), com uma consulta só. #>
+    param([int]$Start = 8000)
+    $ranges = Get-ExcludedPortRanges
+    $listening = Get-ListeningPorts
+    for ($port = $Start; $port -lt $Start + 200 -and $port -le 65535; $port++) {
+        if (-not (Get-PortUsage -Port $port -ExcludedRanges $ranges -Listening $listening)) { return $port }
+    }
+    return $null
 }
 
 function Test-NvidiaGpu {
@@ -912,11 +1070,16 @@ function Invoke-StemmaInstall {
         [string]$Version,
         [string]$ZipPath,
         [switch]$SkipTailscale,
+        [int]$HttpsPort = 443,
         [int]$HealthTimeoutSec = 180
     )
     if (Test-StemmaService $ServiceId) { throw "O serviço '$ServiceId' já existe. Use a atualização." }
     if (-not $DataRoot) { $DataRoot = Get-DefaultDataRoot }
     Assert-StemmaDataRoot $DataRoot
+    $usage = Get-PortUsage -Port $Port
+    if ($usage) {
+        throw "A porta $Port está $usage. Escolha outra (a próxima livre é a $(Find-FreePort -Start ($Port + 1)))."
+    }
     if (-not $SkipTailscale) {
         # Antes de tudo: sem isto, a instalação iria até o fim e falharia no último passo.
         $tailscale = Get-TailscaleState
@@ -939,6 +1102,11 @@ function Invoke-StemmaInstall {
         Write-Step "Criando $($paths.EnvFile)"
         New-StemmaEnvFile -Path $paths.EnvFile -Port $Port -DataRoot $DataRoot -FfmpegBin $paths.Ffmpeg
     }
+    else {
+        # Nova tentativa depois de uma instalação que falhou: vale o que foi escolhido agora.
+        Set-DotEnvValue -Path $paths.EnvFile -Key 'PORT' -Value "$Port"
+        Set-DotEnvValue -Path $paths.EnvFile -Key 'STORAGE_ROOT' -Value $DataRoot
+    }
     $context = Get-StemmaContext -Root $Root
 
     $package = Get-StemmaPackage -Root $Root -Version $Version -ZipPath $ZipPath
@@ -952,12 +1120,13 @@ function Invoke-StemmaInstall {
     Set-CurrentRelease -Root $Root -ReleaseDir $release
 
     Register-StemmaService -Root $Root -ServiceId $ServiceId -ReleaseDir $release
-    Set-StemmaInstallInfo -Root $Root -ServiceId $ServiceId -TailscaleServe (-not $SkipTailscale)
+    Set-StemmaInstallInfo -Root $Root -ServiceId $ServiceId -TailscaleServe (-not $SkipTailscale) -HttpsPort $HttpsPort
     Start-StemmaService -ServiceId $ServiceId
     if (-not (Wait-StemmaHealth -Port $context.Port -ExpectedVersion $package.Tag -TimeoutSec $HealthTimeoutSec)) {
         throw "O serviço subiu mas o /health não confirmou a versão. Veja os logs em $(Join-Path $Root 'logs')."
     }
-    if (-not $SkipTailscale) { Set-TailscaleServe -Port $context.Port }
+    # A escolha entre substituir a 443 de outro app ou usar a 8443 é feita antes (tela do Tailscale).
+    if (-not $SkipTailscale) { Set-TailscaleServe -Port $context.Port -HttpsPort $HttpsPort }
     Write-Step "Stemma $($package.Tag) instalado em $Root"
     return $package.Tag
 }
@@ -1163,7 +1332,8 @@ function Invoke-StemmaUninstall {
     if (-not $ServiceId) { $ServiceId = if ($info) { $info.serviceId } else { 'stemma' } }
     Unregister-StemmaService -Root $Root -ServiceId $ServiceId
     if ($info -and $info.tailscaleServe) {
-        try { Remove-TailscaleServe } catch { Write-Warning "tailscale serve: $($_.Exception.Message)" }
+        try { Remove-TailscaleServe -Port $context.Port -HttpsPort $info.httpsPort }
+        catch { Write-Warning "tailscale serve: $($_.Exception.Message)" }
     }
     $current = Join-Path $Root 'current'
     if (Test-Path -LiteralPath $current) { [IO.Directory]::Delete($current, $false) }

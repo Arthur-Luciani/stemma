@@ -979,6 +979,9 @@ function Get-BuildBackendNames {
             }
         }
     }
+    # O uv instala o projeto como editável, e o hatchling pede o `editables` só nessa hora
+    # (get_requires_for_build_editable): não está no METADATA dele.
+    if ($names -contains 'hatchling') { $names += 'editables' }
     return @($names | Sort-Object -Unique)
 }
 

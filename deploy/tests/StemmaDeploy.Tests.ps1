@@ -750,7 +750,9 @@ source = { editable = "." }
         Set-Content -LiteralPath (Join-Path $dir 'pyproject.toml') -Encoding UTF8 -Value @(
             '[build-system]', 'requires = ["hatchling>=1.25"]', 'build-backend = "hatchling.build"'
         )
-        Get-BuildBackendNames -PyprojectPath (Join-Path $dir 'pyproject.toml') | Should -Contain 'hatchling'
+        $names = Get-BuildBackendNames -PyprojectPath (Join-Path $dir 'pyproject.toml')
+        $names | Should -Contain 'hatchling'
+        $names | Should -Contain 'editables'  # pedido só no build editável
         $plan = Get-UvCacheSeedPlan -Source $cache -LockPath (Join-Path $dir 'uv.lock')
         $plan.Roots | Should -Contain 'archive-v0/idHatch'
         $plan.Roots | Should -Contain 'archive-v0/idPluggy'

@@ -33,7 +33,7 @@ Na F5, instalar era rodar `install.ps1` num PowerShell de administrador, com uv,
   Regras gerais de portas para vários apps no PC: `docs/operacao.md#portas`.
 
 - **Instalador rápido e sem perguntas técnicas** (v1.4.2, pedido do usuário depois da instalação real: "bem lento e fica meio cego"; "selecionar portas daquele jeito é estranho, pense num usuário comum"). Muda os itens de cache, pastas protegidas e portas acima:
-  - **Semeadura seletiva**: do cache do usuário só entram as pastas pequenas (tudo menos `archive-v*`) e os archives dos pacotes do `uv.lock` da versão. Eles são achados pelos ponteiros `wheels-v*\…\<pacote>\<versão>-<tags>`, um texto com `archive-v0/<id>`. Entram também o build backend do `[build-system]` e as dependências dele, lidas do `METADATA` no cache. No PC de referência: ~25 mil arquivos (5,5 GB) em vez de 225 mil (17,6 GB).
+  - **Semeadura seletiva**: do cache do usuário só entram as pastas pequenas (tudo menos `archive-v*`) e os archives dos pacotes do `uv.lock` da versão. Eles são achados pelos ponteiros `wheels-v*\…\<pacote>\<versão>-<tags>`, um texto com `archive-v0/<id>`. Entram também o build backend do `[build-system]` e as dependências dele, lidas do `METADATA` no cache, mais o `editables`, que o hatchling só pede no build editável do próprio projeto. No PC de referência: ~25 mil arquivos (5,5 GB) em vez de 225 mil (17,6 GB).
     - Isso depende do formato interno do uv. Se não achar ponteiros, semeia o `archive-v0` inteiro. Se faltar algo, o `--offline` falha e o download pega só o que falta: nunca quebra.
   - **ACL por arquivo, ao ligar**:
     - a raiz e os dados são protegidos **antes** de criar qualquer coisa dentro, então tudo o que vem depois já herda a ACL certa;

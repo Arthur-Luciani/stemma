@@ -20,7 +20,7 @@ Tempos no PC de referência (2026-10-06): **~1 min** com o torch já no cache do
 
 Pré-requisito que o instalador só confere: driver da NVIDIA (`nvidia-smi`). Sem ele, a separação roda na CPU (bem mais lenta).
 
-**Torch (~3 GB):** na primeira instalação, o instalador liga por hardlink, do cache do uv do seu usuário (`uv cache dir`) para `C:\stemma\cache\uv`, **só os pacotes que o `uv.lock` da versão usa**, mais o build backend (`hatchling`) e as dependências dele. Cada arquivo ligado ganha uma ACL protegida: só administradores alteram, inclusive no seu cache, porque é o mesmo arquivo. Depois o instalador tenta montar o ambiente só com isso (`uv sync --offline`); se faltar algo, baixa só o que falta. O log diz qual caso foi ("Componentes encontrados no PC" ou "Baixando o que falta").
+**Torch (~3 GB):** na primeira instalação, o instalador liga por hardlink, do cache do uv do seu usuário (`uv cache dir`) para `C:\stemma\cache\uv`, **só os pacotes que o `uv.lock` da versão usa**, mais o build backend (`hatchling`, com as dependências dele e o `editables`). Cada arquivo ligado ganha uma ACL protegida: só administradores alteram, inclusive no seu cache, porque é o mesmo arquivo. Depois o instalador tenta montar o ambiente só com isso (`uv sync --offline`); se faltar algo, baixa só o que falta. O log diz qual caso foi ("Componentes encontrados no PC" ou "Baixando o que falta").
 
 ## Atualizar
 

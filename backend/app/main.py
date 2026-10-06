@@ -108,7 +108,11 @@ def create_app(
     app.state.job_runner = job_runner
     app.state.storage = storage
     app.state.gpu_probe = gpu_probe
-    app.state.releases = GitHubReleases(settings.update_repo, ttl_s=settings.update_check_ttl_s)
+    app.state.releases = GitHubReleases(
+        settings.update_repo,
+        ttl_s=settings.update_check_ttl_s,
+        url=settings.update_releases_url,
+    )
     app.state.update_task = UpdateTask(settings.schtasks_bin, settings.update_task)
 
     if settings.cors_origins:

@@ -1,7 +1,9 @@
+import json
 import sys
 import urllib.error
 from collections.abc import Iterator
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -379,3 +381,14 @@ def test_resultado_sem_pedido_nao_falha(client: TestClient) -> None:
         assert record_update_result(db, UpdateState.SUCCEEDED, None) is False
         with pytest.raises(ValueError):
             record_update_result(db, UpdateState.RUNNING, None)
+
+
+def test_releases_de_um_arquivo_local(tmp_path: Path) -> None:
+    """Ensaio: UPDATE_RELEASES_URL=file://… no lugar da API do GitHub."""
+    listing = tmp_path / "releases.json"
+    listing.write_text(json.dumps([release(NEXT)]), encoding="utf-8")
+
+    result = GitHubReleases("x/y", ttl_s=60, url=listing.as_uri()).list()
+
+    assert result is not None
+    assert [format_version(r.version) for r in result.releases] == [NEXT]

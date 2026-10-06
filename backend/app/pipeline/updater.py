@@ -64,12 +64,13 @@ class GitHubReleases:
         repo: str,
         *,
         ttl_s: float,
+        url: str = "",
         timeout_s: float = 5.0,
         fetch: Fetch = _fetch_json,
         clock: Callable[[], float] = time.monotonic,
         now: Callable[[], datetime] | None = None,
     ) -> None:
-        self.url = f"https://api.github.com/repos/{repo}/releases?per_page=30"
+        self.url = url or f"https://api.github.com/repos/{repo}/releases?per_page=30"
         self.ttl_s = ttl_s
         self.timeout_s = timeout_s
         self._fetch = fetch

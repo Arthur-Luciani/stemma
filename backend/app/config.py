@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     schtasks_bin: str = "schtasks"
     # Repositório cujas releases são consultadas (e de onde a tarefa baixa o instalador).
     update_repo: str = "Arthur-Luciani/stemma"
+    # Só para ensaio: URL da lista de releases no lugar da API do GitHub (aceita file://).
+    update_releases_url: str = ""
     update_check_ttl_s: float = Field(default=6 * 3600, gt=0)
 
     @field_validator("ytdlp_js_runtime", mode="before")

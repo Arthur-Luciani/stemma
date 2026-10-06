@@ -53,6 +53,11 @@ No celular e no desktop: abrir uma sessão, mixar, usar loop A–B, aplicar pres
   - se o save do mix falhava, o export saía com o mix salvo antigo (agora `flush()` diz se salvou e o export para; com teste);
   - a resposta do `POST /exports` podia sobrescrever um estado mais novo que já tinha chegado pelo `/ws`;
   - Espaço num botão focado (M, S, preset, Exportar) tocava a música em vez de acionar o botão (com teste).
+- **Primeira conferência no celular (usuário)**: os faders do "Ajustar" não mexiam e a paisagem tinha problemas de uso. Corrigido e conferido com toque emulado (CDP, viewport 390×844, 844×390 e 800×340):
+  - o `Fader` tinha `flex: 1`, que numa coluna vira altura 0: a barra aparecia, mas não havia área de toque. Agora a horizontal é `flex: 1 0 auto` (44px no celular);
+  - o polegar passava das pontas do trilho. Agora o centro dele anda dentro do trilho, e o toque é calculado do mesmo jeito (`--thumb-travel`);
+  - paisagem: nome do stem e pan em linhas separadas (o knob cortava o nome), presets quebrando linha (todos à vista, com "Personalizado"), waveform no espaço vazio, controle de loop, margens do notch, e só o meio rola quando falta altura (cabeçalho e transport fixos);
+  - mudo apaga nome e fader, não os botões M/S.
 - **Conferido ao vivo** (backend local, sessão ST-002):
   - capturas do Edge headless no desktop (1440×900), retrato e paisagem;
   - export MP3 pela API: `PUT /mix` (Sem voz) → `POST /exports` → `done` em ~10 s, 9,8 MB, −15,2 LUFS, download com `Content-Disposition` "Survivor - Eye Of The Tiger (Sem voz).mp3". Depois o mix da ST-002 voltou ao Original.
@@ -70,7 +75,8 @@ No celular e no desktop: abrir uma sessão, mixar, usar loop A–B, aplicar pres
 - Os componentes de controle ficam em `features/mixer/`, não em `ui/`: só o mixer usa.
 
 ### Pegadinhas
-- **Edge/Chrome headless não fica com menos de ~500px de largura.** `--window-size=390,844` desenha a 500px e corta a imagem, e o layout parece vazar à direita. Para conferir o celular, use o aparelho ou o DevTools com emulação.
+- **Edge/Chrome headless não fica com menos de ~500px de largura.** `--window-size=390,844` desenha a 500px e corta a imagem, e o layout parece vazar à direita. Para conferir o celular sem o aparelho, use o DevTools Protocol (`Emulation.setDeviceMetricsOverride` com `mobile: true` + `Emulation.setTouchEmulationEnabled`, e `Input.dispatchTouchEvent` para arrastar). Captura estática não pega controle sem área de toque.
+- **`flex: 1` em controle dentro de coluna** dá altura 0 (base 0). Os testes no jsdom não pegam isso, porque não há layout.
 - **TanStack Query avisa a tela num `setTimeout`.** Depois de `FakeWebSocket.receive()` dentro de `act()`, use `findBy…`/`waitFor`, não `getBy…`.
 - **jsdom não tem pointer capture**: `src/test/setup.ts` tem um polyfill de `setPointerCapture`/`hasPointerCapture`, que solta no `pointerup`. `fireEvent.pointerDown` cria `PointerEvent` com `clientX` e `pointerId`.
 - **Duplo toque nos testes**: dois `pointerDown` seguidos no mesmo controle contam como duplo (são < 300 ms). Teste arrasto e duplo toque em renders separados.

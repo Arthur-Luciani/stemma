@@ -74,9 +74,22 @@
   height: 8px;
 }
 
-/* Stem mudo: o card inteiro apagado, como no design do celular. */
-.muted {
-  opacity: 0.55;
+/* Stem mudo: nome e fader apagados; M e S continuam nítidos para desfazer. */
+.muted .stemName,
+.muted .dot,
+.muted .laneValue,
+.muted .laneFader,
+.muted .stripName,
+.muted .stripFader,
+.muted .stripValue {
+  opacity: 0.4;
+}
+
+.ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------- 1f Modo prática */
@@ -196,10 +209,6 @@
   outline-offset: 1px;
 }
 
-.laneFader {
-  margin-right: 6px;
-}
-
 .hint {
   margin: 0;
   padding: 2px 0 var(--space-2);
@@ -275,14 +284,15 @@
   display: flex;
   gap: var(--space-4);
   height: calc(100dvh - env(safe-area-inset-top));
-  padding: 14px var(--space-4) 20px;
+  padding: 12px max(var(--space-4), env(safe-area-inset-right)) 12px
+    max(var(--space-4), env(safe-area-inset-left));
   box-sizing: border-box;
   overflow: hidden;
 }
 
 .strips {
   display: grid;
-  grid-template-columns: repeat(4, 104px);
+  grid-template-columns: repeat(4, minmax(88px, 104px));
   gap: var(--space-2);
   flex: none;
 }
@@ -291,34 +301,45 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
+  gap: 6px;
   min-height: 0;
-  padding: 10px var(--space-2) var(--space-2);
+  min-width: 0;
+  padding: 10px 6px 6px;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   background: var(--bg-surface);
 }
 
-.stripTop {
+.stripName {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-}
-
-.stripName {
-  display: inline-flex;
-  align-items: center;
   gap: 5px;
+  width: 100%;
   min-width: 0;
+  padding: 0 4px;
+  box-sizing: border-box;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-strong);
 }
 
+.stripPan {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.stripPanValue {
+  width: 34px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-body);
+}
+
 .stripFader {
-  flex: 1;
-  min-height: 0;
+  min-height: 72px;
 }
 
 .stripValue {
@@ -336,12 +357,37 @@
 .consoleSide {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-2);
   flex: 1;
   min-width: 0;
+  min-height: 0;
+}
+
+.consoleMiddle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .consoleSide .header {
   min-height: 0;
   padding: 0;
+}
+
+/* Todos os presets à vista (quebram linha), com o "Personalizado". */
+.consoleMiddle .consolePresets {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.consoleWave {
+  flex: 1 0 44px;
+  min-height: 44px;
+  max-height: 120px;
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  overflow: hidden;
 }

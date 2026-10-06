@@ -36,12 +36,15 @@ export function Fader({
     onChange(defaultValue);
   });
 
+  /** Valor sob o dedo, contando que o centro do polegar anda de meio polegar a meio polegar. */
   const valueAt = (event: PointerEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
+    const el = event.currentTarget;
+    const rect = el.getBoundingClientRect();
+    const thumb = parseFloat(getComputedStyle(el).getPropertyValue('--thumb-travel')) || 0;
     const ratio =
       orientation === 'horizontal'
-        ? (event.clientX - rect.left) / rect.width
-        : (rect.bottom - event.clientY) / rect.height;
+        ? (event.clientX - rect.left - thumb / 2) / (rect.width - thumb)
+        : (rect.bottom - event.clientY - thumb / 2) / (rect.height - thumb);
     return Number.isFinite(ratio) ? Math.min(Math.max(ratio, 0), 1) * 100 : value;
   };
 

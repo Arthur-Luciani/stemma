@@ -5,8 +5,10 @@ import { strings } from '../../strings';
 import { Button, ButtonLink } from '../../ui/Button';
 import { cx } from '../../ui/cx';
 import { Fader } from './Fader';
+import { LoopABControl } from './LoopABControl';
 import { usePlayhead } from './hooks';
 import styles from './MobileMixer.module.css';
+import { formatPan } from './mixState';
 import { MixWaveform } from './MixWaveform';
 import { MuteSoloButton } from './MuteSoloButton';
 import { PanControl } from './PanControl';
@@ -40,11 +42,11 @@ export function ConsoleMixer({
               className={cx(styles.strip, control.mute && styles.muted)}
               aria-label={name}
             >
-              <div className={styles.stripTop}>
-                <span className={styles.stripName}>
-                  <span className={styles.dotSmall} style={{ background: stemColorVar(stem) }} />
-                  {name}
-                </span>
+              <span className={styles.stripName}>
+                <span className={styles.dotSmall} style={{ background: stemColorVar(stem) }} />
+                <span className={styles.ellipsis}>{name}</span>
+              </span>
+              <div className={styles.stripPan}>
                 <PanControl
                   variant="knob"
                   value={control.pan}
@@ -53,6 +55,7 @@ export function ConsoleMixer({
                     dispatch({ type: 'pan', stem, value });
                   }}
                 />
+                <span className={styles.stripPanValue}>{formatPan(control.pan)}</span>
               </div>
               <Fader
                 orientation="vertical"
@@ -114,25 +117,43 @@ export function ConsoleMixer({
             onClick={onOpenExport}
           />
         </header>
-        <PresetSelector
-          variant="pills"
-          value={preset}
-          onChange={(p) => {
-            dispatch({ type: 'preset', preset: p });
-          }}
-        />
-        <div className={styles.spacer} />
-        <MixWaveform
-          className={styles.drawerWave}
-          peaks={peaks}
-          stems={state.stems}
-          loop={state.loop}
-          duration={duration}
-          onSeek={(seconds) => engine?.seek(seconds)}
-          onLoop={(loop) => {
-            dispatch({ type: 'loop', loop });
-          }}
-        />
+        {/* Só o meio rola quando falta altura: cabeçalho e transport ficam à vista. */}
+        <div className={styles.consoleMiddle}>
+          <PresetSelector
+            variant="pills"
+            className={styles.consolePresets}
+            value={preset}
+            onChange={(p) => {
+              dispatch({ type: 'preset', preset: p });
+            }}
+          />
+          <MixWaveform
+            className={styles.consoleWave}
+            peaks={peaks}
+            stems={state.stems}
+            loop={state.loop}
+            duration={duration}
+            markers
+            onSeek={(seconds) => engine?.seek(seconds)}
+            onLoop={(loop) => {
+              dispatch({ type: 'loop', loop });
+            }}
+          />
+          <LoopABControl
+            variant="practice"
+            loop={state.loop}
+            pendingA={mixer.pendingA}
+            onMarkA={() => {
+              mixer.markA(engine?.getPosition() ?? 0);
+            }}
+            onMarkB={() => {
+              mixer.markB(engine?.getPosition() ?? 0);
+            }}
+            onClear={() => {
+              dispatch({ type: 'loop', loop: null });
+            }}
+          />
+        </div>
         <div className={styles.drawerRow}>
           <span className={styles.smallTime} aria-label={strings.mixer.time}>
             <span ref={time}>{formatShortClock(0)}</span>

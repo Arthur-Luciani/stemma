@@ -97,10 +97,11 @@ describe('Biblioteca', () => {
     await waitFor(
       () => {
         expect(router.state.location.search).toBe('?q=queen');
+        // O GET com a busca sai depois da troca de URL: espera por ele também.
+        expect(seen.at(-1)).toBe('queen');
       },
       { timeout: 3000 },
     );
-    expect(seen.at(-1)).toBe('queen');
   });
 
   it('regressão: pausar depois de um espaço não come o espaço do campo', async () => {

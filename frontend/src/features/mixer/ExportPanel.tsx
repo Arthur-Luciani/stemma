@@ -63,7 +63,7 @@ export function ExportPanel({ session, mixer, variant }: ExportPanelProps) {
   const sheet = variant === 'sheet';
 
   return (
-    <div className={cx(styles.panel, styles[variant])}>
+    <div className={cx(styles.panel, sheet && styles.sheet)}>
       {!sheet && (
         <div className={styles.head}>
           <h2 className={styles.title}>{strings.exports.title}</h2>

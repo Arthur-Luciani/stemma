@@ -23,6 +23,9 @@ const FORMAT_LABEL: Record<ExportFormat, string> = { wav: 'WAV', mp3: 'MP3' };
 
 const isActive = (e: Export) => e.state === 'queued' || e.state === 'running';
 
+/** O save do mix antes do export falhou (o toast do save já avisou). */
+class MixNotSaved extends Error {}
+
 function exportTitle(e: Export): string {
   const preset = e.preset ? strings.mixer.preset[e.preset] : strings.mixer.preset.custom;
   return `${preset} · ${FORMAT_LABEL[e.format]}`;
@@ -45,16 +48,19 @@ export function ExportPanel({ session, mixer, variant }: ExportPanelProps) {
   const create = useMutation({
     mutationFn: async (f: ExportFormat) => {
       // Sem `stems`, o backend exporta o mix salvo: o que está na tela precisa estar salvo.
-      await mixer.flush();
+      // Se o save falhou (o toast já saiu), não exporta um mix diferente do da tela.
+      if (!(await mixer.flush())) throw new MixNotSaved();
       return createExport(session.id, f);
     },
     onSuccess: (created) => {
-      queryClient.setQueryData<Export[]>(queryKeys.exports(session.id), (list) => [
-        created,
-        ...(list ?? []).filter((e) => e.id !== created.id),
-      ]);
+      // O `/ws` pode ter trazido um estado mais novo (running, done) antes da resposta.
+      queryClient.setQueryData<Export[]>(queryKeys.exports(session.id), (list = []) =>
+        list.some((e) => e.id === created.id) ? list : [created, ...list],
+      );
     },
-    onError,
+    onError: (error) => {
+      if (!(error instanceof MixNotSaved)) onError(error);
+    },
   });
 
   const active = exports.filter(isActive);

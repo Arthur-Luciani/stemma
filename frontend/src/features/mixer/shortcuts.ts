@@ -52,6 +52,14 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   return false;
 }
 
+/** Controle que o Espaço já aciona: botão, rádio, link. */
+export function isPressable(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest('button, a[href], [role="button"], [role="radio"], [role="checkbox"]') !== null
+  );
+}
+
 /**
  * Liga os atalhos na janela enquanto `enabled`. Sliders e grupos de rádio param a propagação
  * das setas, então elas mexem no controle focado e não no tempo.
@@ -73,6 +81,8 @@ export function useMixerShortcuts(
       if (event.target instanceof Element && event.target.closest('[role="dialog"]')) return;
       const action = keyToAction(event);
       if (!action) return;
+      // Espaço num botão (M, S, preset, Exportar) aciona o botão, como no resto da web.
+      if (action.type === 'toggle' && isPressable(event.target)) return;
       // Segurar a tecla só repete o ±5 s.
       if (event.repeat && action.type !== 'skip') return;
       event.preventDefault();

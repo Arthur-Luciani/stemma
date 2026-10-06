@@ -61,6 +61,8 @@ describe('useMixerShortcuts', () => {
     return (
       <>
         <input aria-label="campo" />
+        <button type="button">botão</button>
+        <div role="slider" tabIndex={0} aria-label="fader" aria-valuenow={1} />
         <div role="dialog">
           <button type="button">no diálogo</button>
         </div>
@@ -83,8 +85,16 @@ describe('useMixerShortcuts', () => {
     fireEvent.keyDown(document.body, { code: 'ArrowRight', key: 'ArrowRight', repeat: true });
     expect(onAction).toHaveBeenLastCalledWith({ type: 'skip', delta: 5 });
 
+    // Espaço num botão é do botão; num slider continua sendo play. Outros atalhos valem.
+    fireEvent.keyDown(getByText('botão'), { code: 'Space', key: ' ' });
+    expect(onAction).toHaveBeenCalledTimes(2);
+    fireEvent.keyDown(getByText('botão'), { code: 'Digit1', key: '1' });
+    expect(onAction).toHaveBeenLastCalledWith({ type: 'mute', stem: 'vocals' });
+    fireEvent.keyDown(getByLabelText('fader'), { code: 'Space', key: ' ' });
+    expect(onAction).toHaveBeenLastCalledWith({ type: 'toggle' });
+
     rerender(<Harness onAction={onAction} enabled={false} />);
     fireEvent.keyDown(document.body, { code: 'Space', key: ' ' });
-    expect(onAction).toHaveBeenCalledTimes(2);
+    expect(onAction).toHaveBeenCalledTimes(4);
   });
 });

@@ -19,7 +19,7 @@ UI final do mixer e export (F4b).
 - [x] AudioEngine completo
 - [x] waveform por peaks + playhead
 - [x] página /dev/engine
-- [ ] medições no celular registradas no Handoff (números)
+- [ ] medições no celular registradas no Handoff (números) → passou para a conferência no celular da F4b
 - [x] ADR atualizada se houver fallback
 - [x] testes
 
@@ -27,7 +27,7 @@ UI final do mixer e export (F4b).
 4 stems tocando sincronizados no celular por 3+ minutos, drift medido abaixo do limiar definido, sem crash; números registrados no Handoff; CI verde.
 
 ## Handoff
-**Status:** em andamento (2026-10-05). PR aberto; falta a medição no Android (ver "Pendente").
+**Status:** concluída — PR #12 (mergeado em 2026-10-05). A medição no Android ficou para a conferência no celular real da F4b, por decisão do usuário (ver "Pendente").
 
 ### Feito
 - **Decisão do mixer no celular**: 1f (Modo prática) é a tela inicial, "Ajustar" abre 1e (Lanes compactas) e a paisagem usa o 1g. Registrada em [docs/design/README.md](../design/README.md#decisões-pendentes).
@@ -51,7 +51,7 @@ UI final do mixer e export (F4b).
 | Android (Chrome, via Tailscale) | _pendente_ | | | | | |
 
 ### Pendente
-- **Medição no Android** (critério de pronto): abrir `https://<máquina>.<tailnet>.ts.net:5183/dev/engine`, escolher uma sessão, Tocar, "Iniciar medição", deixar 3+ min (bloquear a tela e trocar de aba no meio), "Parar e gerar relatório" e colar o JSON aqui.
+- **Medição no Android** (passou para a F4b, junto com a conferência do mixer no celular): abrir `https://<máquina>.<tailnet>.ts.net:5183/dev/engine`, escolher uma sessão, Tocar, "Iniciar medição", deixar 3+ min (bloquear a tela e trocar de aba no meio), "Parar e gerar relatório" e colar o JSON aqui.
 - iPhone: sem aparelho nesta fase; fica para conferir quando houver.
 - Herdado: branch protection (F0).
 

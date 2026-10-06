@@ -6,7 +6,7 @@ import type { Export, MixState, MixStateIn } from '../../api/types';
 import { stubAudioGlobals } from '../../test/audio';
 import { makeExport, makeMix, makeSession } from '../../test/fixtures';
 import { renderApp } from '../../test/render';
-import { server } from '../../test/server';
+import { apiError, server } from '../../test/server';
 import { FakeWebSocket } from '../../test/websocket';
 
 /** Backend falso com o mix e os exports guardados entre renders (recarregar a página). */
@@ -224,6 +224,20 @@ describe('Mixer', () => {
 
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('desktop: se o save do mix falha, o export não sai com o mix antigo', async () => {
+    const { session, calls } = fakeBackend();
+    await openDesktop(`/sessions/${session.id}/mix`);
+    server.use(http.put('*/api/sessions/:id/mix', () => apiError(503, 'boom', 'Servidor fora.')));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Solo de Baixo' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Exportar' }));
+    const popover = screen.getByRole('dialog', { name: 'Exportar mixagem' });
+    await userEvent.click(within(popover).getByRole('button', { name: 'Exportar MP3 320' }));
+
+    expect(await screen.findByText('Servidor fora.')).toBeInTheDocument();
+    expect(calls.some((c) => c.startsWith('post'))).toBe(false);
   });
 
   it('celular: Modo prática primeiro, "Ajustar" abre as lanes e o back volta', async () => {

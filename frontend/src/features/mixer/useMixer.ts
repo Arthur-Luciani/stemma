@@ -26,8 +26,11 @@ export interface Mixer {
   preset: MixPreset;
   loadError: unknown;
   dispatch: (action: MixerAction) => void;
-  /** Salva agora o que estiver pendente (ex.: antes de exportar). */
-  flush: () => Promise<void>;
+  /**
+   * Salva agora o que estiver pendente (ex.: antes de exportar). `true` se o servidor tem o
+   * mix da tela; `false` se o save falhou (já avisado com toast).
+   */
+  flush: () => Promise<boolean>;
   /** A marcado esperando o B (só na tela). */
   pendingA: number | null;
   markA: (position: number) => void;
@@ -61,7 +64,7 @@ export function useMixer(
   const savedRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Saves em fila: um de cada vez, na ordem, para o último sempre ganhar no servidor. */
-  const chainRef = useRef<Promise<void>>(Promise.resolve());
+  const chainRef = useRef<Promise<boolean>>(Promise.resolve(true));
 
   // Carrega uma vez; refetch depois disso não atropela o que está na tela.
   useEffect(() => {
@@ -73,23 +76,25 @@ export function useMixer(
   }, [query.data]);
 
   const save = useCallback(
-    ({ keepalive = false }: { keepalive?: boolean } = {}): Promise<void> => {
+    ({ keepalive = false }: { keepalive?: boolean } = {}): Promise<boolean> => {
       if (timerRef.current !== null) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
-      const run = async () => {
+      const run = async (): Promise<boolean> => {
         const current = stateRef.current;
-        if (!current) return;
+        if (!current) return true;
         const body = toMixStateIn(current);
         const key = JSON.stringify(body);
-        if (key === savedRef.current) return;
+        if (key === savedRef.current) return true;
         try {
           const saved = await saveMix(sessionId, body, { keepalive });
           savedRef.current = key;
           queryClient.setQueryData(queryKeys.mix(sessionId), saved);
+          return true;
         } catch (error) {
           onError(error);
+          return false;
         }
       };
       chainRef.current = chainRef.current.then(run);

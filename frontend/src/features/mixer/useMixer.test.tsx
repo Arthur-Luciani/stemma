@@ -112,9 +112,16 @@ describe('useMixer', () => {
     act(() => {
       result.current.dispatch({ type: 'solo', stem: 'drums' });
     });
-    await act(() => result.current.flush());
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.flush();
+    });
+    expect(ok).toBe(false);
     expect(puts).toHaveLength(0);
-    await act(() => result.current.flush());
+    await act(async () => {
+      ok = await result.current.flush();
+    });
+    expect(ok).toBe(true);
     expect(puts).toHaveLength(1);
   });
 

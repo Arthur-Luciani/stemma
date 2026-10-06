@@ -99,7 +99,9 @@ export function mixerReducer(state: MixerState, action: MixerAction): MixerState
       return patchStem(state, action.stem, { volume: Math.round(clamp(action.value, 0, 100)) });
     case 'pan':
       // Passo de 1%, igual ao rótulo (L30/R20).
-      return patchStem(state, action.stem, { pan: Math.round(clamp(action.value, -1, 1) * 100) / 100 });
+      return patchStem(state, action.stem, {
+        pan: Math.round(clamp(action.value, -1, 1) * 100) / 100,
+      });
     case 'mute':
       return patchStem(state, action.stem, {
         mute: action.value ?? !state.stems[action.stem].mute,
@@ -119,5 +121,5 @@ export function mixerReducer(state: MixerState, action: MixerAction): MixerState
 export function formatPan(pan: number): string {
   const pct = Math.round(Math.abs(pan) * 100);
   if (pct === 0) return 'C';
-  return `${pan < 0 ? 'L' : 'R'}${pct}`;
+  return `${pan < 0 ? 'L' : 'R'}${String(pct)}`;
 }

@@ -101,8 +101,15 @@ export function getMix(id: string, signal?: AbortSignal): Promise<MixState> {
   return call(() => apiClient.GET('/api/sessions/{session_id}/mix', { ...path(id), signal }));
 }
 
-export function saveMix(id: string, body: MixStateIn): Promise<MixState> {
-  return call(() => apiClient.PUT('/api/sessions/{session_id}/mix', { ...path(id), body }));
+/** `keepalive`: o save do `pagehide` termina mesmo com a página indo embora. */
+export function saveMix(
+  id: string,
+  body: MixStateIn,
+  { keepalive = false }: { keepalive?: boolean } = {},
+): Promise<MixState> {
+  return call(() =>
+    apiClient.PUT('/api/sessions/{session_id}/mix', { ...path(id), body, keepalive }),
+  );
 }
 
 export async function listExports(id: string, signal?: AbortSignal): Promise<Export[]> {

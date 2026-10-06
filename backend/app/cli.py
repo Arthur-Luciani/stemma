@@ -3,6 +3,8 @@
 - `uv run python -m app.cli cleanup [--dry-run]`
 - `uv run python -m app.cli backup --dest <arquivo>` / `restore --src <arquivo>` (usados pelo
   `deploy/update.ps1`)
+- `uv run python -m app.cli update-result --state succeeded|failed [--message <texto>]` (usado
+  pela tarefa agendada no fim da atualização pelo app, ADR 0015)
 """
 
 import argparse
@@ -12,10 +14,12 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.db.engine import make_engine, make_sessionmaker
+from app.domain.enums import UpdateState
 from app.domain.errors import AppError
 from app.logging_setup import configure_logging
 from app.services.backup import backup_database, restore_database
 from app.services.cleanup import CleanupService
+from app.services.system_update import record_update_result
 from app.storage import Storage
 
 logger = logging.getLogger("app.cli")
@@ -36,6 +40,13 @@ def main(argv: list[str] | None = None) -> int:
     backup.add_argument("--dest", type=Path, required=True, help="arquivo de destino (novo)")
     restore = commands.add_parser("restore", help="sobrescreve o banco com um backup (app parado)")
     restore.add_argument("--src", type=Path, required=True, help="arquivo de backup")
+    result = commands.add_parser(
+        "update-result", help="grava o resultado da atualização pedida pelo app"
+    )
+    result.add_argument(
+        "--state", required=True, choices=[UpdateState.SUCCEEDED, UpdateState.FAILED]
+    )
+    result.add_argument("--message", default=None, help="motivo da falha (PT-BR)")
     args = parser.parse_args(argv)
 
     settings = get_settings()
@@ -47,10 +58,22 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "restore":
             restore_database(settings.database_url, args.src)
             return 0
+        if args.command == "update-result":
+            return _update_result(settings.database_url, UpdateState(args.state), args.message)
     except AppError as exc:
         logger.error("%s", exc.message)
         return 1
     return _cleanup(settings.database_url, settings.storage_root, args)
+
+
+def _update_result(database_url: str, state: UpdateState, message: str | None) -> int:
+    engine = make_engine(database_url)
+    try:
+        with make_sessionmaker(engine)() as db:
+            record_update_result(db, state, message)
+    finally:
+        engine.dispose()
+    return 0
 
 
 def _cleanup(database_url: str, storage_root: Path, args: argparse.Namespace) -> int:

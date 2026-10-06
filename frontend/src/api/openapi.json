@@ -716,6 +716,48 @@
         "title": "MixStateOut",
         "type": "object"
       },
+      "ReleaseNotes": {
+        "properties": {
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseNotesSection"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "sections"
+        ],
+        "title": "ReleaseNotes",
+        "type": "object"
+      },
+      "ReleaseNotesSection": {
+        "properties": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "items"
+        ],
+        "title": "ReleaseNotesSection",
+        "type": "object"
+      },
       "SearchOut": {
         "properties": {
           "items": {
@@ -1260,6 +1302,156 @@
         },
         "title": "StemMix",
         "type": "object"
+      },
+      "SystemUpdateOut": {
+        "properties": {
+          "active_jobs": {
+            "title": "Active Jobs",
+            "type": "integer"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "can_update": {
+            "title": "Can Update",
+            "type": "boolean"
+          },
+          "check": {
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Check",
+            "type": "string"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "current_version": {
+            "title": "Current Version",
+            "type": "string"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateRunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseNotes"
+            },
+            "title": "Notes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "current_version",
+          "check",
+          "checked_at",
+          "latest_version",
+          "available",
+          "notes",
+          "can_update",
+          "active_jobs",
+          "last_run"
+        ],
+        "title": "SystemUpdateOut",
+        "type": "object"
+      },
+      "UpdateRunOut": {
+        "description": "Uma atualização pedida pelo app.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "from_version": {
+            "title": "From Version",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "state": {
+            "$ref": "#/components/schemas/UpdateState"
+          },
+          "target_version": {
+            "title": "Target Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "from_version",
+          "target_version",
+          "state",
+          "message",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "UpdateRunOut",
+        "type": "object"
+      },
+      "UpdateState": {
+        "description": "Atualização do Stemma disparada pelo app (ADR 0015).",
+        "enum": [
+          "running",
+          "succeeded",
+          "failed"
+        ],
+        "title": "UpdateState",
+        "type": "string"
       }
     }
   },
@@ -2539,6 +2731,106 @@
         "summary": "Stem Audio",
         "tags": [
           "media"
+        ]
+      }
+    },
+    "/api/system/update": {
+      "get": {
+        "operationId": "get_update_api_system_update_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemUpdateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Get Update",
+        "tags": [
+          "system"
+        ]
+      },
+      "post": {
+        "operationId": "start_update_api_system_update_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Start Update",
+        "tags": [
+          "system"
         ]
       }
     },

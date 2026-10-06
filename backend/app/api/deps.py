@@ -8,6 +8,7 @@ from app.db.deps import get_db
 from app.pipeline.download import YtDlpClient
 from app.pipeline.probe import GpuProbe
 from app.pipeline.queue import JobRunner
+from app.pipeline.updater import GitHubReleases, UpdateTask
 from app.services.events import EventBus, EventPublisher
 from app.services.exports import ExportService
 from app.services.health import HealthService
@@ -17,6 +18,7 @@ from app.services.media import MediaService
 from app.services.mix import MixService
 from app.services.search import SearchService
 from app.services.sessions import SessionService
+from app.services.system_update import SystemUpdateService
 from app.storage import Storage
 
 DbSession = Annotated[Session, Depends(get_db)]
@@ -105,6 +107,14 @@ def get_health_service(
     return HealthService(settings, request.app.state.engine, probe)
 
 
+def get_system_update_service(
+    request: Request, jobs: Annotated[JobService, Depends(get_job_service)]
+) -> SystemUpdateService:
+    releases: GitHubReleases = request.app.state.releases
+    task: UpdateTask = request.app.state.update_task
+    return SystemUpdateService(jobs.db, releases, task, jobs)
+
+
 SessionServiceDep = Annotated[SessionService, Depends(get_session_service)]
 IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]
 MixServiceDep = Annotated[MixService, Depends(get_mix_service)]
@@ -113,3 +123,4 @@ HealthServiceDep = Annotated[HealthService, Depends(get_health_service)]
 ExportServiceDep = Annotated[ExportService, Depends(get_export_service)]
 MediaServiceDep = Annotated[MediaService, Depends(get_media_service)]
 SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
+SystemUpdateServiceDep = Annotated[SystemUpdateService, Depends(get_system_update_service)]

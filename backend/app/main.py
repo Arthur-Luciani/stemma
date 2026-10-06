@@ -6,7 +6,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import artists, events, exports, health, jobs, media, mix, search, sessions
+from app.api import (
+    artists,
+    events,
+    exports,
+    health,
+    jobs,
+    media,
+    mix,
+    search,
+    sessions,
+    system,
+)
 from app.api.errors import install_error_handlers
 from app.config import Settings, get_settings
 from app.db.engine import make_engine, make_sessionmaker
@@ -19,6 +30,7 @@ from app.pipeline.handlers import ExportHandler, ProcessHandler
 from app.pipeline.probe import GpuProbe
 from app.pipeline.queue import JobHandler, JobRunner
 from app.pipeline.separate import DemucsSeparator, DemucsSettings
+from app.pipeline.updater import GitHubReleases, UpdateTask
 from app.services.events import EventBus
 from app.spa import install_spa
 from app.storage import Storage
@@ -96,6 +108,8 @@ def create_app(
     app.state.job_runner = job_runner
     app.state.storage = storage
     app.state.gpu_probe = gpu_probe
+    app.state.releases = GitHubReleases(settings.update_repo, ttl_s=settings.update_check_ttl_s)
+    app.state.update_task = UpdateTask(settings.schtasks_bin, settings.update_task)
 
     if settings.cors_origins:
         app.add_middleware(
@@ -114,6 +128,7 @@ def create_app(
     app.include_router(search.router)
     app.include_router(exports.router)
     app.include_router(media.router)
+    app.include_router(system.router)
     app.include_router(events.router)
     if settings.serve_frontend_dir is not None:
         install_spa(app, settings.serve_frontend_dir)

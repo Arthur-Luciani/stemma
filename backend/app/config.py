@@ -51,6 +51,13 @@ class Settings(BaseSettings):
     fake_pipeline_seconds: float = Field(default=20.0, gt=0)
     # Tentativas de um job interrompido (servidor caiu no meio) antes de falhar.
     job_max_attempts: int = Field(default=2, ge=1)
+    # Atualização pelo app (ADR 0015). Tarefa agendada que roda o instalador da versão nova;
+    # vazio = sem atualização pelo app (dev, CI). O instalador grava `\Stemma\Atualizar`.
+    update_task: str = ""
+    schtasks_bin: str = "schtasks"
+    # Repositório cujas releases são consultadas (e de onde a tarefa baixa o instalador).
+    update_repo: str = "Arthur-Luciani/stemma"
+    update_check_ttl_s: float = Field(default=6 * 3600, gt=0)
 
     @field_validator("ytdlp_js_runtime", mode="before")
     @classmethod

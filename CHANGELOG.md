@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/Arthur-Luciani/stemma/compare/v1.2.0...v1.3.0) (2026-10-06)
+
+
+### Features
+
+* runtime, PWA e update (F5) ([#16](https://github.com/Arthur-Luciani/stemma/issues/16)) ([f0e9ab7](https://github.com/Arthur-Luciani/stemma/commit/f0e9ab7ea6d5f02f871c5971aedcaacaa7a88d43))
+
 ## [1.2.0](https://github.com/Arthur-Luciani/stemma/compare/v1.1.0...v1.2.0) (2026-10-06)
 
 

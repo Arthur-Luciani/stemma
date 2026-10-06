@@ -14,8 +14,10 @@ Reescrita do `music-analyzer` sem o inspetor de bateria ([ADR 0001](../decisions
 | F3 Frontend: Descobrir, Processamento, Biblioteca | [F3-frontend-fluxos.md](F3-frontend-fluxos.md) | F0 (+ contrato da F1) | ✅ concluída — PR #10 (mergeado) |
 | F4a Protótipo do AudioEngine | [F4a-audio-engine.md](F4a-audio-engine.md) | F2b, F3 | ✅ concluída — PR #12 (mergeado); medição no Android passou para a F4b |
 | F4b Mixer e Export | [F4b-mixer-export.md](F4b-mixer-export.md) | F4a | ✅ concluída — PR #14 (mergeado) |
-| F5 Runtime, PWA e update | [F5-runtime-pwa.md](F5-runtime-pwa.md) | F4b | 🟡 em andamento — PR aberto; falta o ensaio com a release real |
-| F6 Corte | [F6-corte.md](F6-corte.md) | F5 | ⬜ |
+| F5 Runtime, PWA e update | [F5-runtime-pwa.md](F5-runtime-pwa.md) | F4b | ✅ concluída — PR #16 (mergeado), release v1.3.0; ensaio real do critério passou para a F5b |
+| F5b Instalador | [F5b-instalador.md](F5b-instalador.md) | F5 | ⬜ |
+| F5c Atualizar pelo app | [F5c-atualizar-pelo-app.md](F5c-atualizar-pelo-app.md) | F5b | ⬜ |
+| F6 Corte | [F6-corte.md](F6-corte.md) | F5c | ⬜ |
 
 Legenda: ⬜ não iniciada · 🟡 em andamento · ✅ concluída · ⛔ bloqueada
 
@@ -23,7 +25,7 @@ Legenda: ⬜ não iniciada · 🟡 em andamento · ✅ concluída · ⛔ bloquea
 
 ```
 F0 ──► F1 ──► F2a ──► F2b ──┐
-  └──────────► F3 ──────────┴──► F4a ──► F4b ──► F5 ──► F6
+  └──────────► F3 ──────────┴──► F4a ──► F4b ──► F5 ──► F5b ──► F5c ──► F6
 ```
 
 Após a F1, a **F3 pode rodar em paralelo** com F2a/F2b em sessões separadas, cada uma no seu git worktree. O contrato entre elas é o OpenAPI (tipos gerados commitados; CI acusa drift). Na F3, estados de processamento podem ser simulados com o endpoint de dev da F2a ou com mocks do client.
@@ -42,3 +44,5 @@ Após a F1, a **F3 pode rodar em paralelo** com F2a/F2b em sessões separadas, c
 | yt-dlp exigindo runtime JS e cookies | F2b + `/health` |
 | Sincronia de 4 streams no celular | F4a ([ADR 0006](../decisions/0006-audio-no-celular.md)) |
 | SQLite com worker em thread | F2a (WAL + busy_timeout) |
+| CUDA num serviço com conta do sistema (LocalSystem) | F5b (verificar antes de tudo) |
+| Instalador sem assinatura (aviso do SmartScreen) | F5b (aceito; documentado) |

@@ -21,7 +21,7 @@ Novas funcionalidades.
 - [x] WinSW + start.ps1 + install.ps1 (ensaio real no PC depende da release)
 - [x] update.ps1 com backup, migration e rollback (ensaio real no PC depende da release)
 - [x] tailscale serve configurado (pelo install.ps1) e documentado
-- [ ] PWA instalável no Android (sem erros de instalabilidade no Edge; falta instalar no celular) — iPhone sem aparelho
+- [x] PWA instalável (sem erros de instalabilidade no Edge headless); instalação no celular conferida na F5b — iPhone sem aparelho
 - [x] docs/operacao.md com smoke checklist
 - [x] Modo app no PWA instalado: sem seleção/menu ao segurar, sem pinch zoom (pedido do usuário na sessão)
 
@@ -31,7 +31,8 @@ Instalar a **primeira release com `deploy/`** (a da F5; as releases até a v1.2.
 _Critério reescrito com o usuário em 2026-10-06 (antes: v1.0.0 → v1.0.1)._
 
 ## Handoff
-**Status:** em andamento. O código está pronto no PR da F5, e o critério de pronto depende de releases reais e de você rodar os scripts como administrador (ver "Pendente").
+**Status:** concluída — PR #16 (mergeado em 2026-10-06), release **v1.3.0** (primeira com `deploy/` no zip).
+O ensaio real do critério de pronto (instalar, atualizar, simular falha, PWA no celular) **passou para a [F5b](F5b-instalador.md)**, por decisão do usuário: instalar por script ficou difícil, e o instalador vai embrulhar a mesma lógica. O que ficou validado nesta fase está em "Feito" (ensaio sem o serviço, Edge headless, CI).
 
 ### Feito
 - **SPA servida pelo backend** (`app/spa.py`, `SERVE_FRONTEND_DIR`):
@@ -72,18 +73,15 @@ _Critério reescrito com o usuário em 2026-10-06 (antes: v1.0.0 → v1.0.1)._
   - os prompts do WinSW ficavam presos no pipe;
   - uma falha no `-Rollback` manual deixava o serviço parado.
 
-### Pendente (critério de pronto — precisa de você)
-1. Mergear este PR. O release-please abre o PR de release (provável **v1.3.0**, a primeira com `deploy/` no zip); mergear também.
-2. PowerShell **como administrador**: baixar `stemma-v1.3.0.zip`, extrair e rodar `deploy\install.ps1` ([docs/operacao.md](../operacao.md)). Conferir `/health` e `tailscale serve status`.
-3. Publicar a release seguinte (qualquer `fix:`/`docs:` mergeado + PR de release → **v1.3.1**) e rodar `C:\stemma\current\deploy\update.ps1`. O `/health` deve mostrar 1.3.1.
-4. `update.ps1 -Version v1.3.1 -SimulateFailure` a partir da v1.3.0 (ou `-Rollback` e depois o update com `-SimulateFailure`): ver o rollback automático.
-5. Celular: remover o atalho antigo (`:5183`), abrir `https://desktop-arthur.tail301d2c.ts.net`, "Instalar app" e conferir o ícone, a splash e que segurar não seleciona texto.
+### Pendente
+- **Critério de pronto real → F5b**: instalar no PC, atualizar para a release seguinte, simular falha e ver o rollback, PWA instalado no celular. Na F5b isso é feito pelo instalador, que reaproveita `deploy/StemmaDeploy.psm1`.
+- Ao instalar o PWA de produção: remover o atalho antigo (`:5183`, é outra origem).
 - iPhone: sem aparelho. As metas e o apple-touch-icon estão lá; não há splash própria no iOS.
 - Herdados: medição do AudioEngine no Android (F4a), branch protection (F0).
 
 ### Decisões
 - Venv por release, backup/restore pelo app, rollback por restore (automático) ou downgrade (manual): [ADR 0007](../decisions/0007-processo-de-release.md#atualização-f5-2026-10-06).
-- Critério de pronto reescrito: primeira release com `deploy/` → seguinte.
+- Critério de pronto reescrito: primeira release com `deploy/` → seguinte. Depois transferido para a F5b (instalador).
 - Desvios do design (ícone maskable sem borda, splash, modo app) em [docs/design/README.md](../design/README.md#desvios).
 
 ### Pegadinhas
@@ -93,5 +91,7 @@ _Critério reescrito com o usuário em 2026-10-06 (antes: v1.0.0 → v1.0.1)._
 - O módulo virtual `virtual:pwa-register/react` não existe no Vitest. Há um alias para `src/test/pwaRegister.ts` (fake com `pwaFake.needRefresh(true)`).
 - `SERVE_FRONTEND_DIR` relativo é a partir da **raiz do repo** (`frontend/dist`), não de `backend/`.
 - O PWA da produção é outra origem (`https://<pc>…ts.net`, sem `:5183`): precisa reinstalar no celular.
+- O release-please só abre release com commit `feat:`/`fix:` (ou breaking). `test:`, `docs:` e `chore:` não geram versão nova. Para testar o update é preciso um `fix:` real.
+- `test_descartar_publica_job_com_dismissed_at` era intermitente (evento da falha chegando depois do `wait_until`); corrigido no PR #18.
 - O Pester do Windows é o 3.4. Para rodar localmente: `Install-Module Pester -Scope CurrentUser` (pede o provedor NuGet, interativo) ou importe um Pester 5 baixado.
 

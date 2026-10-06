@@ -123,6 +123,7 @@ No PC (sem nada do Stemma instalado): baixar `Stemma-Setup-vX.Y.Z.exe` da GitHub
 - **`uv python install` sem `--no-bin --no-registry`** escreve no perfil do usuário (`~\.local\bin`, `HKCU\Software\Python\Astral`). Aconteceu no primeiro ensaio; a chave foi apagada à mão.
 - **`icacls ... /T` com `(OI)(CI)` aplicado a arquivos deixa o arquivo sem nenhuma permissão.** O certo é: proteger a pasta (sem `/T`), depois `pasta\* /reset /T`, depois `/setowner /T`.
 - **Python escrevendo arquivos com `\b`/`\t` dentro de strings normais** gerou bytes de controle em workflow e script. O Pester agora acusa.
+- **`[IO.Path]::GetFullPath('D:')`** devolve o diretório atual do drive D, e não `D:\`. Aqui passava por acaso; no runner (checkout em `D:\a\…`) não. Trate `X:` à parte.
 - **`"$var:"` no PowerShell** é variável com escopo (`$var:texto`). Use `"$($var):"`.
 - **Inno**: uma linha do `[Code]` que começa com `#` (ex.: `#13#10`) é lida como diretiva do pré-processador. `AppId` com `{code:}` exige `UsePreviousLanguage=no`.
 - **O `!` do Claude Code roda no bash**: para rodar `.exe` com parâmetros `/X=...`, use um `.ps1` (o Git Bash converte `/ROOT` em caminho).

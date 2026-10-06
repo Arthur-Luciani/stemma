@@ -875,7 +875,9 @@ function New-BackupPath([string]$StorageRoot, [string]$Label) {
 function Assert-StemmaDataRoot {
     <# A pasta de dados não pode ser a raiz de um drive: o desinstalador (-RemoveData) a apaga inteira. #>
     param([Parameter(Mandatory)][string]$Path)
-    $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
+    # "D:" sozinho é o diretório atual do drive para o GetFullPath, mas o desinstalador o leria como o drive.
+    if ($Path.Trim() -match '^[A-Za-z]:\\?$') { $full = $Path.Trim().Substring(0, 2) }
+    else { $full = [IO.Path]::GetFullPath($Path).TrimEnd('\') }
     if ($full.Length -le 2 -or [IO.Path]::GetPathRoot("$full\") -eq "$full\") {
         throw "Escolha uma pasta para os dados (ex.: D:\stemma-data), não a raiz do drive ($Path)."
     }

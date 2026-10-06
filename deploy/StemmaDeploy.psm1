@@ -1,5 +1,5 @@
-﻿# Funções compartilhadas pelo install.ps1, update.ps1 e start.ps1 (ADR 0007).
-# Compatível com o Windows PowerShell 5.1. Salvo com BOM (acentos).
+﻿# Funções compartilhadas pelo instalador (setup.ps1), install.ps1, update.ps1 e start.ps1
+# (ADRs 0007 e 0014). Compatível com o Windows PowerShell 5.1. Salvo com BOM (acentos).
 
 Set-StrictMode -Version Latest
 
@@ -8,6 +8,38 @@ $script:Repo = 'Arthur-Luciani/stemma'
 # WinSW 2.12.0 (x64), conferido pelo SHA256 antes de usar.
 $script:WinSWUrl = 'https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe'
 $script:WinSWSha256 = '05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da'
+
+# Ferramentas portáteis em <Root>\tools (ADR 0014). Versão e SHA256 fixados; trocar a versão
+# exige trocar o hash junto. `Strip`: o zip tem uma pasta de topo que é removida.
+$script:Tools = [ordered]@{
+    uv     = @{
+        Version = '0.12.7'
+        Url     = 'https://github.com/astral-sh/uv/releases/download/0.12.7/uv-x86_64-pc-windows-msvc.zip'
+        Sha256  = 'bf1518af459a3915511a11fdc6e2f43ef9a2afa138b9d498eeb9642fe9d85218'
+        Strip   = $false
+        Exe     = 'uv.exe'
+    }
+    ffmpeg = @{
+        Version = '9.0.2'
+        Url     = 'https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip'
+        Sha256  = '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba'
+        Strip   = $true
+        Exe     = 'bin\ffmpeg.exe'
+    }
+    deno   = @{
+        Version = '2.9.7'
+        Url     = 'https://github.com/denoland/deno/releases/download/v2.9.7/deno-x86_64-pc-windows-msvc.zip'
+        Sha256  = 'a0c3101b4158d1dfb7d6a78a7bf0f3de80c96bb423c152beec8beb22786f2238'
+        Strip   = $false
+        Exe     = 'deno.exe'
+    }
+}
+$script:PythonVersion = '3.12'
+
+# Tailscale: MSI oficial numa versão fixa (depois ele se atualiza sozinho).
+$script:TailscaleMsiUrl = 'https://pkgs.tailscale.com/stable/tailscale-setup-1.102.4-amd64.msi'
+$script:TailscaleMsiSha256 = '80eb007e39dfebe17299fa1a09c79a8e1d934f76e0246c0817ebe3af675b7ef6'
+$script:TailscaleAdminDns = 'https://login.tailscale.com/admin/dns'
 
 function Write-Step([string]$Message) {
     Write-Host "==> $Message" -ForegroundColor Cyan
@@ -223,11 +255,26 @@ function Get-ReleasePython([string]$ReleaseDir) {
 }
 
 function Sync-ReleaseEnvironment {
-    <# venv próprio da release (`backend\.venv`); torch vem do cache do uv por hardlink. #>
-    param([Parameter(Mandatory)][string]$ReleaseDir)
+    <#
+      venv próprio da release (`backend\.venv`); torch vem do cache do uv por hardlink.
+      Com -PreferOffline tenta antes só com o cache (`--offline`) e, se faltar algo, baixa.
+      Devolve 'cache' ou 'download'.
+    #>
+    param([Parameter(Mandatory)][string]$ReleaseDir, [switch]$PreferOffline)
     $backend = Join-Path $ReleaseDir 'backend'
-    Write-Step "uv sync em $backend"
-    Invoke-Native -FilePath 'uv' -Arguments @('sync', '--project', $backend, '--frozen', '--no-dev', '--group', 'api', '--group', 'pipeline')
+    $arguments = @('sync', '--project', $backend, '--frozen', '--no-dev', '--group', 'api', '--group', 'pipeline')
+    if ($PreferOffline) {
+        Write-Step 'Procurando os componentes no PC (sem baixar)'
+        try {
+            Invoke-Native -FilePath 'uv' -Arguments ($arguments + '--offline')
+            Write-Step 'Componentes encontrados no PC'
+            return 'cache'
+        }
+        catch { Write-Host "    Faltou algo no cache ($($_.Exception.Message))." }
+    }
+    Write-Step 'Baixando componentes (~3 GB na primeira vez)'
+    Invoke-Native -FilePath 'uv' -Arguments $arguments
+    return 'download'
 }
 
 function Invoke-Alembic {
@@ -361,6 +408,774 @@ function Assert-Admin {
     $principal = [Security.Principal.WindowsPrincipal]::new($identity)
     if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         throw 'Rode este script num PowerShell como administrador (o serviço do Windows exige).'
+    }
+}
+
+function Test-StemmaService([string]$ServiceId) {
+    return [bool](Get-Service -Name $ServiceId -ErrorAction SilentlyContinue)
+}
+
+function Register-StemmaService {
+    <# Registra o serviço com o WinSW, como LocalSystem (sem pedir conta nem senha; ADR 0014). #>
+    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$ServiceId, [Parameter(Mandatory)][string]$ReleaseDir)
+    Write-Step "Registrando o serviço $ServiceId"
+    $winswDir = Join-Path $Root 'winsw'
+    New-Item -ItemType Directory -Force -Path $winswDir | Out-Null
+    $exe = Join-Path $winswDir "$ServiceId.exe"
+    Get-WinSW -Dest $exe
+    New-ServiceXml -Template (Join-Path $ReleaseDir 'deploy\stemma-service.xml') -ServiceId $ServiceId `
+        -Dest (Join-Path $winswDir "$ServiceId.xml")
+    Invoke-Native -FilePath $exe -Arguments @('install')
+}
+
+function Disable-StemmaService {
+    <# "Parar o Stemma" (Menu Iniciar): para e deixa manual, para não voltar quando o Windows reiniciar. #>
+    param([Parameter(Mandatory)][string]$ServiceId)
+    Stop-StemmaService -ServiceId $ServiceId
+    Invoke-Native -FilePath 'sc.exe' -Arguments @('config', $ServiceId, 'start=', 'demand')
+}
+
+function Enable-StemmaService {
+    <# "Iniciar o Stemma": volta ao início automático (atrasado, como o WinSW registra) e sobe. #>
+    param([Parameter(Mandatory)][string]$ServiceId)
+    Invoke-Native -FilePath 'sc.exe' -Arguments @('config', $ServiceId, 'start=', 'delayed-auto')
+    $service = Get-Service -Name $ServiceId
+    if ($service.Status -ne 'Running') { Start-StemmaService -ServiceId $ServiceId }
+}
+
+function Unregister-StemmaService {
+    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$ServiceId)
+    if (-not (Test-StemmaService $ServiceId)) { return }
+    Stop-StemmaService -ServiceId $ServiceId
+    $exe = Join-Path $Root "winsw\$ServiceId.exe"
+    Write-Step "Removendo o serviço $ServiceId"
+    if (Test-Path -LiteralPath $exe) { Invoke-Native -FilePath $exe -Arguments @('uninstall') }
+    else { Invoke-Native -FilePath 'sc.exe' -Arguments @('delete', $ServiceId) }
+}
+
+# --- ferramentas em <Root>\tools (ADR 0014) --------------------------------------
+
+function Get-StemmaToolCatalog {
+    <# Cópia do catálogo (nome → versão, URL, SHA256, Strip, Exe). #>
+    $copy = [ordered]@{}
+    foreach ($name in $script:Tools.Keys) { $copy[$name] = $script:Tools[$name].Clone() }
+    return $copy
+}
+
+function Get-StemmaPaths {
+    <# Caminhos fixos de uma instalação. #>
+    param([Parameter(Mandatory)][string]$Root)
+    $tools = Join-Path $Root 'tools'
+    return [pscustomobject]@{
+        Tools     = $tools
+        Uv        = Join-Path $tools 'uv\uv.exe'
+        Ffmpeg    = Join-Path $tools 'ffmpeg\bin\ffmpeg.exe'
+        Python    = Join-Path $tools 'python'
+        UvCache   = Join-Path $Root 'cache\uv'
+        EnvFile   = Join-Path $Root '.env'
+        InstallInfo = Join-Path $Root 'install.json'
+        PathDirs  = @((Join-Path $tools 'uv'), (Join-Path $tools 'ffmpeg\bin'), (Join-Path $tools 'deno'))
+    }
+}
+
+function Set-StemmaToolEnv {
+    <#
+      Ambiente deste processo (e dos filhos) para usar só o que está em <Root>\tools:
+      uv, FFmpeg e Deno no começo do PATH, Python gerenciado em tools\python e cache do uv
+      em <Root>\cache\uv (mesmo volume dos venvs, para o hardlink funcionar).
+    #>
+    param([Parameter(Mandatory)][string]$Root)
+    $paths = Get-StemmaPaths -Root $Root
+    $current = @($env:PATH -split ';' | Where-Object { $_ -and $paths.PathDirs -notcontains $_ })
+    $env:PATH = (@($paths.PathDirs) + $current) -join ';'
+    $env:UV_CACHE_DIR = $paths.UvCache
+    $env:UV_PYTHON_INSTALL_DIR = $paths.Python
+    $env:UV_PYTHON_PREFERENCE = 'only-managed'
+    $env:UV_PYTHON_INSTALL_BIN = '0'
+    $env:UV_PYTHON_INSTALL_REGISTRY = '0'
+    $env:UV_NO_PROGRESS = '1'
+}
+
+function Test-StemmaToolInstalled {
+    param([Parameter(Mandatory)][string]$Dir, [Parameter(Mandatory)][hashtable]$Tool)
+    $marker = Join-Path $Dir '.stemma-tool'
+    if (-not (Test-Path -LiteralPath $marker) -or -not (Test-Path -LiteralPath (Join-Path $Dir $Tool.Exe))) { return $false }
+    # Marcador vazio (escrita interrompida) = reinstalar.
+    $line = Get-Content -LiteralPath $marker -TotalCount 1
+    if (-not $line) { return $false }
+    return "$line".Trim() -eq "$($Tool.Version) $($Tool.Sha256)"
+}
+
+function Install-StemmaTool {
+    <# Baixa, confere o SHA256 e extrai em <Root>\tools\<nome>. Pula se a mesma versão já está lá. #>
+    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$Name, [hashtable]$Tool)
+    if (-not $Tool) { $Tool = $script:Tools[$Name] }
+    $toolsDir = Join-Path $Root 'tools'
+    $dest = Join-Path $toolsDir $Name
+    if (Test-StemmaToolInstalled -Dir $dest -Tool $Tool) { return Join-Path $dest $Tool.Exe }
+
+    Write-Step "Baixando $Name $($Tool.Version)"
+    $downloads = Join-Path $toolsDir '.download'
+    New-Item -ItemType Directory -Force -Path $downloads | Out-Null
+    $archive = Join-Path $downloads (($Tool.Url -split '/')[-1])
+    if (-not ((Test-Path -LiteralPath $archive) -and
+            (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -eq $Tool.Sha256)) {
+        Invoke-Download -Url $Tool.Url -Dest "$archive.part"
+        Assert-Sha256 -Path "$archive.part" -Expected $Tool.Sha256
+        Move-Item -LiteralPath "$archive.part" -Destination $archive -Force
+    }
+    $staging = Join-Path $toolsDir ".tmp-$Name"
+    if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
+    Expand-Archive -LiteralPath $archive -DestinationPath $staging
+    $content = $staging
+    if ($Tool.Strip) {
+        $inner = @(Get-ChildItem -LiteralPath $staging -Directory)
+        if ($inner.Count -ne 1) { throw "Esperava uma pasta de topo em $archive." }
+        $content = $inner[0].FullName
+    }
+    if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }
+    Move-Item -LiteralPath $content -Destination $dest
+    if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
+    Set-Content -LiteralPath (Join-Path $dest '.stemma-tool') -Value "$($Tool.Version) $($Tool.Sha256)" -Encoding ASCII
+    Remove-Item -LiteralPath $archive -Force
+    return Join-Path $dest $Tool.Exe
+}
+
+function Install-StemmaTools {
+    <#
+      Ferramentas (todas, ou só as de -Names) + Python gerenciado; deixa o ambiente do processo
+      apontando para elas. Na atualização, o FFmpeg e o Deno (usados pelo serviço) só são
+      trocados com o serviço parado: -Names uv antes, -Names ffmpeg,deno -SkipPython depois.
+    #>
+    param([Parameter(Mandatory)][string]$Root, [string[]]$Names, [switch]$SkipPython)
+    if (-not $Names) { $Names = @($script:Tools.Keys) }
+    foreach ($name in $Names) { Install-StemmaTool -Root $Root -Name $name | Out-Null }
+    Set-StemmaToolEnv -Root $Root
+    if ($SkipPython) { return }
+    Write-Step "Python $script:PythonVersion"
+    # Sem executável no ~\.local\bin nem registro no HKCU: nada do Stemma no perfil do usuário.
+    Invoke-Native -FilePath (Get-StemmaPaths -Root $Root).Uv -Arguments @('python', 'install', $script:PythonVersion, '--no-bin', '--no-registry')
+}
+
+function Protect-StemmaDirectory {
+    <#
+      O serviço roda como SYSTEM e executa o que está em <Root> (scripts, tools, venvs) e carrega
+      o que está nos dados (modelos do torch). Sem isto, a pasta herdaria "Usuários autenticados:
+      Modificar" da raiz do drive, e qualquer processo sem elevação ganharia SYSTEM editando um
+      arquivo. Fica: SYSTEM e Administradores com controle total, Usuários só leitura (o ícone
+      da bandeja lê o .env e o setup\). A troca propaga para os arquivos ligados por hardlink do
+      cache do usuário, que passam a ser só leitura para ele também (o cache do uv é imutável).
+    #>
+    param([Parameter(Mandatory)][string]$Path, [switch]$Force)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    if (-not $Force -and (Get-Acl -LiteralPath $Path).AreAccessRulesProtected) { return }
+    Write-Step "Protegendo $Path (só administradores alteram)"
+    # 1) a pasta: sem herança de cima, com entradas que os filhos herdam;
+    Invoke-Native -FilePath 'icacls.exe' -Arguments @(
+        $Path, '/inheritance:r', '/grant:r',
+        '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-32-545:(OI)(CI)RX', '/Q'
+    )
+    if (Get-ChildItem -LiteralPath $Path -Force | Select-Object -First 1) {
+        # 2) os filhos só herdam (some qualquer entrada explícita, como as do cache do usuário);
+        Invoke-Native -FilePath 'icacls.exe' -Arguments @((Join-Path $Path '*'), '/reset', '/T', '/C', '/Q')
+    }
+    # 3) o dono pode reescrever a ACL sem elevação, e os arquivos ligados do cache são do usuário.
+    Invoke-Native -FilePath 'icacls.exe' -Arguments @($Path, '/setowner', '*S-1-5-32-544', '/T', '/C', '/Q')
+}
+
+# --- cache do uv: semear a partir do cache do usuário ------------------------------
+
+function Find-UserUvCache {
+    <#
+      Cache do uv do usuário que rodou o instalador (elevado, mas no perfil dele). Chame antes
+      do Set-StemmaToolEnv, que troca o UV_CACHE_DIR deste processo. $null se não houver.
+    #>
+    $candidates = @()
+    if ($env:UV_CACHE_DIR) { $candidates += $env:UV_CACHE_DIR }
+    $uv = Get-Command uv -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($uv) {
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try { $dir = & $uv.Source cache dir 2>$null; if ($LASTEXITCODE -eq 0 -and $dir) { $candidates += "$dir".Trim() } }
+        catch { Write-Verbose "uv cache dir falhou: $_" }
+        finally { $ErrorActionPreference = $previous }
+    }
+    if ($env:LOCALAPPDATA) { $candidates += Join-Path $env:LOCALAPPDATA 'uv\cache' }
+    foreach ($dir in $candidates) {
+        if ($dir -and (Test-Path -LiteralPath $dir -PathType Container)) { return [IO.Path]::GetFullPath($dir) }
+    }
+    return $null
+}
+
+function Test-SameVolume([string]$A, [string]$B) {
+    return [IO.Path]::GetPathRoot([IO.Path]::GetFullPath($A)) -eq [IO.Path]::GetPathRoot([IO.Path]::GetFullPath($B))
+}
+
+function Initialize-HardLinkSeeder {
+    if ('Stemma.CacheSeeder' -as [type]) { return }
+    Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+namespace Stemma {
+    public static class CacheSeeder {
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
+
+        // Recria a árvore de `source` em `dest` com hardlinks (cópia se o link falhar).
+        // Arquivos que já existem em `dest` ficam como estão. Pastas que são junction (formatos
+        // antigos do cache) não são atravessadas: um processo elevado recusa junctions criadas
+        // pelo usuário ("untrusted mount point"). Uma pasta ilegível não aborta o resto.
+        // Devolve {linked, copied, skipped, failed}.
+        public static long[] Seed(string source, string dest) {
+            long[] counts = new long[4];
+            source = Path.GetFullPath(source).TrimEnd('\\');
+            dest = Path.GetFullPath(dest).TrimEnd('\\');
+            var pending = new System.Collections.Generic.Stack<string>();
+            pending.Push(source);
+            while (pending.Count > 0) {
+                string dir = pending.Pop();
+                string targetDir = dest + dir.Substring(source.Length);
+                string[] files, dirs;
+                try {
+                    Directory.CreateDirectory(targetDir);
+                    files = Directory.GetFiles(dir);
+                    dirs = Directory.GetDirectories(dir);
+                }
+                catch (Exception) { counts[3]++; continue; }
+                foreach (string sub in dirs) {
+                    try {
+                        if ((File.GetAttributes(sub) & FileAttributes.ReparsePoint) != 0) { counts[2]++; continue; }
+                    }
+                    catch (Exception) { counts[3]++; continue; }
+                    pending.Push(sub);
+                }
+                foreach (string file in files) {
+                    string target = targetDir + file.Substring(dir.Length);
+                    if (File.Exists(target)) { counts[2]++; continue; }
+                    if (CreateHardLink(target, file, IntPtr.Zero)) { counts[0]++; continue; }
+                    try { File.Copy(file, target); counts[1]++; }
+                    catch (Exception) { counts[3]++; }
+                }
+            }
+            return counts;
+        }
+    }
+}
+'@
+}
+
+function Copy-UvCacheSeed {
+    <#
+      Semeia <Root>\cache\uv com o cache do usuário por hardlink (segundos, sem espaço extra; um
+      `uv cache clean` do usuário não afeta). Em outro volume não semeia: copiar o cache inteiro
+      (dezenas de GB) sai mais caro que baixar o que falta. Devolve um resumo ou $null.
+    #>
+    param([Parameter(Mandatory)][string]$Source, [Parameter(Mandatory)][string]$Dest)
+    $src = [IO.Path]::GetFullPath($Source).TrimEnd('\')
+    $dst = [IO.Path]::GetFullPath($Dest).TrimEnd('\')
+    if ($src -eq $dst) { return $null }
+    if (-not (Test-SameVolume $src $dst)) {
+        Write-Host "    Cache do uv em outro volume ($src): sem semear."
+        return $null
+    }
+    Write-Step 'Reaproveitando os componentes já baixados neste PC'
+    Initialize-HardLinkSeeder
+    $counts = [Stemma.CacheSeeder]::Seed($src, $dst)
+    $summary = [pscustomobject]@{ Linked = $counts[0]; Copied = $counts[1]; Skipped = $counts[2]; Failed = $counts[3] }
+    Write-Host "    $($summary.Linked) arquivos ligados, $($summary.Copied) copiados, $($summary.Skipped) já estavam, $($summary.Failed) falharam."
+    return $summary
+}
+
+# --- .env e dados da instalação ---------------------------------------------------
+
+function Get-DefaultDataRoot {
+    if (Test-Path -LiteralPath 'D:\') { return 'D:\stemma-data' }
+    return 'C:\stemma-data'
+}
+
+function Write-DotEnvLines([string]$Path, [string[]]$Lines) {
+    [IO.File]::WriteAllLines($Path, $Lines, [Text.UTF8Encoding]::new($false))
+}
+
+function New-StemmaEnvFile {
+    <# .env de produção novo. FFMPEG_BIN absoluto: o serviço não depende do PATH de ninguém. #>
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][int]$Port,
+        [Parameter(Mandatory)][string]$DataRoot,
+        [Parameter(Mandatory)][string]$FfmpegBin
+    )
+    Write-DotEnvLines $Path @(
+        '# Configuração de produção do Stemma (variáveis em .env.example da release).',
+        "PORT=$Port",
+        "STORAGE_ROOT=$DataRoot",
+        "FFMPEG_BIN=$FfmpegBin",
+        'LOG_LEVEL=INFO'
+    )
+}
+
+function Update-StemmaEnvFile {
+    <# Acrescenta as chaves que faltam (ex.: FFMPEG_BIN de uma instalação antiga), sem mexer nas outras. #>
+    param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][System.Collections.IDictionary]$Defaults)
+    $values = Read-DotEnv -Path $Path
+    $missing = @($Defaults.Keys | Where-Object { -not $values.Contains($_) })
+    if ($missing.Count -eq 0) { return @() }
+    $lines = @()
+    if (Test-Path -LiteralPath $Path) { $lines = @(Get-Content -LiteralPath $Path -Encoding UTF8) }
+    foreach ($key in $missing) { $lines += "$key=$($Defaults[$key])" }
+    Write-DotEnvLines $Path $lines
+    return $missing
+}
+
+function Get-StemmaInstallInfo {
+    <# install.json: o que o instalador precisa lembrar (serviço, porta da 443 no tailscale). #>
+    param([Parameter(Mandatory)][string]$Root)
+    $path = (Get-StemmaPaths -Root $Root).InstallInfo
+    if (-not (Test-Path -LiteralPath $path)) { return $null }
+    return Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+}
+
+function Set-StemmaInstallInfo {
+    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$ServiceId, [bool]$TailscaleServe)
+    $info = [ordered]@{ serviceId = $ServiceId; tailscaleServe = $TailscaleServe }
+    [IO.File]::WriteAllText((Get-StemmaPaths -Root $Root).InstallInfo, ($info | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
+}
+
+# --- Tailscale ----------------------------------------------------------------------
+
+function Get-TailscaleExe {
+    $default = Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe'
+    if ($env:ProgramFiles -and (Test-Path -LiteralPath $default)) { return $default }
+    $cmd = Get-Command tailscale -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($cmd) { return $cmd.Source }
+    return $null
+}
+
+function ConvertFrom-TailscaleStatus {
+    <#
+      `tailscale status --json` → estado para o instalador:
+      needslogin | stopped | starting | nohttps | ready, com o nome HTTPS do PC.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Json)
+    $status = $Json | ConvertFrom-Json
+    $backend = "$($status.BackendState)"
+    $dnsName = ''
+    if ($status.PSObject.Properties['Self'] -and $status.Self -and $status.Self.PSObject.Properties['DNSName']) {
+        $dnsName = "$($status.Self.DNSName)".TrimEnd('.')
+    }
+    $certDomains = @()
+    if ($status.PSObject.Properties['CertDomains'] -and $status.CertDomains) { $certDomains = @($status.CertDomains) }
+    $authUrl = if ($status.PSObject.Properties['AuthURL']) { "$($status.AuthURL)" } else { '' }
+    $state = switch ($backend) {
+        'Running' { if ($certDomains.Count -gt 0) { 'ready' } else { 'nohttps' } }
+        'NeedsLogin' { 'needslogin' }
+        'NeedsMachineAuth' { 'needslogin' }
+        'NoState' { 'needslogin' }
+        'Stopped' { 'stopped' }
+        default { 'starting' }
+    }
+    $hostName = if ($certDomains.Count -gt 0) { "$($certDomains[0])" } else { $dnsName }
+    return [pscustomobject]@{ State = $state; Host = $hostName; AuthUrl = $authUrl }
+}
+
+function Get-TailscaleState {
+    $exe = Get-TailscaleExe
+    if (-not $exe) { return [pscustomobject]@{ State = 'missing'; Host = ''; AuthUrl = '' } }
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { $json = (& $exe status --json 2>$null) -join "`n" }
+    finally { $ErrorActionPreference = $previous }
+    if (-not $json) { return [pscustomobject]@{ State = 'starting'; Host = ''; AuthUrl = '' } }
+    return ConvertFrom-TailscaleStatus -Json $json
+}
+
+function Install-Tailscale {
+    <# MSI oficial (versão fixa, SHA256 conferido), silencioso. #>
+    param([Parameter(Mandatory)][string]$Root)
+    $downloads = Join-Path $Root 'downloads'
+    New-Item -ItemType Directory -Force -Path $downloads | Out-Null
+    $msi = Join-Path $downloads (($script:TailscaleMsiUrl -split '/')[-1])
+    Write-Step 'Baixando o Tailscale'
+    Invoke-Download -Url $script:TailscaleMsiUrl -Dest $msi
+    Assert-Sha256 -Path $msi -Expected $script:TailscaleMsiSha256
+    Write-Step 'Instalando o Tailscale'
+    $process = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', "`"$msi`"", '/qn', '/norestart') -Wait -PassThru
+    if (@(0, 3010) -notcontains $process.ExitCode) { throw "A instalação do Tailscale falhou (código $($process.ExitCode))." }
+    Remove-Item -LiteralPath $msi -Force
+}
+
+function Start-TailscaleLogin {
+    <# `tailscale up` em segundo plano e abre no navegador a página de login que ele gerar. #>
+    $exe = Get-TailscaleExe
+    if (-not $exe) { throw 'Tailscale não instalado.' }
+    Start-Process -FilePath $exe -ArgumentList 'up' -WindowStyle Hidden
+    $deadline = (Get-Date).AddSeconds(20)
+    do {
+        Start-Sleep -Seconds 1
+        $state = Get-TailscaleState
+        if ($state.AuthUrl) { Start-Process $state.AuthUrl; return $state }
+        if ($state.State -in 'ready', 'nohttps') { return $state }
+    } while ((Get-Date) -lt $deadline)
+    return Get-TailscaleState
+}
+
+function Set-TailscaleServe {
+    param([Parameter(Mandatory)][int]$Port)
+    $exe = Get-TailscaleExe
+    if (-not $exe) { throw 'Tailscale não instalado: instale e faça login, ou use -SkipTailscale.' }
+    Write-Step 'Publicando no Tailscale (HTTPS na 443)'
+    Invoke-Native -FilePath $exe -Arguments @('serve', '--bg', '--https=443', "http://127.0.0.1:$Port")
+}
+
+function Remove-TailscaleServe {
+    $exe = Get-TailscaleExe
+    if (-not $exe) { return }
+    Write-Step 'Desligando o tailscale serve da 443'
+    Invoke-Native -FilePath $exe -Arguments @('serve', '--https=443', 'off')
+}
+
+function Test-NvidiaGpu {
+    $smi = Get-Command nvidia-smi -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $smi) { return $false }
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $smi.Source -L 2>$null | Out-Null; return $LASTEXITCODE -eq 0 }
+    finally { $ErrorActionPreference = $previous }
+}
+
+# --- fluxos: instalar, atualizar, voltar, desinstalar -------------------------------
+
+function Get-StemmaContext {
+    <# Estado de uma instalação existente: .env, porta, release no ar e STORAGE_ROOT. #>
+    param([Parameter(Mandatory)][string]$Root)
+    $envValues = Read-DotEnv -Path (Join-Path $Root '.env')
+    $current = Get-CurrentRelease -Root $Root
+    return [pscustomobject]@{
+        EnvValues   = $envValues
+        Port        = Get-StemmaPort $envValues
+        Current     = $current
+        CurrentTag  = if ($current) { Split-Path -Leaf $current } else { $null }
+        StorageRoot = if ($envValues.Contains('STORAGE_ROOT') -and $envValues['STORAGE_ROOT']) { $envValues['STORAGE_ROOT'] } else { Get-DefaultDataRoot }
+    }
+}
+
+function Test-StemmaDatabase {
+    <# Há banco para fazer backup? (DATABASE_URL próprio ou o stemma.db padrão.) #>
+    param([Parameter(Mandatory)]$Context)
+    $custom = $Context.EnvValues.Contains('DATABASE_URL') -and $Context.EnvValues['DATABASE_URL']
+    return [bool]($custom -or (Test-Path -LiteralPath (Join-Path $Context.StorageRoot 'stemma.db')))
+}
+
+function New-BackupPath([string]$StorageRoot, [string]$Label) {
+    $stamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
+    return Join-Path $StorageRoot "backups\stemma-$Label-$stamp.db"
+}
+
+function Assert-StemmaDataRoot {
+    <# A pasta de dados não pode ser a raiz de um drive: o desinstalador (-RemoveData) a apaga inteira. #>
+    param([Parameter(Mandatory)][string]$Path)
+    # "D:" sozinho é o diretório atual do drive para o GetFullPath, mas o desinstalador o leria como o drive.
+    if ($Path.Trim() -match '^[A-Za-z]:\\?$') { $full = $Path.Trim().Substring(0, 2) }
+    else { $full = [IO.Path]::GetFullPath($Path).TrimEnd('\') }
+    if ($full.Length -le 2 -or [IO.Path]::GetPathRoot("$full\") -eq "$full\") {
+        throw "Escolha uma pasta para os dados (ex.: D:\stemma-data), não a raiz do drive ($Path)."
+    }
+}
+
+function Test-EmptyDirectory([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return $true }
+    return -not (Get-ChildItem -LiteralPath $Path -Force | Select-Object -First 1)
+}
+
+function Initialize-StemmaRuntime {
+    <# Ferramentas em tools\, ambiente do processo e chaves novas no .env de uma instalação existente. #>
+    param([Parameter(Mandatory)][string]$Root, [string[]]$Names, [switch]$SkipPython)
+    Install-StemmaTools -Root $Root -Names $Names -SkipPython:$SkipPython
+    $paths = Get-StemmaPaths -Root $Root
+    if (Test-Path -LiteralPath $paths.EnvFile) {
+        $added = Update-StemmaEnvFile -Path $paths.EnvFile -Defaults ([ordered]@{ FFMPEG_BIN = $paths.Ffmpeg })
+        if ($added) { Write-Host "    .env: acrescentado $($added -join ', ')" }
+    }
+}
+
+function Invoke-StemmaInstall {
+    <#
+      Primeira instalação: ferramentas, cache semeado, release (venv), .env, migrations, serviço
+      (LocalSystem), /health e tailscale serve. Devolve a tag instalada.
+    #>
+    param(
+        [string]$Root = 'C:\stemma',
+        [string]$DataRoot,
+        [int]$Port = 8000,
+        [string]$ServiceId = 'stemma',
+        [string]$Version,
+        [string]$ZipPath,
+        [switch]$SkipTailscale,
+        [int]$HealthTimeoutSec = 180
+    )
+    if (Test-StemmaService $ServiceId) { throw "O serviço '$ServiceId' já existe. Use a atualização." }
+    if (-not $DataRoot) { $DataRoot = Get-DefaultDataRoot }
+    Assert-StemmaDataRoot $DataRoot
+    if (-not $SkipTailscale) {
+        # Antes de tudo: sem isto, a instalação iria até o fim e falharia no último passo.
+        $tailscale = Get-TailscaleState
+        if ($tailscale.State -ne 'ready') {
+            throw "O Tailscale não está pronto ($($tailscale.State)): instale, faça login e ative o HTTPS, ou use -SkipTailscale."
+        }
+    }
+    $userCache = Find-UserUvCache  # antes do Set-StemmaToolEnv, que troca o UV_CACHE_DIR
+    foreach ($dir in $Root, (Join-Path $Root 'releases'), (Join-Path $Root 'logs'), $DataRoot) {
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    }
+    $paths = Get-StemmaPaths -Root $Root
+    Initialize-StemmaRuntime -Root $Root
+    if ($userCache) { Copy-UvCacheSeed -Source $userCache -Dest $paths.UvCache | Out-Null }
+    # Depois de semear: a proteção vale também para os arquivos ligados do cache.
+    Protect-StemmaDirectory -Path $Root
+    Protect-StemmaDirectory -Path $DataRoot
+
+    if (-not (Test-Path -LiteralPath $paths.EnvFile)) {
+        Write-Step "Criando $($paths.EnvFile)"
+        New-StemmaEnvFile -Path $paths.EnvFile -Port $Port -DataRoot $DataRoot -FfmpegBin $paths.Ffmpeg
+    }
+    $context = Get-StemmaContext -Root $Root
+
+    $package = Get-StemmaPackage -Root $Root -Version $Version -ZipPath $ZipPath
+    Write-Step "Extraindo $($package.Tag)"
+    $release = Expand-StemmaPackage -Root $Root -Zip $package.Zip -Tag $package.Tag
+    Sync-ReleaseEnvironment -ReleaseDir $release -PreferOffline | Out-Null
+
+    Write-Step 'Migrations'
+    Import-DotEnv -Path $paths.EnvFile | Out-Null
+    Invoke-Alembic -ReleaseDir $release -Arguments @('upgrade', 'head')
+    Set-CurrentRelease -Root $Root -ReleaseDir $release
+
+    Register-StemmaService -Root $Root -ServiceId $ServiceId -ReleaseDir $release
+    Set-StemmaInstallInfo -Root $Root -ServiceId $ServiceId -TailscaleServe (-not $SkipTailscale)
+    Start-StemmaService -ServiceId $ServiceId
+    if (-not (Wait-StemmaHealth -Port $context.Port -ExpectedVersion $package.Tag -TimeoutSec $HealthTimeoutSec)) {
+        throw "O serviço subiu mas o /health não confirmou a versão. Veja os logs em $(Join-Path $Root 'logs')."
+    }
+    if (-not $SkipTailscale) { Set-TailscaleServe -Port $context.Port }
+    Write-Step "Stemma $($package.Tag) instalado em $Root"
+    return $package.Tag
+}
+
+function Restart-StemmaAndCheck {
+    param([string]$ServiceId, [int]$Port, [string]$Tag, [int]$HealthTimeoutSec)
+    Stop-StemmaService -ServiceId $ServiceId
+    Start-StemmaService -ServiceId $ServiceId
+    return Wait-StemmaHealth -Port $Port -ExpectedVersion $Tag -TimeoutSec $HealthTimeoutSec
+}
+
+function Invoke-StemmaUpdate {
+    <#
+      Atualiza para outra release (ADR 0007): baixa/confere, extrai lado a lado, venv (serviço
+      no ar), para, backup, migrations, `current`, sobe e confere o /health. Falha depois de
+      parar → restaura o banco, volta o `current` e sobe a anterior; aí lança o erro.
+      Devolve a tag no ar.
+    #>
+    param(
+        [string]$Root = 'C:\stemma',
+        [string]$ServiceId = 'stemma',
+        [string]$Version,
+        [string]$ZipPath,
+        [switch]$SimulateFailure,
+        [int]$HealthTimeoutSec = 180
+    )
+    $context = Get-StemmaContext -Root $Root
+    if (-not $context.Current) { throw "Nenhuma release em $Root\current. Faça a instalação primeiro." }
+    $current = $context.Current
+    $currentTag = $context.CurrentTag
+    $paths = Get-StemmaPaths -Root $Root
+    $userCache = Find-UserUvCache  # antes do Set-StemmaToolEnv, que troca o UV_CACHE_DIR
+    # Com o serviço no ar, só o uv e o Python (o serviço usa FFmpeg e Deno; eles vêm depois de parar).
+    Initialize-StemmaRuntime -Root $Root -Names @('uv')
+    # Instalação feita pelos scripts da F5 (cache no perfil do usuário): semeia como na instalação.
+    if ($userCache -and (Test-EmptyDirectory $paths.UvCache)) {
+        Copy-UvCacheSeed -Source $userCache -Dest $paths.UvCache | Out-Null
+        Protect-StemmaDirectory -Path $paths.UvCache -Force
+    }
+    Protect-StemmaDirectory -Path $Root
+    Protect-StemmaDirectory -Path $context.StorageRoot
+    $context = Get-StemmaContext -Root $Root  # o .env pode ter ganhado chaves
+
+    $package = Get-StemmaPackage -Root $Root -Version $Version -ZipPath $ZipPath
+    $target = $package.Tag
+    if ($target -eq $currentTag) {
+        # Mesma versão (ex.: instalação que falhou no meio e foi rodada de novo): só confere
+        # ferramentas, serviço e /health.
+        Write-Step "Já está na $($target): conferindo"
+        Import-DotEnv -Path (Join-Path $Root '.env') | Out-Null
+        $running = (Get-Service -Name $ServiceId).Status -eq 'Running'
+        if (-not $running) { Initialize-StemmaRuntime -Root $Root -Names @('ffmpeg', 'deno') -SkipPython }
+        if (-not $running) { Start-StemmaService -ServiceId $ServiceId }
+        if (-not (Wait-StemmaHealth -Port $context.Port -ExpectedVersion $target -TimeoutSec $HealthTimeoutSec)) {
+            throw "A $target não respondeu no /health. Veja os logs em $Root\logs."
+        }
+        return $target
+    }
+
+    Write-Step "Atualizando $currentTag → $target"
+    $release = Expand-StemmaPackage -Root $Root -Zip $package.Zip -Tag $target
+    Sync-ReleaseEnvironment -ReleaseDir $release -PreferOffline | Out-Null
+    Import-DotEnv -Path (Join-Path $Root '.env') | Out-Null
+
+    Stop-StemmaService -ServiceId $ServiceId
+    $backup = $null
+    try {
+        # Com o serviço parado: FFmpeg e Deno podem ser trocados (nenhum processo os usa).
+        Initialize-StemmaRuntime -Root $Root -Names @('ffmpeg', 'deno') -SkipPython
+        if (Test-StemmaDatabase $context) {
+            Write-Step 'Backup do banco'
+            $dest = New-BackupPath $context.StorageRoot "$currentTag-to-$target"
+            Invoke-StemmaCli -ReleaseDir $release -Arguments @('backup', '--dest', $dest)
+            # Só depois do sucesso: o rollback restaura deste arquivo.
+            $backup = $dest
+        }
+        else { Write-Host '    Banco ainda não existe: sem backup.' }
+        Write-Step 'Migrations'
+        Invoke-Alembic -ReleaseDir $release -Arguments @('upgrade', 'head')
+        Set-CurrentRelease -Root $Root -ReleaseDir $release
+        Start-StemmaService -ServiceId $ServiceId
+        $expected = if ($SimulateFailure) { 'v0.0.0' } else { $target }
+        if ($SimulateFailure) { Write-Warning 'SimulateFailure: a checagem do /health vai falhar de propósito.' }
+        if (-not (Wait-StemmaHealth -Port $context.Port -ExpectedVersion $expected -TimeoutSec $HealthTimeoutSec)) {
+            throw "A $target não confirmou a versão no /health."
+        }
+    }
+    catch {
+        $reason = $_.Exception.Message.TrimEnd('.')
+        Write-Warning "Falhou: $reason"
+        Write-Step "Voltando para $currentTag"
+        Stop-StemmaService -ServiceId $ServiceId
+        if ($backup -and (Test-Path -LiteralPath $backup)) {
+            Write-Step 'Restaurando o banco do backup'
+            Invoke-StemmaCli -ReleaseDir $current -Arguments @('restore', '--src', $backup)
+        }
+        Set-CurrentRelease -Root $Root -ReleaseDir $current
+        Start-StemmaService -ServiceId $ServiceId
+        if (Wait-StemmaHealth -Port $context.Port -ExpectedVersion $currentTag -TimeoutSec $HealthTimeoutSec) {
+            throw "A atualização para $target falhou ($reason). A $currentTag continua no ar."
+        }
+        throw "A atualização falhou ($reason) e a $currentTag não confirmou no /health. Veja $Root\logs."
+    }
+
+    Write-Step 'Limpando releases antigas'
+    $names = @(Get-InstalledReleases -Root $Root | ForEach-Object { $_.Name })
+    foreach ($name in (Select-ReleasesToRemove -Names $names -Keep 3 -Protect @($target, $currentTag))) {
+        Write-Host "    removendo $name"
+        Remove-Item -LiteralPath (Join-Path $Root "releases\$name") -Recurse -Force
+    }
+    Write-Step "Stemma $target no ar"
+    return $target
+}
+
+function Invoke-StemmaRollback {
+    <# Volta para a release instalada anterior, desfazendo as migrations. Lança erro se falhar. #>
+    param([string]$Root = 'C:\stemma', [string]$ServiceId = 'stemma', [int]$HealthTimeoutSec = 180)
+    $context = Get-StemmaContext -Root $Root
+    if (-not $context.Current) { throw "Nenhuma release em $Root\current." }
+    $current = $context.Current
+    $currentTag = $context.CurrentTag
+    Set-StemmaToolEnv -Root $Root
+    Import-DotEnv -Path (Join-Path $Root '.env') | Out-Null
+    $previous = Get-PreviousRelease -Root $Root -Current $currentTag
+    if (-not $previous) { throw "Não há release instalada anterior a $currentTag." }
+    $targetHead = Get-AlembicHead -ReleaseDir $previous.Path
+    $currentHead = Get-AlembicHead -ReleaseDir $current
+    Stop-StemmaService -ServiceId $ServiceId
+    $backup = $null
+    try {
+        if (Test-StemmaDatabase $context) {
+            Write-Step 'Backup do banco'
+            $dest = New-BackupPath $context.StorageRoot "$currentTag-rollback"
+            Invoke-StemmaCli -ReleaseDir $current -Arguments @('backup', '--dest', $dest)
+            $backup = $dest
+        }
+        if ($targetHead -ne $currentHead) {
+            Write-Step "Desfazendo migrations até $targetHead"
+            Invoke-Alembic -ReleaseDir $current -Arguments @('downgrade', $targetHead)
+        }
+        Set-CurrentRelease -Root $Root -ReleaseDir $previous.Path
+        Start-StemmaService -ServiceId $ServiceId
+        if (-not (Wait-StemmaHealth -Port $context.Port -ExpectedVersion $previous.Name -TimeoutSec $HealthTimeoutSec)) {
+            throw "A $($previous.Name) não confirmou a versão no /health."
+        }
+    }
+    catch {
+        # Desfaz o rollback: banco e `current` como estavam, e a versão atual no ar de novo.
+        $reason = $_.Exception.Message.TrimEnd('.')
+        Write-Warning "Rollback falhou: $reason"
+        Stop-StemmaService -ServiceId $ServiceId
+        if ($backup -and (Test-Path -LiteralPath $backup)) {
+            Invoke-StemmaCli -ReleaseDir $current -Arguments @('restore', '--src', $backup)
+        }
+        Set-CurrentRelease -Root $Root -ReleaseDir $current
+        Start-StemmaService -ServiceId $ServiceId
+        $back = Wait-StemmaHealth -Port $context.Port -ExpectedVersion $currentTag -TimeoutSec $HealthTimeoutSec
+        $state = if ($back) { "Continua na $currentTag." } else { "E a $currentTag não confirmou no /health; veja $Root\logs." }
+        throw "Rollback para $($previous.Name) falhou ($reason). $state"
+    }
+    Write-Step "Voltou para $($previous.Name)"
+    return $previous.Name
+}
+
+function Update-StemmaYtDlp {
+    <# Só o yt-dlp do venv atual (até o próximo update, que volta para o do uv.lock). #>
+    param([string]$Root = 'C:\stemma', [string]$ServiceId = 'stemma', [int]$HealthTimeoutSec = 180)
+    $context = Get-StemmaContext -Root $Root
+    if (-not $context.Current) { throw "Nenhuma release em $Root\current." }
+    Set-StemmaToolEnv -Root $Root
+    Write-Step "Atualizando o yt-dlp de $($context.CurrentTag)"
+    Invoke-Native -FilePath 'uv' -Arguments @('pip', 'install', '--python', (Get-ReleasePython $context.Current), '--upgrade', 'yt-dlp[default]')
+    if (-not (Restart-StemmaAndCheck -ServiceId $ServiceId -Port $context.Port -Tag $context.CurrentTag -HealthTimeoutSec $HealthTimeoutSec)) {
+        throw 'O serviço não voltou depois de atualizar o yt-dlp. Veja os logs.'
+    }
+}
+
+function Remove-StemmaTree {
+    <# Apaga uma pasta grande (o cache tem centenas de milhares de arquivos); junctions só como link. #>
+    param([Parameter(Mandatory)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { [IO.Directory]::Delete($Path, $false); return }
+    if (-not $item.PSIsContainer) { Remove-Item -LiteralPath $Path -Force; return }
+    # O rd não segue junctions (só remove o link), e é bem mais rápido que o Remove-Item.
+    Invoke-Native -FilePath 'cmd.exe' -Arguments @('/c', 'rd', '/s', '/q', "`"$Path`"")
+}
+
+function Invoke-StemmaUninstall {
+    <#
+      Para e remove o serviço, desliga o tailscale serve da 443 (se foi o instalador que
+      ligou) e apaga <Root>, menos as pastas em -Keep (a do desinstalador). Com -RemoveData
+      apaga também o STORAGE_ROOT.
+    #>
+    param(
+        [string]$Root = 'C:\stemma',
+        [string]$ServiceId,
+        [string[]]$Keep = @(),
+        [switch]$RemoveData
+    )
+    $context = Get-StemmaContext -Root $Root
+    $info = Get-StemmaInstallInfo -Root $Root
+    if (-not $ServiceId) { $ServiceId = if ($info) { $info.serviceId } else { 'stemma' } }
+    Unregister-StemmaService -Root $Root -ServiceId $ServiceId
+    if ($info -and $info.tailscaleServe) {
+        try { Remove-TailscaleServe } catch { Write-Warning "tailscale serve: $($_.Exception.Message)" }
+    }
+    $current = Join-Path $Root 'current'
+    if (Test-Path -LiteralPath $current) { [IO.Directory]::Delete($current, $false) }
+    Write-Step "Apagando $Root"
+    foreach ($child in @(Get-ChildItem -LiteralPath $Root -Force -ErrorAction SilentlyContinue)) {
+        if ($Keep -contains $child.Name) { continue }
+        Remove-StemmaTree -Path $child.FullName
+    }
+    if ($RemoveData -and $context.StorageRoot -and (Test-Path -LiteralPath $context.StorageRoot)) {
+        Assert-StemmaDataRoot $context.StorageRoot  # nunca apagar um drive inteiro
+        Write-Step "Apagando os dados em $($context.StorageRoot)"
+        Remove-StemmaTree -Path $context.StorageRoot
     }
 }
 

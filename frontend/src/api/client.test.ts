@@ -46,7 +46,7 @@ describe('client da API', () => {
     server.use(http.get('*/api/sessions/:id', () => HttpResponse.error()));
     await expect(getSession('x')).rejects.toMatchObject({
       code: NETWORK_ERROR,
-      message: 'Sem conexão com o servidor.',
+      message: 'Sem conexão com o PC. Confira se o Tailscale está ligado neste aparelho.',
     });
   });
 });

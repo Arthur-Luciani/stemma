@@ -47,22 +47,35 @@ jobs:
           npm ci
           npm run build
       - name: Montar pacote
-        run: |
-          set -euo pipefail
-          name="stemma-${TAG}"
-          stage="$RUNNER_TEMP/$name"
-          mkdir -p "$stage/frontend"
-          # Backend: código, migrations (quando existirem), pyproject e uv.lock; sem testes nem caches.
-          rsync -a --exclude '__pycache__' --exclude '.venv' --exclude 'tests' \
-            --exclude '.pytest_cache' --exclude '.mypy_cache' --exclude '.ruff_cache' \
-            backend/ "$stage/backend/"
-          cp -r frontend/dist "$stage/frontend/dist"
-          if [ -d deploy ]; then cp -r deploy "$stage/deploy"; fi
-          cp .env.example README.md CHANGELOG.md "$stage/"
-          (cd "$RUNNER_TEMP" && zip -qr "$GITHUB_WORKSPACE/$name.zip" "$name")
-          sha256sum "$name.zip" > "$name.zip.sha256"
-          cat "$name.zip.sha256"
+        run: bash scripts/package.sh "$TAG" .
       - name: Anexar à release
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" "stemma-${TAG}.zip" "stemma-${TAG}.zip.sha256" --clobber
+
+  # Instalador do Windows (Inno Setup) com o zip da própria release dentro (ADR 0014).
+  installer:
+    needs: [release-please, package]
+    runs-on: windows-latest
+    env:
+      TAG: ${{ needs.release-please.outputs.tag_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Baixar o pacote da release
+        shell: bash
+        run: |
+          mkdir -p build
+          gh release download "$TAG" --dir build --pattern "stemma-${TAG}.zip" --pattern "stemma-${TAG}.zip.sha256"
+      - name: Inno Setup
+        shell: powershell
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: Compilar o instalador
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File installer\build.ps1 -ZipPath "build\stemma-$env:TAG.zip"
+      - name: Anexar à release
+        shell: bash
+        run: gh release upload "$TAG" "build/Stemma-Setup-${TAG}.exe" "build/Stemma-Setup-${TAG}.exe.sha256" --clobber

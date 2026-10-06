@@ -1,0 +1,18 @@
+.text {
+  margin: 0;
+  color: var(--text-body);
+}
+
+.code {
+  display: flex;
+  justify-content: center;
+}
+
+.url {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono-size);
+  color: var(--text-muted);
+  text-align: center;
+  overflow-wrap: anywhere;
+}

@@ -3,6 +3,8 @@
 # Scripts PowerShell: CRLF + BOM para o Windows PowerShell 5.1 ler acentos corretamente
 *.ps1 text eol=crlf
 *.psm1 text eol=crlf
+# Inno Setup: CRLF + BOM (sem BOM o ISCC lê como ANSI)
+*.iss text eol=crlf
 
 # Binários
 *.png binary
@@ -13,3 +15,4 @@
 *.wav binary
 *.mp3 binary
 *.zip binary
+*.exe binary

@@ -36,18 +36,97 @@ Instalar e atualizar o Stemma no PC por um **instalador `.exe`**, sem rodar scri
 - Instalar o driver NVIDIA (pré-requisito: o instalador só confere com `nvidia-smi` e avisa).
 
 ## Checklist
-- [ ] CUDA funciona como LocalSystem (verificado antes de tudo)
-- [ ] ferramentas portáteis com SHA256 em `C:\stemma\tools`
-- [ ] cache do uv fixo em `C:\stemma\cache\uv`, semeado do cache do usuário (hardlink), com `--offline` primeiro: instalar no PC atual não baixa o torch de novo
-- [ ] Tailscale: instalar, login, checagem de HTTPS e `serve`
-- [ ] assistente Inno Setup em PT-BR com QR code no fim
-- [ ] mesma `.exe` instala e atualiza (backup, migrations, rollback)
-- [ ] desinstalador
-- [ ] instalador gerado e anexado pelo `release.yml`
-- [ ] docs/operacao.md, ADR nova, ADR 0007 e CLAUDE.md
+- [x] CUDA funciona como LocalSystem (verificado antes de tudo: `2.7.1+cu118 True GTX 1650` numa tarefa como SYSTEM)
+- [x] ferramentas portáteis com SHA256 em `C:\stemma\tools`
+- [x] cache do uv fixo em `C:\stemma\cache\uv`, semeado do cache do usuário (hardlink), com `--offline` primeiro: instalar no PC atual não baixa o torch de novo (ensaio: 226 mil arquivos ligados em ~2,5 min; venv em 7 s)
+- [x] Tailscale: instalar, login, checagem de HTTPS e `serve` (ensaio: tela "pronto" e 443 → ensaio; os ramos "não instalado", "sem login" e "sem HTTPS" só pelo Pester do parser, porque o PC já tinha o Tailscale logado)
+- [x] assistente Inno Setup em PT-BR com QR code no fim
+- [x] mesma `.exe` instala e atualiza (backup, migrations, rollback)
+- [x] desinstalador
+- [x] ícone na bandeja (`Stemma.exe`) e QR no app do desktop (pedidos na sessão)
+- [ ] instalador gerado e anexado pelo `release.yml` (confere na primeira release depois do merge)
+- [x] docs/operacao.md, ADR nova, ADR 0007 e CLAUDE.md
 
 ## Critério de pronto
 No PC (sem nada do Stemma instalado): baixar `Stemma-Setup-vX.Y.Z.exe` da GitHub Release, instalar pelo assistente (**sem baixar o torch de novo**, porque ele já está no cache do usuário) e abrir o endereço do QR code no celular. Publicar a release seguinte e rodar o instalador novo: o `/health` mostra a versão nova sem passo manual. Simular falha na atualização e ver o rollback (`-SimulateFailure` exposto como parâmetro de linha de comando do instalador, só para teste). App instalado na tela inicial do celular com ícone e splash corretos e sem seleção de texto ao segurar. CI verde.
 
 ## Handoff
-_Preencher ao final._
+**Status:** implementação no PR da F5b. O **ensaio local** passou por inteiro, com instaladores compilados aqui numa instalação paralela (`C:\stemma-ensaio`, porta 8001). Fica pendente o **critério de pronto real**: instalar pelo `.exe` da GitHub Release e atualizar para a release seguinte. Isso só pode ser feito depois do merge e da release.
+
+### Feito
+- **Pré-checagem**: o torch enxerga a GPU como SYSTEM (`2.7.1+cu118 True GTX 1650`, tarefa agendada temporária).
+- **Instalador** (`installer/stemma.iss`, Inno Setup 6.3+, PT-BR):
+  - telas: boas-vindas, pasta de dados, porta, Tailscale (instalar / Entrar / painel de HTTPS / Verificar de novo), progresso por etapa e tela final com endereço, QR e "Abrir o Stemma";
+  - o mesmo `.exe` instala e atualiza;
+  - `/SIMULATEFAILURE` para testar o rollback;
+  - `/ROOT /SERVICEID /PORT /DATAROOT /SKIPTAILSCALE` para ensaio paralelo;
+  - desinstalador com a pergunta sobre os dados (padrão: manter).
+- **Motor** `deploy/setup.ps1` (Check, Install, Update, Uninstall, Start, Stop, TailscaleInstall, TailscaleLogin). A lógica foi para o `StemmaDeploy.psm1`:
+  - `Invoke-StemmaInstall`, `Invoke-StemmaUpdate`, `Invoke-StemmaRollback`, `Invoke-StemmaUninstall`, `Update-StemmaYtDlp`;
+  - o `install.ps1` e o `update.ps1` viraram cascas.
+- **Ferramentas** em `<raiz>\tools`: uv 0.12.7, FFmpeg 9.0.2 e Deno 2.9.7, com SHA256 fixado, mais Python 3.12 via `uv python install --no-bin --no-registry`. O serviço roda como **LocalSystem**.
+- **Cache do uv** em `<raiz>\cache\uv`:
+  - semeado por hardlink a partir do cache do usuário;
+  - o `uv sync --offline` é tentado primeiro;
+  - ensaio: 226 mil arquivos em ~2,5 min, venv em 7 s, torch não baixado de novo.
+- **Pastas protegidas** (achado do `/code-review`):
+  - `<raiz>` e os dados ficam só com SYSTEM e Administradores alterando, e Administradores como dono;
+  - consequência: os arquivos do cache do uv do usuário ligados por hardlink ficam só leitura para ele (ADR 0014).
+- **Tailscale**:
+  - checagem por `tailscale status --json`, instalação por MSI fixo e login pelo navegador;
+  - `serve` 443 → porta, refeito na atualização;
+  - o desinstalador só desliga o `serve` se foi o instalador que ligou (`install.json`).
+- **Bandeja** (pedido na sessão: "parecer um app, como o Tailscale"):
+  - `Stemma.exe` (`installer/tray`, C# 5 compilado no build), com DPI por monitor e tema escuro dos tokens;
+  - mostra o estado e oferece Abrir, QR, Parar (manual), Iniciar (automático) e Sair;
+  - abre no login e no fim da instalação; no Menu Iniciar fica só "Stemma".
+- **App** (pedido na sessão):
+  - botão discreto de QR na topbar do desktop (`OpenOnPhone`, `uqr`), que explica em vez de mostrar QR quando o endereço é `localhost`;
+  - a mensagem de rede agora aponta para o Tailscale do aparelho.
+- **Ícone** `installer/stemma.ico` em 8 tamanhos, gerado do SVG pelo `npm run gen:icons`.
+- **CI**:
+  - job `installer` (`windows-latest`): Pester no Windows PowerShell 5.1 e build do instalador quando `deploy/`, `installer/`, o empacotamento ou os workflows mudam;
+  - saiu o Pester do Linux;
+  - `release.yml` anexa `Stemma-Setup-vX.Y.Z.exe` + `.sha256`;
+  - empacotamento em `scripts/package.sh`.
+- **Testes**: Pester 31 → 70.
+- **Ensaio local** (com você clicando no assistente): instalação nova; atualização com falha simulada (rollback com banco restaurado); atualização normal; desinstalação (dados mantidos); reinstalação reaproveitando o banco; Tailscale de verdade (443 → ensaio) e QR; bandeja.
+- **`/code-review`**: 10 achados, todos corrigidos:
+  - bytes de controle nos workflows (`\b`): agora há um teste que procura isso;
+  - pastas graváveis por usuários comuns executadas como SYSTEM;
+  - reinstalação depois de falha caía em "já está na versão" sem conferir nada;
+  - FFmpeg e Deno trocados com o serviço no ar;
+  - a atualização não semeava o cache;
+  - exceção no seeder;
+  - `tailscale serve` sem Tailscale;
+  - caminho com `\` no fim e a raiz de um drive como pasta de dados;
+  - exceções no timer da bandeja;
+  - marcador vazio.
+
+### Pendente
+- **Critério de pronto real** (depois do merge e da release v1.4.0):
+  1. **Remover o ensaio**: Configurações → Aplicativos → "Stemma (stemma-ensaio)" → Desinstalar, apagando também `D:\stemma-ensaio-data`. Isso libera a 443.
+  2. Baixar `Stemma-Setup-v1.4.0.exe` da Release e instalar em `C:\stemma`. Conferir "Componentes encontrados no PC" no log, QR no celular e PWA.
+  3. Um `fix:` gera a v1.4.1: rodar o instalador novo com `/SIMULATEFAILURE` (volta para a 1.4.0) e depois normal (`/health` 1.4.1).
+- Medir quanto a proteção das pastas acrescenta à primeira instalação: o `icacls` percorre ~230 mil arquivos do cache.
+- Ramos do Tailscale "não instalado", "sem login" e "sem HTTPS": validados só pelo Pester do parser. O PC já tinha o Tailscale logado.
+- Herdados: medição do AudioEngine no Android (F4a), branch protection (F0), iPhone (F5).
+
+### Decisões
+- [ADR 0014](../decisions/0014-instalador-e-conta-do-sistema.md): instalador, LocalSystem, `tools\`, cache semeado, pastas protegidas, serviço + bandeja.
+- Notas nas ADRs [0002](../decisions/0002-runtime-nativo-windows.md) e [0007](../decisions/0007-processo-de-release.md).
+- Cache do usuário em outro volume: **sem** semear (o plano previa copiar, mas copiar dezenas de GB sai mais caro que baixar ~3 GB).
+- Desvios de design (QR na topbar, QR escuro sobre claro, bandeja fora dos tokens CSS) em [docs/design](../design/README.md#desvios).
+
+### Pegadinhas
+- **"untrusted mount point"**: um processo elevado não atravessa junctions criadas pelo usuário. O cache antigo do uv (`wheels-v3`) tem junctions, e o seeder as pula.
+- **`uv python install` sem `--no-bin --no-registry`** escreve no perfil do usuário (`~\.local\bin`, `HKCU\Software\Python\Astral`). Aconteceu no primeiro ensaio; a chave foi apagada à mão.
+- **`icacls ... /T` com `(OI)(CI)` aplicado a arquivos deixa o arquivo sem nenhuma permissão.** O certo é: proteger a pasta (sem `/T`), depois `pasta\* /reset /T`, depois `/setowner /T`.
+- **Python escrevendo arquivos com `\b`/`\t` dentro de strings normais** gerou bytes de controle em workflow e script. O Pester agora acusa.
+- **`[IO.Path]::GetFullPath('D:')`** devolve o diretório atual do drive D, e não `D:\`. Aqui passava por acaso; no runner (checkout em `D:\a\…`) não. Trate `X:` à parte.
+- **`"$var:"` no PowerShell** é variável com escopo (`$var:texto`). Use `"$($var):"`.
+- **Inno**: uma linha do `[Code]` que começa com `#` (ex.: `#13#10`) é lida como diretiva do pré-processador. `AppId` com `{code:}` exige `UsePreviousLanguage=no`.
+- **O `!` do Claude Code roda no bash**: para rodar `.exe` com parâmetros `/X=...`, use um `.ps1` (o Git Bash converte `/ROOT` em caminho).
+- **O PWA já instalado no celular abre mesmo com o Tailscale do celular desligado** (o service worker serve a casca), e então dá erro de conexão. Confira `tailscale status`: o celular aparece `offline`.
+- **WinForms sem manifesto de DPI** fica borrado com escala acima de 100%: use `Stemma.manifest` (`PerMonitorV2`) no `csc /win32manifest`.
+- O ícone `.ico` com só 16/32/192 px fica feio na bandeja a 125%: gere todos os tamanhos (`gen:icons`).

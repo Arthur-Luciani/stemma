@@ -6,6 +6,7 @@ import { cx } from '../ui/cx';
 import { Icon } from '../ui/Icon';
 import { useLastSession } from './lastSession';
 import styles from './Navigation.module.css';
+import { OpenOnPhone } from './OpenOnPhone';
 
 interface Destination {
   to: string;
@@ -46,7 +47,7 @@ function Logo() {
   );
 }
 
-/** Topbar do desktop (60px): logo + Descobrir · Biblioteca · Mixer. */
+/** Topbar do desktop (60px): logo + Descobrir · Biblioteca · Mixer; à direita, "Abrir no celular". */
 export function Topbar() {
   const destinations = useDestinations();
   return (
@@ -66,6 +67,9 @@ export function Topbar() {
           </NavLink>
         ))}
       </nav>
+      <div className={styles.topActions}>
+        <OpenOnPhone />
+      </div>
     </header>
   );
 }

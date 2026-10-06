@@ -1,0 +1,179 @@
+﻿<#
+.SYNOPSIS
+  Motor do instalador (installer/stemma.iss). Toda a lógica fica aqui e no StemmaDeploy.psm1;
+  o Inno Setup só mostra as telas e repassa os parâmetros (ADR 0014).
+
+.DESCRIPTION
+  Protocolo com o instalador, pela saída padrão (UTF-8):
+    ==> texto        etapa (vira o texto da tela de progresso)
+    ##RESULT k=v     resultado para o instalador
+    ##ERROR texto    falha (com exit code 1)
+  Modos:
+    Check             estado do PC: release instalada, porta, pasta de dados, Tailscale, GPU
+    TailscaleInstall  instala o Tailscale (MSI oficial)
+    TailscaleLogin    abre o login do Tailscale no navegador
+    Install           instalação nova (ferramentas, release, serviço, tailscale serve)
+    Update            atualização com backup e rollback (-SimulateFailure para testar)
+    Uninstall         remove serviço, tailscale serve e <Root> (-RemoveData apaga os dados)
+    Start / Stop      "Iniciar o Stemma" / "Parar o Stemma" do ícone da bandeja (Stemma.exe): pedem
+                      administrador (UAC) sozinhos e mostram um aviso no fim
+#>
+param(
+    [Parameter(Mandatory)]
+    [ValidateSet('Check', 'TailscaleInstall', 'TailscaleLogin', 'Install', 'Update', 'Uninstall', 'Start', 'Stop')]
+    [string]$Mode,
+    [string]$Root = 'C:\stemma',
+    [string]$ServiceId = 'stemma',
+    [string]$DataRoot,
+    [int]$Port = 8000,
+    [string]$ZipPath,
+    [string]$QrPath,
+    [string]$Keep,
+    [switch]$SkipTailscale,
+    [switch]$SimulateFailure,
+    [switch]$RemoveData
+)
+
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+$OutputEncoding = [Text.UTF8Encoding]::new($false)
+Import-Module (Join-Path $PSScriptRoot 'StemmaDeploy.psm1') -Force
+
+function Write-Result([string]$Key, [string]$Value) { Write-Host "##RESULT $Key=$Value" }
+
+function Get-StemmaUrl([int]$PortNumber, [bool]$UseTailscale) {
+    if ($UseTailscale) {
+        $state = Get-TailscaleState
+        if ($state.Host) { return "https://$($state.Host)" }
+    }
+    return "http://127.0.0.1:$PortNumber"
+}
+
+function Write-StemmaQr([string]$Url) {
+    <#
+      QR code do endereço (BMP) para a tela final, com o Python da release e o segno ao lado do
+      qr.py. Só para o endereço do Tailscale: um QR de 127.0.0.1 não abre nada no celular.
+    #>
+    if (-not $QrPath -or -not $Url.StartsWith('https://')) { return }
+    $script = Join-Path $PSScriptRoot 'qr.py'
+    $release = Get-CurrentRelease -Root $Root
+    if (-not (Test-Path -LiteralPath $script) -or -not $release) { return }
+    try {
+        Invoke-Native -FilePath (Get-ReleasePython $release) -Arguments @($script, $Url, $QrPath)
+        Write-Result 'qr' $QrPath
+    }
+    catch { Write-Warning "QR code: $($_.Exception.Message)" }
+}
+
+function Show-Popup([string]$Text, [int]$Icon) {
+    # 64 = informação, 16 = erro (WScript.Shell.Popup).
+    (New-Object -ComObject WScript.Shell).Popup($Text, 0, 'Stemma', $Icon) | Out-Null
+}
+
+# Ações do ícone da bandeja: sem janela de console e com UAC só aqui.
+if ($Mode -in 'Start', 'Stop') {
+    $identity = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+    if (-not $identity.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        $arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`" -Mode $Mode -Root `"$Root`" -ServiceId `"$ServiceId`""
+        try { Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -WindowStyle Hidden }
+        catch { Show-Popup 'É preciso permitir (administrador) para iniciar ou parar o Stemma.' 16 }
+        exit 0
+    }
+    try {
+        $info = Get-StemmaInstallInfo -Root $Root
+        if ($info) { $ServiceId = $info.serviceId }
+        if ($Mode -eq 'Stop') {
+            Disable-StemmaService -ServiceId $ServiceId
+            Show-Popup "O Stemma está parado e não vai subir sozinho com o Windows.`n`nPara voltar: ícone do Stemma perto do relógio → Iniciar o Stemma." 64
+        }
+        else {
+            Enable-StemmaService -ServiceId $ServiceId
+            $context = Get-StemmaContext -Root $Root
+            if (-not (Wait-StemmaHealth -Port $context.Port -ExpectedVersion $context.CurrentTag -TimeoutSec 120)) {
+                throw "o serviço subiu, mas não respondeu. Veja os logs em $Root\logs."
+            }
+            $useTailscale = if ($info) { [bool]$info.tailscaleServe } else { $true }
+            Show-Popup "O Stemma está no ar e volta a subir sozinho com o Windows.`n`n$(Get-StemmaUrl -PortNumber $context.Port -UseTailscale $useTailscale)" 64
+        }
+        exit 0
+    }
+    catch {
+        Show-Popup "Não deu certo: $($_.Exception.Message)" 16
+        exit 1
+    }
+}
+
+$transcript = $null
+if ($Mode -in 'Install', 'Update', 'Uninstall') {
+    $logDir = if ($Mode -eq 'Uninstall') { $env:TEMP } else { Join-Path $Root 'logs' }
+    New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+    $transcript = Join-Path $logDir ("setup-{0}-{1}.log" -f $Mode.ToLowerInvariant(), (Get-Date).ToString('yyyyMMdd-HHmmss'))
+    Start-Transcript -LiteralPath $transcript | Out-Null
+    Write-Result 'log' $transcript
+}
+
+try {
+    switch ($Mode) {
+        'Check' {
+            $context = Get-StemmaContext -Root $Root
+            Write-Result 'installed' "$($context.CurrentTag)"
+            $info = Get-StemmaInstallInfo -Root $Root
+            $id = if ($info) { $info.serviceId } else { $ServiceId }
+            Write-Result 'service' $(if (Test-StemmaService $id) { 'yes' } else { 'no' })
+            Write-Result 'port' "$($context.Port)"
+            Write-Result 'dataroot' $(if ($context.CurrentTag) { $context.StorageRoot } else { Get-DefaultDataRoot })
+            $tailscale = Get-TailscaleState
+            Write-Result 'tailscale' $tailscale.State
+            Write-Result 'host' $tailscale.Host
+            Write-Result 'gpu' $(if (Test-NvidiaGpu) { 'ok' } else { 'missing' })
+        }
+        'TailscaleInstall' {
+            Assert-Admin
+            Install-Tailscale -Root $Root
+            Write-Result 'tailscale' (Get-TailscaleState).State
+        }
+        'TailscaleLogin' {
+            $state = Start-TailscaleLogin
+            Write-Result 'tailscale' $state.State
+        }
+        'Install' {
+            Assert-Admin
+            $tag = Invoke-StemmaInstall -Root $Root -DataRoot $DataRoot -Port $Port -ServiceId $ServiceId `
+                -ZipPath $ZipPath -SkipTailscale:$SkipTailscale
+            $url = Get-StemmaUrl -PortNumber (Get-StemmaContext -Root $Root).Port -UseTailscale (-not $SkipTailscale)
+            Write-Result 'version' $tag
+            Write-Result 'url' $url
+            Write-StemmaQr $url
+        }
+        'Update' {
+            Assert-Admin
+            $info = Get-StemmaInstallInfo -Root $Root
+            if ($info) { $ServiceId = $info.serviceId }
+            $tag = Invoke-StemmaUpdate -Root $Root -ServiceId $ServiceId -ZipPath $ZipPath -SimulateFailure:$SimulateFailure
+            $useTailscale = if ($info) { [bool]$info.tailscaleServe } else { -not $SkipTailscale }
+            $port = (Get-StemmaContext -Root $Root).Port
+            # Idempotente: refaz o serve se uma instalação anterior falhou antes dele.
+            if ($useTailscale) {
+                try { Set-TailscaleServe -Port $port }
+                catch { Write-Warning "tailscale serve: $($_.Exception.Message)" }
+            }
+            $url = Get-StemmaUrl -PortNumber $port -UseTailscale $useTailscale
+            Write-Result 'version' $tag
+            Write-Result 'url' $url
+            Write-StemmaQr $url
+        }
+        'Uninstall' {
+            Assert-Admin
+            $keepList = @($Keep -split ',' | Where-Object { $_ })
+            Invoke-StemmaUninstall -Root $Root -Keep $keepList -RemoveData:$RemoveData
+        }
+    }
+    exit 0
+}
+catch {
+    Write-Host "##ERROR $($_.Exception.Message)"
+    exit 1
+}
+finally {
+    if ($transcript) { Stop-Transcript | Out-Null }
+}

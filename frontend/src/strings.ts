@@ -17,6 +17,13 @@ export const strings = {
     library: 'Biblioteca',
     mixer: 'Mixer',
   },
+  phone: {
+    open: 'Abrir no celular',
+    qrLabel: (url: string) => `QR code de ${url}`,
+    hint: 'Aponte a câmera do celular para o código ou abra o endereço abaixo. No Chrome, use ⋮ → Instalar app.',
+    localOnly:
+      'Este endereço só funciona neste PC. Para abrir no celular, use o endereço do Tailscale (https://<pc>.<tailnet>.ts.net) — o QR aparece aqui quando o Stemma é aberto por ele.',
+  },
   common: {
     cancel: 'Cancelar',
     close: 'Fechar',

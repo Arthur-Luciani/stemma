@@ -21,3 +21,6 @@ Sem CORS nem proxy em produção. O ambiente não é 100% reprodutível: Python,
 - O serviço roda `current\deploy\start.ps1` (carrega `C:\stemma\.env`, `alembic upgrade head`, uvicorn com o Python do venv da release). O WinSW manda Ctrl+C primeiro (`stopparentprocessfirst`) e mata a árvore após 20 s.
 - O backend serve o `frontend/dist` quando `SERVE_FRONTEND_DIR` está definido (`app/spa.py`): assets com hash `immutable`; `index.html`, `sw.js` e `manifest.webmanifest` com `no-cache`; `/api`, `/ws` e `/health` nunca caem no fallback da SPA.
 - `tailscale serve --bg --https=443 http://127.0.0.1:8000` (o dev continua na `:5183`).
+
+## Atualização (F5b, 2026-10-06)
+O serviço passa a rodar como **LocalSystem**, não mais com a conta do usuário. Python, FFmpeg e Deno deixam de ser instalados à mão: vêm em `C:\stemma\tools` (versão e SHA256 fixados). A instalação é feita por um instalador `.exe`. Detalhes em [ADR 0014](0014-instalador-e-conta-do-sistema.md).

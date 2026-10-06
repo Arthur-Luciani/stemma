@@ -1,0 +1,14 @@
+.qr {
+  display: block;
+  width: 220px;
+  height: 220px;
+  border-radius: var(--radius-control);
+}
+
+.quiet {
+  fill: var(--qr-light);
+}
+
+.modules {
+  fill: var(--qr-dark);
+}

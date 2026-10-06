@@ -72,7 +72,7 @@ O instalador do Stemma já aplica isso:
 
 Para mudar a porta de uma instalação existente:
 1. Edite `PORT` no `C:\stemma\.env` como administrador.
-2. Rode `tailscale serve --bg --https=443 http://127.0.0.1:<nova>`.
+2. Veja a porta HTTPS dela em `C:\stemma\install.json` (`httpsPort`: 443 ou 8443) e rode `tailscale serve --bg --https=<httpsPort> http://127.0.0.1:<nova>`.
 3. Reinicie o Stemma (ícone da bandeja → Parar e depois Iniciar).
 
 ## Layout

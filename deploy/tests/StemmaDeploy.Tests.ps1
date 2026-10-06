@@ -382,6 +382,18 @@ Describe '.env da instalação' {
         $values['FFMPEG_BIN'] | Should -Be 'C:\stemma\tools\ffmpeg\bin\ffmpeg.exe'
     }
 
+    It 'troca um valor (nova tentativa de instalação vale a porta escolhida agora)' {
+        $file = Join-Path $TestDrive 'tentativa.env'
+        Set-Content -LiteralPath $file -Encoding UTF8 -Value @('# x', 'PORT=8000', 'STORAGE_ROOT=D:\a')
+        Set-DotEnvValue -Path $file -Key 'PORT' -Value '8002'
+        Set-DotEnvValue -Path $file -Key 'LOG_LEVEL' -Value 'INFO'
+        $values = Read-DotEnv -Path $file
+        $values['PORT'] | Should -Be '8002'
+        $values['STORAGE_ROOT'] | Should -Be 'D:\a'
+        $values['LOG_LEVEL'] | Should -Be 'INFO'
+        (Get-Content -LiteralPath $file -Encoding UTF8)[0] | Should -Be '# x'
+    }
+
     It 'acrescenta só o que falta e preserva o resto' {
         $file = Join-Path $TestDrive 'antigo.env'
         Set-Content -LiteralPath $file -Encoding UTF8 -Value @('# meu comentário', 'PORT=8123', 'FFMPEG_BIN=ffmpeg')
@@ -449,6 +461,7 @@ Describe 'Portas HTTPS do Tailscale' {
     It 'o desinstalador só desliga a 443 se ela ainda publica este Stemma' {
         Mock -ModuleName StemmaDeploy Get-TailscaleExe { 'tailscale.exe' }
         Mock -ModuleName StemmaDeploy Get-TailscaleServeTarget { 'http://127.0.0.1:8001' }
+        Mock -ModuleName StemmaDeploy Get-PortUsage { $null }
         Mock -ModuleName StemmaDeploy Invoke-Native {}
         Mock -ModuleName StemmaDeploy Write-Step {}
 
@@ -457,6 +470,36 @@ Describe 'Portas HTTPS do Tailscale' {
 
         Remove-TailscaleServe -Port 8001
         Should -Invoke -ModuleName StemmaDeploy Invoke-Native -Times 1 -Exactly -ParameterFilter { ($Arguments -join ' ') -eq 'serve --https=443 off' }
+    }
+
+    It 'mesma porta local que outra instalação (ex.: ensaio e real): não desliga' {
+        Mock -ModuleName StemmaDeploy Get-TailscaleExe { 'tailscale.exe' }
+        Mock -ModuleName StemmaDeploy Get-TailscaleServeTarget { 'http://127.0.0.1:8001' }
+        # O serviço desta instalação já foi removido; quem escuta na 8001 é a outra.
+        Mock -ModuleName StemmaDeploy Get-PortUsage { 'em uso por python (PID 4120)' }
+        Mock -ModuleName StemmaDeploy Invoke-Native {}
+        Remove-TailscaleServe -Port 8001 6>$null
+        Should -Invoke -ModuleName StemmaDeploy Invoke-Native -Times 0 -Exactly
+    }
+
+    It 'nada publicado: não faz nada' {
+        Mock -ModuleName StemmaDeploy Get-TailscaleExe { 'tailscale.exe' }
+        Mock -ModuleName StemmaDeploy Get-TailscaleServeTarget { $null }
+        Mock -ModuleName StemmaDeploy Invoke-Native {}
+        Remove-TailscaleServe -Port 8001 6>$null
+        Should -Invoke -ModuleName StemmaDeploy Invoke-Native -Times 0 -Exactly
+    }
+
+    It 'estado da porta HTTPS: livre, deste Stemma ou de outro app' {
+        Get-ServePortState -Target $null -Port 8000 | Should -Be 'free'
+        Get-ServePortState -Target 'http://127.0.0.1:8000' -Port 8000 | Should -Be 'ours'
+        Get-ServePortState -Target 'http://127.0.0.1:9000' -Port 8000 | Should -Be 'other'
+        Get-ServePortState -Target '(outro: TCP)' -Port 8000 | Should -Be 'other'
+    }
+
+    It 'encaminhamento TCP e saída que não é JSON contam como ocupada' {
+        ConvertFrom-TailscaleServeStatus -Json '{"TCP":{"443":{"TCPForward":"127.0.0.1:5432"}}}' -HttpsPort 443 | Should -Be '(outro: TCP)'
+        ConvertFrom-TailscaleServeStatus -Json 'Tailscale is starting...' -HttpsPort 443 | Should -Be '(desconhecido)'
     }
 
     It 'publica na porta HTTPS escolhida' {
@@ -490,8 +533,7 @@ Describe 'Portas locais' {
     }
 
     It 'diz quem usa a porta, ou que o Windows a reserva' {
-        Mock -ModuleName StemmaDeploy Get-NetTCPConnection { [pscustomobject]@{ OwningProcess = 4120 } } -ParameterFilter { $LocalPort -eq 8001 }
-        Mock -ModuleName StemmaDeploy Get-NetTCPConnection { $null } -ParameterFilter { $LocalPort -ne 8001 }
+        Mock -ModuleName StemmaDeploy Get-NetTCPConnection { @([pscustomobject]@{ LocalPort = 8001; OwningProcess = 4120 }) }
         Mock -ModuleName StemmaDeploy Get-Process { [pscustomobject]@{ ProcessName = 'python' } }
         $ranges = @([pscustomobject]@{ Start = 50000; End = 50059 })
 
@@ -502,10 +544,13 @@ Describe 'Portas locais' {
 
     It 'sugere a próxima porta livre' {
         Mock -ModuleName StemmaDeploy Get-ExcludedPortRanges { @() }
-        Mock -ModuleName StemmaDeploy Get-NetTCPConnection { [pscustomobject]@{ OwningProcess = 1 } } -ParameterFilter { @($LocalPort)[0] -in 8000, 8001 }
-        Mock -ModuleName StemmaDeploy Get-NetTCPConnection { $null } -ParameterFilter { @($LocalPort)[0] -notin 8000, 8001 }
+        Mock -ModuleName StemmaDeploy Get-NetTCPConnection {
+            @([pscustomobject]@{ LocalPort = 8000; OwningProcess = 1 }, [pscustomobject]@{ LocalPort = 8001; OwningProcess = 2 })
+        }
         Mock -ModuleName StemmaDeploy Get-Process { $null }
         Find-FreePort -Start 8000 | Should -Be 8002
+        # Uma consulta só, por mais portas que varra.
+        Should -Invoke -ModuleName StemmaDeploy Get-NetTCPConnection -Times 1 -Exactly
     }
 
     It 'a instalação recusa uma porta em uso antes de mexer em qualquer coisa' {

@@ -52,6 +52,16 @@ function Get-StemmaUrl([int]$PortNumber, [bool]$UseTailscale, [int]$Https = 443)
     return "http://127.0.0.1:$PortNumber"
 }
 
+function Write-ServeResults([int]$LocalPort) {
+    <# serve443/serve8443 (o que publicam) e serve443state/serve8443state (free | ours | other). #>
+    $json = Get-TailscaleServeJson
+    foreach ($https in 443, 8443) {
+        $target = Get-TailscaleServeTarget -HttpsPort $https -Json $json
+        Write-Result "serve$https" "$target"
+        Write-Result "serve$($https)state" (Get-ServePortState -Target $target -Port $LocalPort)
+    }
+}
+
 function Write-StemmaQr([string]$Url) {
     <#
       QR code do endereço (BMP) para a tela final, com o Python da release e o segno ao lado do
@@ -132,14 +142,16 @@ try {
             Write-Result 'gpu' $(if (Test-NvidiaGpu) { 'ok' } else { 'missing' })
             # Instalação nova: sugere a primeira porta livre a partir da 8000.
             if (-not $context.CurrentTag) { Write-Result 'freeport' "$(Find-FreePort -Start 8000)" }
-            # O que as portas HTTPS do Tailscale já publicam (vazio = livre).
-            Write-Result 'serve443' "$(Get-TailscaleServeTarget -HttpsPort 443)"
-            Write-Result 'serve8443' "$(Get-TailscaleServeTarget -HttpsPort 8443)"
+            # O que as portas HTTPS do Tailscale publicam, e se é este Stemma (pela porta local:
+            # a instalada, ou a -Port que o assistente está usando).
+            $localPort = if ($context.CurrentTag) { $context.Port } else { $Port }
+            Write-ServeResults -LocalPort $localPort
         }
         'CheckPort' {
             $usage = Get-PortUsage -Port $Port
             Write-Result 'portuse' "$usage"
             if ($usage) { Write-Result 'freeport' "$(Find-FreePort -Start ($Port + 1))" }
+            Write-ServeResults -LocalPort $Port
         }
         'TailscaleInstall' {
             Assert-Admin
@@ -170,12 +182,15 @@ try {
             # Refaz o serve se ele sumiu (instalação que falhou antes dele, outro desinstalador),
             # mas nunca toma a porta HTTPS de outro app.
             if ($useTailscale) {
-                $target = Get-TailscaleServeTarget -HttpsPort $https
-                if (-not $target -or $target -eq (Get-StemmaServeTarget $port)) {
-                    try { Set-TailscaleServe -Port $port -HttpsPort $https }
-                    catch { Write-Warning "tailscale serve: $($_.Exception.Message)" }
+                # A atualização já terminou: nada aqui pode virar "falhou".
+                try {
+                    $target = Get-TailscaleServeTarget -HttpsPort $https
+                    switch (Get-ServePortState -Target $target -Port $port) {
+                        'free' { Set-TailscaleServe -Port $port -HttpsPort $https }
+                        'other' { Write-Warning "A $https do Tailscale publica '$target', não o Stemma: não mexi nela." }
+                    }
                 }
-                else { Write-Warning "A $https do Tailscale publica '$target', não o Stemma: não mexi nela." }
+                catch { Write-Warning "tailscale serve: $($_.Exception.Message)" }
             }
             $url = Get-StemmaUrl -PortNumber $port -UseTailscale $useTailscale -Https $https
             Write-Result 'version' $tag

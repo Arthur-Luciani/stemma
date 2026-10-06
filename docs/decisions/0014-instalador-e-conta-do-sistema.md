@@ -2,6 +2,7 @@
 
 - **Status:** aceita (2026-10-06, F5b)
 - Muda a [ADR 0002](0002-runtime-nativo-windows.md) (conta do serviço e pré-requisitos) e complementa a [ADR 0007](0007-processo-de-release.md) (o que a release publica).
+- Complementada pela [ADR 0015](0015-atualizar-pelo-app.md) (F5c): o instalador também cria as tarefas agendadas da atualização pelo app e aceita `/NOTRAY` e `/RESULTFILE=`.
 
 ## Contexto
 Na F5, instalar era rodar `install.ps1` num PowerShell de administrador, com uv, FFmpeg e Deno instalados à mão no PATH do usuário, o WinSW pedindo conta e senha do Windows (`install /p`) e o `tailscale serve` configurado à mão. O usuário achou difícil e pediu um instalador. Rodar o serviço com a conta do usuário também amarrava tudo ao perfil dele (PATH, cache do uv, Python do `%APPDATA%`).

@@ -20,12 +20,15 @@
     Install           instalação nova (ferramentas, release, serviço, tailscale serve)
     Update            atualização com backup e rollback (-SimulateFailure para testar)
     Uninstall         remove serviço, tailscale serve e <Root> (-RemoveData apaga os dados)
+    AppUpdate         tarefa agendada \Stemma\Atualizar (ADR 0015): baixa o instalador da última
+                      release, roda em modo silencioso e grava o resultado no banco
+                      (-InstallerPath usa um .exe local, para ensaio)
     Start / Stop      "Iniciar o Stemma" / "Parar o Stemma" do ícone da bandeja (Stemma.exe): pedem
                       administrador (UAC) sozinhos e mostram um aviso no fim
 #>
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('Check', 'CheckPort', 'TailscaleInstall', 'TailscaleLogin', 'Install', 'Update', 'Uninstall', 'Start', 'Stop')]
+    [ValidateSet('Check', 'CheckPort', 'TailscaleInstall', 'TailscaleLogin', 'Install', 'Update', 'Uninstall', 'AppUpdate', 'Start', 'Stop')]
     [string]$Mode,
     [string]$Root = 'C:\stemma',
     [string]$ServiceId = 'stemma',
@@ -36,6 +39,7 @@ param(
     [string]$QrPath,
     [string]$LockPath,
     [string]$Keep,
+    [string]$InstallerPath,
     [switch]$SkipTailscale,
     [switch]$SimulateFailure,
     [switch]$RemoveData
@@ -123,7 +127,7 @@ if ($Mode -in 'Start', 'Stop') {
 
 $transcript = $null
 if ($Mode -in 'Install', 'Update') { Set-StemmaProgressProtocol $true }
-if ($Mode -in 'Install', 'Update', 'Uninstall') {
+if ($Mode -in 'Install', 'Update', 'Uninstall', 'AppUpdate') {
     $logDir = if ($Mode -eq 'Uninstall') { $env:TEMP } else { Join-Path $Root 'logs' }
     New-Item -ItemType Directory -Force -Path $logDir | Out-Null
     $transcript = Join-Path $logDir ("setup-{0}-{1}.log" -f $Mode.ToLowerInvariant(), (Get-Date).ToString('yyyyMMdd-HHmmss'))
@@ -181,7 +185,7 @@ try {
         'Install' {
             Assert-Admin
             $tag = Invoke-StemmaInstall -Root $Root -DataRoot $DataRoot -Port $Port -ServiceId $ServiceId `
-                -ZipPath $ZipPath -SkipTailscale:$SkipTailscale -HttpsPort $HttpsPort
+                -ZipPath $ZipPath -SkipTailscale:$SkipTailscale -HttpsPort $HttpsPort -EngineDir $PSScriptRoot
             $url = Get-StemmaUrl -PortNumber (Get-StemmaContext -Root $Root).Port -UseTailscale (-not $SkipTailscale) -Https $HttpsPort
             Write-Result 'version' $tag
             Write-Result 'url' $url
@@ -191,7 +195,8 @@ try {
             Assert-Admin
             $info = Get-StemmaInstallInfo -Root $Root
             if ($info) { $ServiceId = $info.serviceId }
-            $tag = Invoke-StemmaUpdate -Root $Root -ServiceId $ServiceId -ZipPath $ZipPath -SimulateFailure:$SimulateFailure
+            $tag = Invoke-StemmaUpdate -Root $Root -ServiceId $ServiceId -ZipPath $ZipPath -SimulateFailure:$SimulateFailure `
+                -EngineDir $PSScriptRoot
             $useTailscale = if ($info) { [bool]$info.tailscaleServe } else { -not $SkipTailscale }
             $https = if ($info) { [int]$info.httpsPort } else { $HttpsPort }
             $port = (Get-StemmaContext -Root $Root).Port
@@ -212,6 +217,12 @@ try {
             Write-Result 'version' $tag
             Write-Result 'url' $url
             Write-StemmaQr $url
+        }
+        'AppUpdate' {
+            Assert-Admin
+            $outcome = Invoke-StemmaAppUpdate -Root $Root -ServiceId $ServiceId -InstallerPath $InstallerPath `
+                -SimulateFailure:$SimulateFailure
+            if ($outcome.State -ne 'succeeded') { throw $outcome.Message }
         }
         'Uninstall' {
             Assert-Admin

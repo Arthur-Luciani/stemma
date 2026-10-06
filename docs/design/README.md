@@ -166,3 +166,22 @@ Feitos na F5b (instalador), de propósito:
 - **"Abrir no celular" (só desktop)**: não há tela no design. É um botão só com ícone (`qr_code_2`, *ghost*) no canto direito da topbar, que abre um Dialog com o QR code do endereço atual, a dica de instalar o app e o endereço em mono. Se o app foi aberto por `localhost`/`127.0.0.1`, o Dialog explica que esse endereço só funciona no PC, em vez de mostrar um QR que não abre nada.
 - **QR code escuro sobre claro** (`--qr-dark` = `--bg-base` sobre `--qr-light` = base do tema claro): a única área clara do app escuro. QR invertido (claro sobre escuro) falha em parte das câmeras.
 - **Fora do app**: o ícone da bandeja do Windows (`installer/tray`) e as telas do instalador usam o ícone da marca e os controles nativos do Windows, sem os tokens.
+
+Feitos na F5c (atualizar pelo app), de propósito:
+
+- **Aviso de versão nova do servidor** não tem tela no design. Ele usa peças existentes (decidido com o usuário):
+  - desktop: chip discreto na topbar, à esquerda do QR (pílula `surface` com borda `line`, ponto `accent` e "vX.Y.Z disponível"; alvo de 44px);
+  - celular: faixa fina no topo do Descobrir e da Biblioteca (card `surface`, ponto `accent`, "Stemma vX.Y.Z disponível" e botão **Ver**);
+  - durante a atualização, os dois mostram um spinner e "Atualizando…".
+- **"Ver"** abre um Dialog (desktop) ou BottomSheet (celular) por `?atualizacao=1`, com:
+  - "Instalada vX → Nova vY" em mono;
+  - **Novidades** (seções do release-please em PT-BR, sem links nem hashes de commit);
+  - "O Stemma fica fora do ar por ~1 min enquanto atualiza.";
+  - **Agora não** e **Atualizar** (primary). A própria tela é a confirmação.
+- **Estados do dialog/sheet**:
+  - "Atualizando…" com spinner;
+  - sucesso (caixa `good-soft`): "Stemma atualizado para a vX.Y.Z." + dica de tocar em Recarregar;
+  - falha (caixa `bad-soft`, "Não deu certo"): motivo + "A vX continua no ar.", e o botão continua para tentar de novo;
+  - com job ativo: botão desabilitado e aviso em `warn-text`.
+- Não confundir com o toast "Nova versão disponível · Recarregar" do PWA, que aparece depois que o servidor já atualizou.
+

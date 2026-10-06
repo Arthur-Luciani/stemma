@@ -20,6 +20,9 @@ export type MixPreset = Schemas['MixPreset'];
 export type Export = Schemas['ExportOut'];
 export type ExportFormat = Schemas['ExportFormat'];
 export type ExportState = Schemas['ExportState'];
+export type SystemUpdate = Schemas['SystemUpdateOut'];
+export type UpdateRun = Schemas['UpdateRunOut'];
+export type ReleaseNotes = Schemas['ReleaseNotes'];
 
 /** `GET /peaks/{stem}.json` (o OpenAPI não tipa: é um arquivo servido como está). */
 export interface StemPeaks {

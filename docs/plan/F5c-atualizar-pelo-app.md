@@ -21,14 +21,75 @@ Saber de dentro do app (inclusive no celular) que existe versão nova do Stemma 
 Atualização automática sem toque; canal beta.
 
 ## Checklist
-- [ ] abordagem da tarefa agendada confirmada + ADR
-- [ ] `GET/POST /api/system/update` com estado no banco
-- [ ] design da tela/aviso aprovado
-- [ ] aviso, confirmação e acompanhamento no app (desktop e celular)
-- [ ] falha mostra o motivo e mantém a versão anterior
+- [x] abordagem da tarefa agendada confirmada + ADR (tarefa SYSTEM + **instalador silencioso**, [ADR 0015](../decisions/0015-atualizar-pelo-app.md))
+- [x] `GET/POST /api/system/update` com estado no banco
+- [x] design da tela/aviso aprovado (chip + faixa + Dialog/Sheet, em Desvios)
+- [x] aviso, confirmação e acompanhamento no app (desktop e celular)
+- [x] falha mostra o motivo e mantém a versão anterior
 
 ## Critério de pronto
 Com a versão N instalada pela F5b e a N+1 publicada: o celular mostra o aviso, "Atualizar" leva o PC à N+1 sem tocar no PC, e o app volta sozinho (com o "Recarregar" do PWA). Com falha simulada, o app mostra o erro e a N continua no ar. CI verde.
 
 ## Handoff
-_Preencher ao final._
+**Status:** implementada e ensaiada no PC em 2026-10-06. O critério de pronto **com releases de verdade** depende de duas releases que já tragam a F5c (v1.5.0 instalada pelo `.exe`, depois a v1.5.1). Isso fica para depois do merge e vai num PR `docs:`.
+
+Ensaio no PC (o `stemma-ensaio` que tinha sobrado do PR #27, na v1.4.3, porta 8000 e 8443 do Tailscale; a instalação real, v1.4.1 na 8001, não foi tocada):
+- **1.4.3 → 9.0.0 pelo `.exe` em modo silencioso** (`/VERYSILENT /NOTRAY /RESULTFILE=`): código 0, `ok|v9.0.0`. As tarefas `\Stemma\Atualizar-stemma-ensaio` e `Bandeja-stemma-ensaio` foram criadas, e o `UPDATE_TASK` foi gravado no `.env`. Isso mostra que uma instalação pré-F5c ganha as tarefas pelo `.exe`.
+- **9.0.0 → 9.0.1 pelo app** (usuário clicando): chip, dialog com as novidades, "Atualizando…" e volta sozinho. Levou 30 s, gravou `succeeded` no banco e a bandeja foi reaberta pela tarefa `Bandeja`.
+- **9.0.1 → 9.0.2 com falha simulada**: rollback (backup antes das migrations, banco restaurado) e o app mostrou "Não deu certo: A atualização para v9.0.2 falhou (A v9.0.2 não confirmou a versão no /health). A v9.0.1 continua no ar.". A falha também ficou gravada no banco. Isso cobre ainda a pendência do `/SIMULATEFAILURE` da F5b pelo `.exe`.
+- Lista de releases falsa via `UPDATE_RELEASES_URL=file://…` e instalador local via `-InstallerPath` nos argumentos da tarefa (ver `docs/operacao.md`).
+
+### Feito
+- **Backend**:
+  - `GET/POST /api/system/update` (`SystemUpdateService`, rotas finas);
+  - tabela `system_updates` (migration 0003);
+  - `pipeline/updater.py`: releases do GitHub por `urllib`, com `User-Agent`, timeout de 5 s, cache de 6 h (5 min na falha) e só releases com o instalador anexado. O disparo é `schtasks /run` pelo `run_process`;
+  - CLI `update-result`;
+  - recusas 409 (`update_running`, `jobs_active`, `update_unavailable`, `update_not_supported`), 503 sem GitHub e 502 se o `schtasks` falhar (grava `failed`);
+  - um `running` com mais de 3 h 30 vira `failed` (mais que o limite de 3 h da tarefa);
+  - com atualização `running`, processar e exportar respondem 409 `update_running`;
+  - CLI `update-target`: a tarefa instala exatamente a versão que o app mostrou;
+  - notas do release-please em PT-BR, sem links e hashes, acumuladas entre a versão atual e a última.
+- **Deploy**:
+  - `Register-StemmaTasks` / `Unregister-StemmaTasks`. Install e Update do instalador recriam as tarefas antes de subir o serviço; o desinstalador remove;
+  - `Invoke-StemmaAppUpdate` (`setup.ps1 -Mode AppUpdate`): lê a versão alvo do banco, baixa e confere o `.exe` daquela tag (`Get-ReleaseAssets -Kind installer`), roda em modo silencioso, lê o `/RESULTFILE`, grava pelo CLI da release no ar (aspas duplas viram simples) e reabre a bandeja.
+- **Instalador**: `/NOTRAY`, `/RESULTFILE=`, código de saída 1 na falha (`GetCustomSetupExitCode`), e o Tailscale fora do ar não trava a atualização silenciosa.
+- **Frontend** (`features/update`):
+  - chip na topbar (desktop) e faixa no Descobrir/Biblioteca (celular);
+  - Dialog/BottomSheet em `?atualizacao=1`;
+  - estados: atualizando (polling de 5 s que tolera o servidor fora), atualizado, falha com motivo, job ativo e instalação sem tarefa.
+- **Testes**: pytest +32 (service, rotas, CLI, notas, `GitHubReleases`, `UpdateTask`, trava de jobs); Pester 70 → 116 (tarefas, resultado do instalador, fluxo do `AppUpdate`, `Get-ReleaseAssets`); Vitest +13.
+- **`/code-review`**: 9 achados, 8 corrigidos:
+  - backend e tarefa podiam escolher versões diferentes: agora a tarefa usa o `update-target`;
+  - o resultado caía numa linha já encerrada;
+  - o timeout era menor que o limite da tarefa;
+  - jobs novos durante a atualização;
+  - release malformada derrubava o GET (500);
+  - aspas no motivo quebravam o argumento do CLI;
+  - `Get-ReleaseInstaller` duplicado;
+  - keys repetidas nas notas.
+  - Descartado: "re-registrar a tarefa enquanto ela roda". O ensaio 9.0.0 → 9.0.1 fez exatamente isso e gravou o resultado.
+- **Docs**: ADR 0015, nota na ADR 0014, `operacao.md` (seção "Atualizar pelo app", layout, logs) e Desvios de design.
+
+### Pendente
+- **Critério real** (depois do merge): instalar a v1.5.0 pelo `.exe` na instalação real → publicar a v1.5.1 → aviso no celular → Atualizar → `/health` 1.5.1 e "Recarregar". A falha simulada já foi coberta no ensaio.
+- **Ensaio que sobrou**: o `stemma-ensaio` está na v9.0.1, com `UPDATE_RELEASES_URL` no `.env` e a tarefa com `-InstallerPath … -SimulateFailure`. Para desligar: rodar o desinstalador "Stemma (stemma-ensaio)". Os dados ficam em `D:\stemma-ensaio-data`.
+- Herdados: medição do AudioEngine no Android (F4a), branch protection (F0), iPhone (F5), ramos do Tailscale só no Pester (F5b).
+
+### Decisões
+- [ADR 0015](../decisions/0015-atualizar-pelo-app.md):
+  - instalador silencioso (e não o `update.ps1`), escolhido com o usuário;
+  - estado no banco: o backend grava `running` e o CLI grava o resultado;
+  - cache em memória só da resposta do GitHub;
+  - o "Recarregar" do PWA continua sendo o último passo.
+- Desenho do aviso escolhido com o usuário: chip na topbar + faixa no celular + Dialog/Sheet (Desvios F5c em `docs/design`).
+- `UPDATE_RELEASES_URL` (só ensaio) e `-InstallerPath` do `AppUpdate`, para ensaiar sem publicar release.
+
+### Pegadinhas
+- **O backend guarda a lista de releases por 6 h.** Uma release recém-publicada pode demorar a aparecer, e no ensaio é preciso reiniciar o serviço depois de mudar o `releases.json`.
+- **Cada atualização recria as tarefas** (o instalador as registra de novo): ajustes feitos à mão na tarefa (como o `-InstallerPath` do ensaio) somem.
+- **`New-ScheduledTaskPrincipal` com SID** (`S-1-5-18`, `S-1-5-32-545`) vira o nome localizado ("SISTEMA", "Usuários"). Nos testes, compare `LogonType`/`RunLevel`, e não o nome.
+- **Pester 5 não está no Windows PowerShell do PC** (só o 3.4). Para rodar local sem instalar no perfil: baixe o `.nupkg` da PowerShell Gallery para uma pasta temporária e importe o `Pester.psd1` dela.
+- **`python -m json.tool` no Git Bash** mostra acentos corrompidos (lê o stdin como cp1252). Os bytes da API estão certos.
+- **Barras invertidas em scripts Python gerados pelo Bash tool**: sequências como `\a` e `\S` viraram escape do Python (um `\a` virou o byte BEL num `.md`). Para caminhos Windows, use `chr(92)`, e procure bytes de controle (o Pester já faz isso em `deploy/`).
+- **Prioridade dos estados no app**: "atualizado agora há pouco" não pode esconder uma versão mais nova (bug achado no ensaio e corrigido).

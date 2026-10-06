@@ -7,7 +7,7 @@ o runner e se publicam os eventos.
 import logging
 import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.db.models import ExportModel, JobModel, SessionModel
@@ -26,6 +26,7 @@ from app.pipeline.queue import JobRunner
 from app.schemas.jobs import JobOut
 from app.services.events import EventPublisher, build_job_out
 from app.services.sessions import SessionService
+from app.services.update_guard import ensure_not_updating
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,17 @@ class JobService:
         self.runner = runner
 
     # --- leitura -----------------------------------------------------------
+
+    def count_active(self) -> int:
+        """Jobs na fila ou rodando (processamento e export)."""
+        return (
+            self.db.scalar(
+                select(func.count())
+                .select_from(JobModel)
+                .where(JobModel.state.in_(ACTIVE_JOB_STATES))
+            )
+            or 0
+        )
 
     def list(self) -> list[JobOut]:
         """Em execução, depois a fila por chegada, depois os encerrados mais recentes."""
@@ -174,6 +186,7 @@ class JobService:
     # --- internos ----------------------------------------------------------
 
     def _enqueue(self, session_id: uuid.UUID, *, from_states: tuple[SessionState, ...]) -> JobOut:
+        ensure_not_updating(self.db)
         # Condicional no estado: duas chamadas simultâneas não criam dois jobs.
         moved = self.db.scalar(
             update(SessionModel)

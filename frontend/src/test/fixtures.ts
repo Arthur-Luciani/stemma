@@ -6,6 +6,8 @@ import type {
   Session,
   SessionList,
   SessionState,
+  SystemUpdate,
+  UpdateRun,
 } from '../api/types';
 
 let seq = 0;
@@ -128,6 +130,35 @@ export function makeExport(overrides: Partial<Export> = {}): Export {
     file_name: 'Green Day - Basket Case (Original).mp3',
     created_at: new Date().toISOString(),
     finished_at: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+/** `GET /api/system/update` sem versão nova (o padrão do servidor de teste). */
+export function makeSystemUpdate(overrides: Partial<SystemUpdate> = {}): SystemUpdate {
+  return {
+    current_version: '1.5.0',
+    check: 'ok',
+    checked_at: '2026-10-06T18:00:00Z',
+    latest_version: '1.5.0',
+    available: false,
+    notes: [],
+    can_update: true,
+    active_jobs: 0,
+    last_run: null,
+    ...overrides,
+  };
+}
+
+export function makeUpdateRun(overrides: Partial<UpdateRun> = {}): UpdateRun {
+  return {
+    id: 1,
+    from_version: '1.5.0',
+    target_version: '1.5.1',
+    state: 'running',
+    message: null,
+    created_at: '2026-10-06T18:00:00Z',
+    finished_at: null,
     ...overrides,
   };
 }

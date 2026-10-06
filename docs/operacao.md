@@ -34,6 +34,21 @@ Para testar o rollback: `Stemma-Setup-vX.Y.Z.exe /SIMULATEFAILURE` (a checagem d
 
 No celular, o app avisa "Nova versão disponível" com o botão **Recarregar**.
 
+### Atualizar pelo app (sem ir ao PC)
+
+Quando sai uma release nova (com o instalador já anexado), o app mostra **"vX.Y.Z disponível"**: um chip na topbar do desktop ou uma faixa no topo do Descobrir e da Biblioteca no celular. **Ver** abre a versão atual → nova, as novidades e o botão **Atualizar** (ADR 0015):
+
+- o backend roda a tarefa agendada `\Stemma\Atualizar` (SYSTEM), que baixa o `Stemma-Setup-vX.Y.Z.exe` da Release, confere o SHA256 e o roda em modo silencioso. É a mesma atualização de rodar o `.exe` à mão, com backup e rollback;
+- o app fica fora do ar por ~1 min, mostra "Atualizando…" e volta sozinho. Depois aparece o "Recarregar" do PWA;
+- se falhar, o app mostra o motivo e a versão anterior continua no ar;
+- não começa com música sendo processada ou exportada (o botão fica desabilitado);
+- a consulta ao GitHub tem cache de 6 h no servidor: uma release nova pode levar até 6 h para aparecer (ou reinicie o serviço);
+- as tarefas (`Atualizar` e `Bandeja`, que reabre o ícone da bandeja) são criadas pelo instalador. Uma instalação anterior à F5c ganha as tarefas no próximo `.exe` rodado à mão.
+
+Linha de comando do instalador usada pela tarefa: `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOTRAY /RESULTFILE=<arq> /LOG=<arq>`. O código de saída é 1 na falha.
+
+Ensaio sem publicar release (como foi feito na F5c): `UPDATE_RELEASES_URL=file:///C:/…/releases.json` no `.env` (lista no formato da API do GitHub) e `-InstallerPath <exe>` (com `-SimulateFailure`, se for o caso) nos argumentos da tarefa.
+
 ## Ícone na bandeja, parar e iniciar
 
 O Stemma fica sempre no ar, como o Tailscale: um **serviço do Windows** sobe com o Windows (início automático atrasado, mesmo sem login) e reinicia sozinho se cair (10 s, 30 s, depois a cada 60 s). Ocioso, usa ~250 MB de RAM e nada de CPU/GPU; a GPU só trabalha durante uma separação.
@@ -92,12 +107,15 @@ C:\stemma\
   cache\uv\             cache do uv (no mesmo volume dos venvs, para o hardlink)
   setup\                Stemma.exe (ícone da bandeja), desinstalador, motor (engine\setup.ps1 + StemmaDeploy.psm1), pacote, QR
   winsw\                stemma.exe (WinSW 2.12) + stemma.xml
-  logs\                 serviço (stemma.out.log / stemma.err.log, rotação) e setup-*.log do instalador
+  logs\                 serviço (stemma.out.log / stemma.err.log, rotação), setup-*.log do instalador,
+                        update-vX.Y.Z.log (instalador rodado pelo app) e app-update-result.txt
+  downloads\            instalador baixado pela atualização pelo app
 D:\stemma-data\         STORAGE_ROOT: banco, stems, exports, cache do torch
   backups\              backups do banco feitos antes de cada atualização
 ```
 
 - O serviço `stemma` roda como **LocalSystem** (não pede senha) e executa `current\deploy\start.ps1`: põe `tools\` no `PATH`, carrega o `.env`, aplica as migrations e sobe o uvicorn (1 worker) em `127.0.0.1:<porta>`, servindo também o `frontend\dist` da versão.
+- Tarefas agendadas `\Stemma\Atualizar` (SYSTEM, sob demanda) e `\Stemma\Bandeja` (grupo Usuários): atualização pelo app. O `.env` aponta para a primeira em `UPDATE_TASK`.
 - Acesso de fora só pelo `tailscale serve`: `https://<pc>.<tailnet>.ts.net` → `http://127.0.0.1:<porta>`.
 
 ## Voltar versão (rollback manual)
@@ -131,6 +149,8 @@ Se o download falhar com "YouTube pediu login. Atualize os cookies.":
 ```powershell
 Get-Content C:\stemma\logs\stemma.err.log -Tail 50 -Wait   # o log do app vai para o stderr
 Get-ChildItem C:\stemma\logs\setup-*.log                   # cada execução do instalador
+Get-Content C:\stemma\logs\app-update-result.txt          # resultado da última atualização pelo app
+Get-ScheduledTask -TaskPath '\Stemma\'                    # tarefas da atualização pelo app
 Get-Service stemma
 Invoke-RestMethod http://127.0.0.1:8000/health
 tailscale serve status

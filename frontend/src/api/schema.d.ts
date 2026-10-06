@@ -263,6 +263,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Update */
+        get: operations["get_update_api_system_update_get"];
+        put?: never;
+        /** Start Update */
+        post: operations["start_update_api_system_update_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -515,6 +533,20 @@ export interface components {
             /** Updated At */
             updated_at: string | null;
         };
+        /** ReleaseNotes */
+        ReleaseNotes: {
+            /** Sections */
+            sections: components["schemas"]["ReleaseNotesSection"][];
+            /** Version */
+            version: string;
+        };
+        /** ReleaseNotesSection */
+        ReleaseNotesSection: {
+            /** Items */
+            items: string[];
+            /** Title */
+            title: string;
+        };
         /** SearchOut */
         SearchOut: {
             /** Items */
@@ -705,6 +737,57 @@ export interface components {
              */
             volume: number;
         };
+        /** SystemUpdateOut */
+        SystemUpdateOut: {
+            /** Active Jobs */
+            active_jobs: number;
+            /** Available */
+            available: boolean;
+            /** Can Update */
+            can_update: boolean;
+            /**
+             * Check
+             * @enum {string}
+             */
+            check: "ok" | "unavailable";
+            /** Checked At */
+            checked_at: string | null;
+            /** Current Version */
+            current_version: string;
+            last_run: components["schemas"]["UpdateRunOut"] | null;
+            /** Latest Version */
+            latest_version: string | null;
+            /** Notes */
+            notes: components["schemas"]["ReleaseNotes"][];
+        };
+        /**
+         * UpdateRunOut
+         * @description Uma atualização pedida pelo app.
+         */
+        UpdateRunOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /** From Version */
+            from_version: string;
+            /** Id */
+            id: number;
+            /** Message */
+            message: string | null;
+            state: components["schemas"]["UpdateState"];
+            /** Target Version */
+            target_version: string;
+        };
+        /**
+         * UpdateState
+         * @description Atualização do Stemma disparada pelo app (ADR 0015).
+         * @enum {string}
+         */
+        UpdateState: "running" | "succeeded" | "failed";
     };
     responses: never;
     parameters: never;
@@ -1628,6 +1711,100 @@ export interface operations {
                 };
                 content: {
                     "audio/mpeg": unknown;
+                };
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    get_update_api_system_update_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemUpdateOut"];
+                };
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    start_update_api_system_update_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateRunOut"];
                 };
             };
             /** @description Não encontrado */

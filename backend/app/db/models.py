@@ -16,6 +16,7 @@ from app.domain.enums import (
     JobState,
     MixPreset,
     SessionState,
+    UpdateState,
 )
 
 NAMING_CONVENTION = {
@@ -162,3 +163,18 @@ class MixStateModel(Base):
     loop_a_s: Mapped[float | None]
     loop_b_s: Mapped[float | None]
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class SystemUpdateModel(Base):
+    """Atualização do Stemma pedida pelo app (ADR 0015). O backend grava `running`; o CLI,
+    rodado pela tarefa agendada no fim, grava o resultado."""
+
+    __tablename__ = "system_updates"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    from_version: Mapped[str] = mapped_column(String(32))
+    target_version: Mapped[str] = mapped_column(String(32))
+    state: Mapped[UpdateState] = mapped_column(_enum(UpdateState), default=UpdateState.RUNNING)
+    message: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

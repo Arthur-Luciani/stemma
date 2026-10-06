@@ -108,3 +108,11 @@ class SessionSort(StrEnum):
     ARTIST = "artist"
     LONGEST = "longest"
     SHORTEST = "shortest"
+
+
+class UpdateState(StrEnum):
+    """Atualização do Stemma disparada pelo app (ADR 0015)."""
+
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"

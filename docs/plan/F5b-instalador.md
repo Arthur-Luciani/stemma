@@ -11,6 +11,7 @@ Instalar e atualizar o Stemma no PC por um **instalador `.exe`**, sem rodar scri
 ## Antes de começar
 1. **Verificar o risco principal**: o torch enxerga a GPU (CUDA) num processo rodando como LocalSystem? Teste rápido com `psexec -s` ou com um serviço WinSW temporário rodando `python -c "import torch; print(torch.cuda.is_available())"`. Se **não** funcionar, pare e leve ao usuário (alternativa: conta de serviço virtual `NT SERVICE\stemma`, ou voltar à conta do usuário).
 2. Ler o Handoff da [F5](F5-runtime-pwa.md) (pegadinhas do PowerShell 5.1: stderr de nativos, BOM, Pester) e o [docs/operacao.md](../operacao.md).
+3. **Estado do PC em 2026-10-06**: o celular já tem o PWA instalado na origem de produção (`https://desktop-arthur.tail301d2c.ts.net`, porta 443). Ele foi servido por um backend temporário do repo (porta 8000, `SERVE_FRONTEND_DIR`), e ícone, splash e "sem seleção ao segurar" foram conferidos assim. O `tailscale serve` da 443 → `127.0.0.1:8000` pode ter ficado configurado. O instalador assume a 443 (confira com `tailscale serve status`). A conferência do critério de pronto continua sendo pelo instalador.
 
 ## Escopo
 - **Instalador com Inno Setup 6**, gerado no CI (`release.yml`, job em `windows-latest`) e anexado à GitHub Release como `Stemma-Setup-vX.Y.Z.exe` + `.sha256`. Sem assinatura de código (aviso do SmartScreen documentado).

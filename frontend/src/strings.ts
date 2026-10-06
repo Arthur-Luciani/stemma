@@ -11,6 +11,31 @@ export const strings = {
   pwa: {
     updateAvailable: 'Nova versão disponível',
   },
+  update: {
+    available: (version: string) => `v${version} disponível`,
+    availableLong: (version: string) => `Stemma v${version} disponível`,
+    view: 'Ver',
+    updating: 'Atualizando…',
+    title: 'Atualizar o Stemma',
+    current: 'Instalada',
+    next: 'Nova',
+    notes: 'Novidades',
+    noNotes: 'A release não trouxe notas.',
+    downtime: 'O Stemma fica fora do ar por ~1 min enquanto atualiza.',
+    confirm: 'Atualizar',
+    later: 'Agora não',
+    jobsActive: (n: number) =>
+      `Há ${plural(n, 'música sendo processada ou exportada', 'músicas sendo processadas ou exportadas')}. Atualize quando terminar.`,
+    notSupported: 'Esta instalação não atualiza pelo app. Rode no PC o instalador da versão nova.',
+    checkFailed: 'Não foi possível verificar se há versão nova agora. Tente mais tarde.',
+    upToDate: (version: string) => `O Stemma está na versão mais recente (v${version}).`,
+    updatingDetail: (version: string) =>
+      `Instalando a v${version}. O app perde a conexão por ~1 min e volta sozinho; pode fechar esta tela.`,
+    updated: (version: string) => `Stemma atualizado para a v${version}.`,
+    updatedHint: 'Toque em Recarregar no aviso de nova versão para abrir a versão nova.',
+    failed: 'Não deu certo',
+    stillRunning: (version: string) => `A v${version} continua no ar.`,
+  },
   nav: {
     label: 'Navegação principal',
     discover: 'Descobrir',

@@ -12,6 +12,7 @@ export const queryKeys = {
   mix: (id: string) => ['sessions', 'mix', id] as const,
   exports: (id: string) => ['sessions', 'exports', id] as const,
   jobs: ['jobs'] as const,
+  systemUpdate: ['system', 'update'] as const,
   search: (q: string) => ['search', q] as const,
   artists: (q: string) => ['artists', q] as const,
 };

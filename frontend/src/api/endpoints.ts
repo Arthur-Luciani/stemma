@@ -14,6 +14,8 @@ import type {
   SessionPatch,
   Stem,
   StemPeaks,
+  SystemUpdate,
+  UpdateRun,
 } from './types';
 
 const path = (id: string) => ({ params: { path: { session_id: id } } });
@@ -129,4 +131,14 @@ export function createExport(id: string, format: ExportFormat): Promise<Export> 
 /** URL do arquivo exportado (o backend manda `Content-Disposition` com o nome). */
 export function exportFileUrl(exportId: string): string {
   return `/api/exports/${encodeURIComponent(exportId)}/file`;
+}
+
+/** Versão atual, última release e a última atualização pedida pelo app (ADR 0015). */
+export function getSystemUpdate(signal?: AbortSignal): Promise<SystemUpdate> {
+  return call(() => apiClient.GET('/api/system/update', { signal }));
+}
+
+/** Dispara a atualização (responde na hora; o servidor sai do ar por ~1 min). */
+export function startSystemUpdate(): Promise<UpdateRun> {
+  return call(() => apiClient.POST('/api/system/update'));
 }

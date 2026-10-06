@@ -1,5 +1,6 @@
 import { NavLink, useMatch } from 'react-router';
 
+import { UpdateChip } from '../features/update/UpdateNotice';
 import { mixPath } from '../lib/session';
 import { strings } from '../strings';
 import { cx } from '../ui/cx';
@@ -47,7 +48,10 @@ function Logo() {
   );
 }
 
-/** Topbar do desktop (60px): logo + Descobrir · Biblioteca · Mixer; à direita, "Abrir no celular". */
+/**
+ * Topbar do desktop (60px): logo + Descobrir · Biblioteca · Mixer; à direita, o aviso de versão
+ * nova do Stemma e "Abrir no celular".
+ */
 export function Topbar() {
   const destinations = useDestinations();
   return (
@@ -68,6 +72,7 @@ export function Topbar() {
         ))}
       </nav>
       <div className={styles.topActions}>
+        <UpdateChip />
         <OpenOnPhone />
       </div>
     </header>

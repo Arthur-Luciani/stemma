@@ -51,7 +51,12 @@ Instalar e atualizar o Stemma no PC por um **instalador `.exe`**, sem rodar scri
 No PC (sem nada do Stemma instalado): baixar `Stemma-Setup-vX.Y.Z.exe` da GitHub Release, instalar pelo assistente (**sem baixar o torch de novo**, porque ele já está no cache do usuário) e abrir o endereço do QR code no celular. Publicar a release seguinte e rodar o instalador novo: o `/health` mostra a versão nova sem passo manual. Simular falha na atualização e ver o rollback (`-SimulateFailure` exposto como parâmetro de linha de comando do instalador, só para teste). App instalado na tela inicial do celular com ícone e splash corretos e sem seleção de texto ao segurar. CI verde.
 
 ## Handoff
-**Status:** implementação no PR da F5b. O **ensaio local** passou por inteiro, com instaladores compilados aqui numa instalação paralela (`C:\stemma-ensaio`, porta 8001). Fica pendente o **critério de pronto real**: instalar pelo `.exe` da GitHub Release e atualizar para a release seguinte. Isso só pode ser feito depois do merge e da release.
+**Status:** PR #21 mergeado em 2026-10-06; release **v1.4.0** com `Stemma-Setup-v1.4.0.exe`, gerado e anexado pelo `release.yml` na primeira tentativa. **Instalado de verdade no PC pelo `.exe` da Release**:
+- ~8 min no total, sem baixar o torch (venv do cache em 7,7 s);
+- `/health` 1.4.0 com `gpu ok`;
+- 443 publicada.
+
+Do critério de pronto, falta a **atualização para a v1.4.1** (com `/SIMULATEFAILURE` e depois normal). A v1.4.1 sai do PR `fix:` das portas (ver Pendente).
 
 ### Feito
 - **Pré-checagem**: o torch enxerga a GPU como SYSTEM (`2.7.1+cu118 True GTX 1650`, tarefa agendada temporária).
@@ -104,11 +109,29 @@ No PC (sem nada do Stemma instalado): baixar `Stemma-Setup-vX.Y.Z.exe` da GitHub
   - marcador vazio.
 
 ### Pendente
-- **Critério de pronto real** (depois do merge e da release v1.4.0):
-  1. **Remover o ensaio**: Configurações → Aplicativos → "Stemma (stemma-ensaio)" → Desinstalar, apagando também `D:\stemma-ensaio-data`. Isso libera a 443.
-  2. Baixar `Stemma-Setup-v1.4.0.exe` da Release e instalar em `C:\stemma`. Conferir "Componentes encontrados no PC" no log, QR no celular e PWA.
-  3. Um `fix:` gera a v1.4.1: rodar o instalador novo com `/SIMULATEFAILURE` (volta para a 1.4.0) e depois normal (`/health` 1.4.1).
-- Medir quanto a proteção das pastas acrescenta à primeira instalação: o `icacls` percorre ~230 mil arquivos do cache.
+- **Resto do critério de pronto** (depois do PR `fix:` das portas e da release v1.4.1):
+  1. **Remover o ensaio**: Configurações → Aplicativos → "Stemma (stemma-ensaio)" → Desinstalar, respondendo **Não** para apagar os dados. `D:\stemma-ensaio-data` tem 2 sessões do usuário, criadas nos testes de hoje. O desinstalador do ensaio é anterior à correção e **desliga a 443**; o passo 3 a republica.
+  2. `Stemma-Setup-v1.4.1.exe /SIMULATEFAILURE`: rollback para a 1.4.0, com a 1.4.0 no ar.
+  3. `Stemma-Setup-v1.4.1.exe` normal: `/health` 1.4.1, 443 republicada, PWA no celular atualiza.
+- **PR `fix:` das portas** (bugs achados na instalação real; decidido com o usuário):
+  1. A tela da porta recusa uma porta em uso ou reservada pelo Windows e sugere a próxima livre. Na instalação real, o usuário digitou 8001 (a do ensaio), e as duas instalações ficaram na mesma porta.
+  2. Antes de publicar na 443, conferir se ela já serve outro app: perguntar se pode substituir ou usar a 8443.
+  3. O desinstalador só desliga a 443 se ela apontar para a porta da própria instalação. Hoje, desinstalar o ensaio derruba a 443 da instalação real.
+  4. Seção "Portas" no `docs/operacao.md`.
+- **UX do instalador** (pedido do usuário depois da instalação real: "bem lento e fica meio cego"):
+  - **Otimizar**: a proteção das pastas é o gargalo, ~4–5 min de `icacls` sobre os ~230 mil arquivos do cache ligados por hardlink. Ideias:
+    - aplicar a ACL no próprio seeder (C#), arquivo a arquivo, ao ligar;
+    - semear só os buckets que o uv usa (`archive-v0`, `wheels-v6`) e não os formatos antigos;
+    - pular os arquivos que já herdam certo.
+  - **Prever o tamanho necessário** antes de começar: ferramentas ~300 MB; pacotes ~3 GB se não houver cache; dados por música.
+  - **Etapas numeradas** ("Etapa 3 de 9: …").
+  - **Percentual de conclusão**: barra com peso por etapa, e contagem nas etapas longas (seeder, `icacls`, download).
+  - Tempos medidos na instalação real (2026-10-06):
+    - ferramentas + Python: ~1 min;
+    - ligação do cache: ~1 min;
+    - **proteção das pastas: ~4–5 min**;
+    - ambiente da versão: ~10 s;
+    - banco, serviço, `/health` e Tailscale: ~1 min.
 - Ramos do Tailscale "não instalado", "sem login" e "sem HTTPS": validados só pelo Pester do parser. O PC já tinha o Tailscale logado.
 - Herdados: medição do AudioEngine no Android (F4a), branch protection (F0), iPhone (F5).
 
@@ -123,6 +146,8 @@ No PC (sem nada do Stemma instalado): baixar `Stemma-Setup-vX.Y.Z.exe` da GitHub
 - **`uv python install` sem `--no-bin --no-registry`** escreve no perfil do usuário (`~\.local\bin`, `HKCU\Software\Python\Astral`). Aconteceu no primeiro ensaio; a chave foi apagada à mão.
 - **`icacls ... /T` com `(OI)(CI)` aplicado a arquivos deixa o arquivo sem nenhuma permissão.** O certo é: proteger a pasta (sem `/T`), depois `pasta\* /reset /T`, depois `/setowner /T`.
 - **Python escrevendo arquivos com `\b`/`\t` dentro de strings normais** gerou bytes de controle em workflow e script. O Pester agora acusa.
+- **Instalar de novo com outra pasta de dados "some" com as sessões**: elas continuam na pasta antiga. Na instalação real, o banco novo em `D:\stemma-data` veio vazio; as sessões estavam em `D:\stemma-ensaio-data` (ensaio) e `C:\git\stemma\storage` (dev). Atualizar nunca troca a pasta: ela vem do `.env`.
+- **Duas instalações na mesma porta**: o serviço que sobe depois não escuta, e o `/health` de quem instalou pode responder pelo outro. Na tela da porta, use uma livre (o PR `fix:` das portas passa a conferir).
 - **`[IO.Path]::GetFullPath('D:')`** devolve o diretório atual do drive D, e não `D:\`. Aqui passava por acaso; no runner (checkout em `D:\a\…`) não. Trate `X:` à parte.
 - **`"$var:"` no PowerShell** é variável com escopo (`$var:texto`). Use `"$($var):"`.
 - **Inno**: uma linha do `[Code]` que começa com `#` (ex.: `#13#10`) é lida como diretiva do pré-processador. `AppId` com `{code:}` exige `UsePreviousLanguage=no`.

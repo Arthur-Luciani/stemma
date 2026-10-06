@@ -1,7 +1,11 @@
 import { apiClient, call, toApiError } from './client';
 import type {
   Artist,
+  Export,
+  ExportFormat,
   Job,
+  MixState,
+  MixStateIn,
   SearchResult,
   Session,
   SessionCreate,
@@ -91,4 +95,31 @@ export async function getPeaks(id: string, stem: Stem, signal?: AbortSignal): Pr
   );
   if (!isStemPeaks(data)) throw toApiError(200, data);
   return data;
+}
+
+export function getMix(id: string, signal?: AbortSignal): Promise<MixState> {
+  return call(() => apiClient.GET('/api/sessions/{session_id}/mix', { ...path(id), signal }));
+}
+
+export function saveMix(id: string, body: MixStateIn): Promise<MixState> {
+  return call(() => apiClient.PUT('/api/sessions/{session_id}/mix', { ...path(id), body }));
+}
+
+export async function listExports(id: string, signal?: AbortSignal): Promise<Export[]> {
+  const data = await call(() =>
+    apiClient.GET('/api/sessions/{session_id}/exports', { ...path(id), signal }),
+  );
+  return data.items;
+}
+
+/** Sem `stems`, o backend usa o mix salvo: salve antes de pedir. */
+export function createExport(id: string, format: ExportFormat): Promise<Export> {
+  return call(() =>
+    apiClient.POST('/api/sessions/{session_id}/exports', { ...path(id), body: { format } }),
+  );
+}
+
+/** URL do arquivo exportado (o backend manda `Content-Disposition` com o nome). */
+export function exportFileUrl(exportId: string): string {
+  return `/api/exports/${encodeURIComponent(exportId)}/file`;
 }

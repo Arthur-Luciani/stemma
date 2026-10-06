@@ -27,13 +27,13 @@ PWA, serviço, update (F5).
 - [x] presets + Personalizado
 - [x] persistência do mix
 - [x] export + download
-- [ ] conferido no celular real e no desktop (desktop: capturas + export real pela API; falta a conferência do usuário, ver "Pendente")
+- [x] conferido no celular real e no desktop (pelo usuário, em 2026-10-05, depois de duas rodadas de correção)
 
 ## Critério de pronto
 No celular e no desktop: abrir uma sessão, mixar, usar loop A–B, aplicar preset, recarregar a página e encontrar o mix salvo, exportar MP3 e baixar; CI verde.
 
 ## Handoff
-**Status:** PR #14 aberto (2026-10-05). Falta a conferência no celular real e no desktop, que é sua (ver "Pendente").
+**Status:** concluída — PR #14 (mergeado em 2026-10-05), com critério de pronto conferido pelo usuário no celular (em pé e deitado) e no desktop.
 
 ### Feito
 - **Rota `/sessions/:id/mix`** (`features/mixer/MixerPage.tsx`) no lugar do placeholder da F3. Sessão que não está pronta mostra um estado vazio com "Abrir sessão".
@@ -64,9 +64,7 @@ No celular e no desktop: abrir uma sessão, mixar, usar loop A–B, aplicar pres
   - export MP3 pela API: `PUT /mix` (Sem voz) → `POST /exports` → `done` em ~10 s, 9,8 MB, −15,2 LUFS, download com `Content-Disposition` "Survivor - Eye Of The Tiger (Sem voz).mp3". Depois o mix da ST-002 voltou ao Original.
 
 ### Pendente
-- **Conferência no celular real** (critério de pronto) via Tailscale: abrir uma sessão, mixar no 1e, marcar loop arrastando no 1f, aplicar preset, girar para paisagem, recarregar e achar o mix, exportar MP3 e baixar.
-- **Medição do AudioEngine no Android** (herdada da F4a): `/dev/engine`, 3+ min com tela bloqueada e troca de aba, colar o JSON no Handoff da F4a.
-- **Conferência no desktop** com mouse e ouvido: atalhos, arrastar nas lanes, popover de export e download pelo navegador.
+- **Medição numérica do AudioEngine no Android** (herdada da F4a): não foi feita. O mixer foi conferido no celular sem problema de sincronia relatado. Se um dia aparecer "flam" entre os stems no celular, rode `/dev/engine` (3+ min, com tela bloqueada e troca de aba) e cole o JSON no Handoff da F4a.
 - iPhone: sem aparelho.
 - Herdado: branch protection (F0).
 

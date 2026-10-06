@@ -139,6 +139,24 @@ Describe 'Pacote local' {
     }
 }
 
+Describe 'Invoke-Native' {
+    BeforeAll {
+        function Invoke-Shell([string]$Script) {
+            if ([Environment]::OSVersion.Platform -eq 'Win32NT') { Invoke-Native -FilePath 'cmd.exe' -Arguments @('/c', $Script) }
+            else { Invoke-Native -FilePath 'sh' -Arguments @('-c', $Script) }
+        }
+    }
+
+    It 'stderr com exit 0 não derruba o script (log do uv/alembic)' {
+        $ErrorActionPreference = 'Stop'
+        { Invoke-Shell 'echo log-no-stderr 1>&2' 6>$null } | Should -Not -Throw
+    }
+
+    It 'exit code diferente de 0 falha' {
+        { Invoke-Shell 'exit 3' } | Should -Throw '*código 3*'
+    }
+}
+
 Describe 'ConvertFrom-AlembicHeads' {
     It 'pega a revisão head' {
         ConvertFrom-AlembicHeads @('INFO  [alembic] algo', 'a1b2c3d4e5f6 (head)') | Should -Be 'a1b2c3d4e5f6'

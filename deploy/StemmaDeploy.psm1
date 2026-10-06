@@ -196,14 +196,25 @@ function Expand-StemmaPackage {
 # --- Python da release ---------------------------------------------------------
 
 function Invoke-Native {
-    <# Roda um executável e falha se o exit code não for 0. #>
+    <#
+      Roda um executável, mostra a saída (stdout e stderr) no console e falha se o exit code
+      não for 0. No 5.1, com a saída redirecionada (serviço), cada linha de stderr vira um
+      ErrorRecord; com ErrorActionPreference=Stop isso derrubaria o script por um simples log
+      (uv, alembic e uvicorn escrevem no stderr). Por isso só o exit code decide.
+    #>
     param([Parameter(Mandatory)][string]$FilePath, [string[]]$Arguments = @(), [string]$WorkingDirectory)
     if ($WorkingDirectory) { Push-Location -LiteralPath $WorkingDirectory }
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     try {
-        & $FilePath @Arguments
-        if ($LASTEXITCODE -ne 0) { throw "'$([IO.Path]::GetFileName($FilePath)) $($Arguments -join ' ')' falhou (código $LASTEXITCODE)." }
+        & $FilePath @Arguments 2>&1 | ForEach-Object { "$_" } | Out-Host
+        $code = $LASTEXITCODE
     }
-    finally { if ($WorkingDirectory) { Pop-Location } }
+    finally {
+        $ErrorActionPreference = $previous
+        if ($WorkingDirectory) { Pop-Location }
+    }
+    if ($code -ne 0) { throw "'$([IO.Path]::GetFileName($FilePath)) $($Arguments -join ' ')' falhou (código $code)." }
 }
 
 function Get-ReleasePython([string]$ReleaseDir) {
@@ -229,10 +240,16 @@ function Get-AlembicHead {
     param([Parameter(Mandatory)][string]$ReleaseDir)
     Push-Location -LiteralPath (Join-Path $ReleaseDir 'backend')
     try {
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
         $output = & (Get-ReleasePython $ReleaseDir) -m alembic heads 2>$null
-        if ($LASTEXITCODE -ne 0) { throw "alembic heads falhou em $ReleaseDir." }
+        $code = $LASTEXITCODE
     }
-    finally { Pop-Location }
+    finally {
+        $ErrorActionPreference = $previous
+        Pop-Location
+    }
+    if ($code -ne 0) { throw "alembic heads falhou em $ReleaseDir." }
     return ConvertFrom-AlembicHeads $output
 }
 

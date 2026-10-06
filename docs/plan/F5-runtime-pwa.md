@@ -17,15 +17,18 @@ Stemma rodando como serviço no PC, acessível pelo celular via HTTPS, instaláv
 Novas funcionalidades.
 
 ## Checklist
-- [ ] SPA servida pelo FastAPI com cache correto
-- [ ] WinSW + start.ps1 + install.ps1
-- [ ] update.ps1 com backup, migration e rollback
-- [ ] tailscale serve configurado e documentado
-- [ ] PWA instalável no Android e iPhone
-- [ ] docs/operacao.md com smoke checklist
+- [x] SPA servida pelo FastAPI com cache correto
+- [x] WinSW + start.ps1 + install.ps1 (ensaio real no PC depende da release)
+- [x] update.ps1 com backup, migration e rollback (ensaio real no PC depende da release)
+- [x] tailscale serve configurado (pelo install.ps1) e documentado
+- [ ] PWA instalável no Android (sem erros de instalabilidade no Edge; falta instalar no celular) — iPhone sem aparelho
+- [x] docs/operacao.md com smoke checklist
+- [x] Modo app no PWA instalado: sem seleção/menu ao segurar, sem pinch zoom (pedido do usuário na sessão)
 
 ## Critério de pronto
-Instalar a **v1.0.0** a partir do zip da GitHub Release com `install.ps1`; publicar **v1.0.1**; rodar `update.ps1` e ver a nova versão no `/health` sem passo manual; simular falha e ver o rollback; app instalado na tela inicial do celular abrindo via `https://<pc>.<tailnet>.ts.net`.
+Instalar a **primeira release com `deploy/`** (a da F5; as releases até a v1.2.0 não têm `deploy/` no zip) a partir do zip da GitHub Release com `install.ps1`; publicar a **release seguinte**; rodar `update.ps1` e ver a nova versão no `/health` sem passo manual; simular falha (`-SimulateFailure`) e ver o rollback; app instalado na tela inicial do celular abrindo via `https://<pc>.<tailnet>.ts.net`.
+
+_Critério reescrito com o usuário em 2026-10-06 (antes: v1.0.0 → v1.0.1)._
 
 ## Handoff
 _Preencher ao final da sessão._

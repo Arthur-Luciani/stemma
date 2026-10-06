@@ -25,7 +25,7 @@ AppPublisherURL=https://github.com/Arthur-Luciani/stemma
 DefaultDirName={code:GetRoot}\setup
 DisableDirPage=yes
 DisableProgramGroupPage=yes
-DisableReadyPage=yes
+DisableReadyPage=no
 UsePreviousAppDir=no
 UsePreviousLanguage=no
 PrivilegesRequired=admin
@@ -45,7 +45,9 @@ CloseApplications=no
 Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
 
 [Messages]
-brazilianportuguese.WelcomeLabel2=Vamos instalar o Stemma {#AppVersion} neste PC.%n%nO Stemma roda como um serviço do Windows e fica acessível no celular pelo Tailscale. Na primeira vez são baixados alguns componentes (até ~3 GB, se ainda não estiverem no PC).
+brazilianportuguese.WelcomeLabel2=Vamos instalar o Stemma {#AppVersion} neste PC.%n%nO Stemma roda como um serviço do Windows e fica acessível no celular pelo Tailscale.%n%nLeva uns 3 minutos se os componentes (torch e companhia) já estiverem neste PC. Se não estiverem, some o tempo de baixar ~3 GB. Antes de começar, o assistente mostra quanto vai baixar e o espaço necessário.
+brazilianportuguese.ReadyLabel1=Tudo pronto para começar.
+brazilianportuguese.ReadyLabel2b=Confira o que vai ser feito e clique em Instalar.
 
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\payload"
@@ -63,6 +65,8 @@ Source: "{#PayloadDir}\Stemma.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; Cópias para a checagem antes de instalar (extraídas em {tmp}).
 Source: "..\deploy\setup.ps1"; Flags: dontcopy
 Source: "..\deploy\StemmaDeploy.psm1"; Flags: dontcopy
+; uv.lock da release (build.ps1): estimativa de download e espaço na tela "Pronto para instalar".
+Source: "{#PayloadDir}\uv.lock"; Flags: dontcopy
 
 [Icons]
 ; Menu Iniciar: abre o navegador (e põe o ícone na bandeja, se não estiver). No login: só o ícone.
@@ -79,7 +83,6 @@ Type: dirifempty; Name: "{app}\.."
 [Code]
 var
   DataPage: TInputDirWizardPage;
-  PortPage: TInputQueryWizardPage;
   TailscalePage: TWizardPage;
   TsStatus: TNewStaticText;
   TsAction: TNewButton;
@@ -90,8 +93,13 @@ var
   { Resultado do motor (linhas ##RESULT). }
   Installed, HasService, CheckPort, CheckDataRoot, TsState, TsHost, Gpu: String;
   FreePort, PortUse, Serve443, Serve8443, Serve443State, Serve8443State: String;
-  { Porta HTTPS do Tailscale escolhida (443, ou 8443 se a 443 publica outro app). }
-  HttpsPort: Integer;
+  { Estimativa (modo Check com -LockPath), em MB. }
+  DownloadMB, NeedRootMB: String;
+  { Progresso da instalação: etapa ("Etapa 3 de 9: …") e avanço de 0 a 1000. }
+  StageText: String;
+  ProgressValue: Integer;
+  { Porta local, escolhida sozinha (a primeira livre a partir da 8000; /PORT= para forçar). }
+  LocalPort: String;
   ResultUrl, ResultQr, ResultVersion, ResultLog, ErrorText, LastStep: String;
   Succeeded: Boolean;
 
@@ -204,8 +212,14 @@ begin
     else if Key = 'url' then ResultUrl := Value
     else if Key = 'qr' then ResultQr := Value
     else if Key = 'version' then ResultVersion := Value
-    else if Key = 'log' then ResultLog := Value;
+    else if Key = 'log' then ResultLog := Value
+    else if Key = 'downloadmb' then DownloadMB := Value
+    else if Key = 'needrootmb' then NeedRootMB := Value;
   end
+  else if Pos('##STAGE ', Line) = 1 then
+    StageText := Copy(Line, 9, Length(Line))
+  else if Pos('##PROGRESS ', Line) = 1 then
+    ProgressValue := StrToIntDef(Copy(Line, 12, Length(Line)), ProgressValue)
   else if Pos('##ERROR ', Line) = 1 then
     ErrorText := Copy(Line, 9, Length(Line))
   else if Pos('==> ', Line) = 1 then
@@ -217,6 +231,12 @@ begin
   ExtractTemporaryFile('setup.ps1');
   ExtractTemporaryFile('StemmaDeploy.psm1');
   Result := ExpandConstant('{tmp}\setup.ps1');
+end;
+
+function TempLock: String;
+begin
+  ExtractTemporaryFile('uv.lock');
+  Result := ExpandConstant('{tmp}\uv.lock');
 end;
 
 { Roda um modo rápido do motor e lê as linhas ##RESULT. }
@@ -235,14 +255,24 @@ begin
   end;
 end;
 
-{ Instalação/atualização: o texto de cada etapa vai para a tela de progresso. }
+{ Instalação/atualização: a etapa numerada em cima, o detalhe (passo ou saída) embaixo e a barra
+  com o avanço total. }
 procedure OnEngineLog(const S: String; const Error, FirstLine: Boolean);
+var
+  Line: String;
 begin
   Log(S);
   HandleLine(S);
-  WizardForm.StatusLabel.Caption := LastStep;
-  if (Pos('##', Trim(S)) <> 1) and (Pos('==> ', Trim(S)) <> 1) then
-    WizardForm.FilenameLabel.Caption := Trim(S);
+  Line := Trim(S);
+  if StageText <> '' then
+    WizardForm.StatusLabel.Caption := StageText
+  else
+    WizardForm.StatusLabel.Caption := LastStep;
+  if Pos('==> ', Line) = 1 then
+    WizardForm.FilenameLabel.Caption := LastStep
+  else if (Line <> '') and (Pos('##', Line) <> 1) then
+    WizardForm.FilenameLabel.Caption := Line;
+  WizardForm.ProgressGauge.Position := ProgressValue;
 end;
 
 { --- Tailscale ------------------------------------------------------------------ }
@@ -283,7 +313,7 @@ procedure RefreshTailscale;
 begin
   WizardForm.NextButton.Enabled := False;
   TsStatus.Caption := 'Verificando o Tailscale…';
-  RunEngineQuick('Check', '-Port ' + Trim(PortPage.Values[0]));
+  RunEngineQuick('Check', '-Port ' + LocalPort);
   UpdateTailscalePage;
   WizardForm.NextButton.Enabled := True;
 end;
@@ -332,7 +362,7 @@ end;
 
 procedure InitializeWizard;
 begin
-  RunEngineQuick('Check', '');
+  RunEngineQuick('Check', '-LockPath ' + Quote(TempLock));
   if Gpu <> 'ok' then
     SuppressibleMsgBox('Não achei a GPU NVIDIA (nvidia-smi). O Stemma funciona, mas a separação na CPU é bem mais lenta. Instale o driver da NVIDIA se o PC tiver uma placa.',
       mbInformation, MB_OK, IDOK);
@@ -344,17 +374,26 @@ begin
   DataPage.Add('');
   DataPage.Values[0] := ExpandConstant('{param:DATAROOT|' + CheckDataRoot + '}');
 
-  PortPage := CreateInputQueryPage(DataPage.ID, 'Porta',
-    'Porta local do Stemma neste PC.',
-    'O Tailscale publica o Stemma em HTTPS a partir desta porta. Mude só se a 8000 já estiver em uso.');
-  PortPage.Add('Porta:', False);
-  { Sugestão: a primeira porta livre a partir da 8000 (conferida de novo ao avançar). }
+  { Sem tela de porta (detalhe técnico): a primeira livre a partir da 8000, que o motor confere de
+    novo ao instalar. }
   if FreePort = '' then
     FreePort := '8000';
-  PortPage.Values[0] := ExpandConstant('{param:PORT|' + FreePort + '}');
-  HttpsPort := 443;
+  LocalPort := ExpandConstant('{param:PORT|' + FreePort + '}');
+  { /PORT= (ensaio): só uma porta válida, e o que as portas HTTPS do Tailscale publicam é
+    conferido para ela (o Check inicial olhou a porta livre sugerida). }
+  if (not IsUpdate) and (LocalPort <> FreePort) then
+  begin
+    if (StrToIntDef(LocalPort, 0) < 1024) or (StrToIntDef(LocalPort, 0) > 65535) then
+    begin
+      SuppressibleMsgBox('/PORT=' + LocalPort + ' não é uma porta válida (de 1024 a 65535). Vou usar a ' + FreePort + '.',
+        mbInformation, MB_OK, IDOK);
+      LocalPort := FreePort;
+    end
+    else
+      RunEngineQuick('CheckPort', '-Port ' + LocalPort);
+  end;
 
-  TailscalePage := CreateCustomPage(PortPage.ID, 'Tailscale',
+  TailscalePage := CreateCustomPage(DataPage.ID, 'Tailscale',
     'Acesso pelo celular, com HTTPS, sem abrir portas no roteador.');
   TsStatus := TNewStaticText.Create(TailscalePage);
   TsStatus.Parent := TailscalePage.Surface;
@@ -389,10 +428,33 @@ end;
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := False;
-  if (PageID = DataPage.ID) or (PageID = PortPage.ID) then
+  if PageID = DataPage.ID then
     Result := IsUpdate
   else if PageID = TailscalePage.ID then
-    Result := SkipTailscale or (IsUpdate and (TsState = 'ready'));
+    { Só aparece quando há o que fazer (instalar, entrar, ativar o HTTPS). }
+    Result := SkipTailscale or (TsState = 'ready');
+end;
+
+{ Porta HTTPS do Tailscale: a 443 (endereço sem porta), a não ser que ela já publique outro app;
+  aí a 8443. Nunca tira o endereço de outro app. 0 = as duas ocupadas por outros apps. }
+function ChosenHttpsPort: Integer;
+begin
+  if SkipTailscale or (Serve443State <> 'other') then
+    Result := 443
+  else if Serve8443State <> 'other' then
+    Result := 8443
+  else
+    Result := 0;
+end;
+
+function StemmaAddress: String;
+begin
+  if SkipTailscale then
+    Result := 'http://127.0.0.1:' + LocalPort + ' (só neste PC, sem o Tailscale)'
+  else if ChosenHttpsPort = 443 then
+    Result := 'https://' + TsHost
+  else
+    Result := 'https://' + TsHost + ':' + IntToStr(ChosenHttpsPort);
 end;
 
 procedure ShowFinished; forward;
@@ -401,13 +463,43 @@ procedure CurPageChanged(CurPageID: Integer);
 begin
   if CurPageID = TailscalePage.ID then
     RefreshTailscale
+  else if (CurPageID = wpReady) and IsUpdate then
+    WizardForm.NextButton.Caption := 'Atualizar'
   else if CurPageID = wpFinished then
     ShowFinished;
 end;
 
+{ --- espaço em disco ------------------------------------------------------------ }
+
+function FormatMB(MB: Int64): String;
+begin
+  if MB >= 1024 then
+    Result := IntToStr(MB div 1024) + ',' + IntToStr((MB mod 1024) * 10 div 1024) + ' GB'
+  else
+    Result := IntToStr(MB) + ' MB';
+end;
+
+{ Espaço livre (MB) no drive de um caminho que pode ainda não existir; -1 se não der para saber. }
+function FreeMB(const Path: String): Int64;
+var
+  Free, Total: Int64;
+begin
+  Result := -1;
+  if GetSpaceOnDisk64(AddBackslash(ExtractFileDrive(Path)), Free, Total) then
+    Result := Free div (1024 * 1024);
+end;
+
+function DataRootChoice: String;
+begin
+  if IsUpdate then
+    Result := CheckDataRoot
+  else
+    Result := Trim(DataPage.Values[0]);
+end;
+
 function NextButtonClick(CurPageID: Integer): Boolean;
 var
-  Port: Integer;
+  Need, Free: Int64;
 begin
   Result := True;
   if CurPageID = DataPage.ID then
@@ -419,69 +511,82 @@ begin
       Result := False;
     end;
   end
-  else if CurPageID = PortPage.ID then
-  begin
-    Port := StrToIntDef(Trim(PortPage.Values[0]), 0);
-    if (Port < 1024) or (Port > 65535) then
-    begin
-      SuppressibleMsgBox('Use uma porta entre 1024 e 65535.', mbError, MB_OK, IDOK);
-      Result := False;
-      Exit;
-    end;
-    { Porta em uso (outro app, outra instalação) ou reservada pelo Windows: sugere a próxima livre. }
-    PortUse := '';
-    FreePort := '';
-    RunEngineQuick('CheckPort', '-Port ' + IntToStr(Port));
-    if PortUse <> '' then
-    begin
-      if FreePort <> '' then
-      begin
-        SuppressibleMsgBox('A porta ' + IntToStr(Port) + ' está ' + PortUse + '.' + #13#10#13#10 +
-          'Preenchi a próxima livre: ' + FreePort + '.', mbInformation, MB_OK, IDOK);
-        PortPage.Values[0] := FreePort;
-      end
-      else
-        SuppressibleMsgBox('A porta ' + IntToStr(Port) + ' está ' + PortUse + '. Escolha outra.', mbError, MB_OK, IDOK);
-      Result := False;
-    end;
-  end
   else if CurPageID = TailscalePage.ID then
   begin
     if TsState <> 'ready' then
     begin
       SuppressibleMsgBox('Termine a configuração do Tailscale antes de continuar.', mbInformation, MB_OK, IDOK);
       Result := False;
+    end;
+  end
+  else if CurPageID = wpReady then
+  begin
+    if (not IsUpdate) and (not SkipTailscale) and (ChosenHttpsPort = 0) then
+    begin
+      SuppressibleMsgBox('Os dois endereços HTTPS do Tailscale deste PC (portas 443 e 8443) já são usados por outros apps.' + #13#10#13#10 +
+        'Libere um deles (por exemplo: tailscale serve --https=8443 off) e rode o instalador de novo.', mbError, MB_OK, IDOK);
+      Result := False;
       Exit;
     end;
-    { A 443 já publica outro app? Pergunta antes de tomar; senão usa a 8443. }
-    HttpsPort := 443;
-    { Estados calculados pelo motor (Get-ServePortState): free | ours | other. }
-    if Serve443State = 'other' then
+    { Falta espaço no drive da raiz: não começa (pararia no meio do download). }
+    Need := StrToInt64Def(NeedRootMB, 0);
+    Free := FreeMB(GetRoot(''));
+    if (Need > 0) and (Free >= 0) and (Free < Need) then
     begin
-      { Silencioso: não toma a 443 de outro app (usa a 8443). }
-      if SuppressibleMsgBox('O endereço https://' + TsHost + ' (porta 443 do Tailscale) já publica outro app:' + #13#10 +
-        Serve443 + #13#10#13#10 + 'Substituir pelo Stemma?' + #13#10#13#10 +
-        'Sim: o Stemma fica em https://' + TsHost + ' e o outro app sai dali.' + #13#10 +
-        'Não: o Stemma fica em https://' + TsHost + ':8443 e o outro app continua.',
-        mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDNO then
-      begin
-        if Serve8443State = 'other' then
-        begin
-          SuppressibleMsgBox('A 8443 do Tailscale também publica outro app (' + Serve8443 + '). ' +
-            'Libere uma delas (tailscale serve --https=8443 off) e clique em Verificar de novo.', mbError, MB_OK, IDOK);
-          Result := False;
-          Exit;
-        end;
-        HttpsPort := 8443;
-      end;
+      SuppressibleMsgBox('Falta espaço em ' + ExtractFileDrive(GetRoot('')) + ': o Stemma precisa de ~' + FormatMB(Need) +
+        ' e há ' + FormatMB(Free) + ' livres.' + #13#10#13#10 + 'Libere espaço e clique em Instalar de novo.', mbError, MB_OK, IDOK);
+      Result := False;
+      Exit;
     end;
+    Free := FreeMB(DataRootChoice);
+    if (Free >= 0) and (Free < 2048) then
+      Result := SuppressibleMsgBox('O drive dos dados (' + ExtractFileDrive(DataRootChoice) + ') tem só ' + FormatMB(Free) +
+        ' livres. Cada música ocupa ~50 MB, então cabem poucas.' + #13#10#13#10 + 'Continuar assim mesmo?',
+        mbConfirmation, MB_YESNO, IDYES) = IDYES;
   end;
 end;
 
+{ Tela "Pronto para instalar": o que vai acontecer, quanto vai baixar e o espaço. }
 function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo,
   MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String;
+var
+  Download, Need: Int64;
+  Root, Data: String;
 begin
-  Result := '';
+  Root := GetRoot('');
+  Data := DataRootChoice;
+  Download := StrToInt64Def(DownloadMB, -1);
+  Need := StrToInt64Def(NeedRootMB, -1);
+
+  if IsUpdate then
+    Result := 'Atualizar o Stemma ' + Installed + ' para a v{#AppVersion}.' + NewLine +
+      Space + 'O Stemma fica fora do ar por cerca de 1 minuto. Se algo der errado, a versão atual volta sozinha.' + NewLine
+  else
+  begin
+    Result := 'Instalar o Stemma {#AppVersion} em ' + Root + ', com os dados em ' + Data + '.' + NewLine +
+      NewLine + 'Endereço' + NewLine + Space + StemmaAddress + NewLine;
+    if (not SkipTailscale) and (ChosenHttpsPort = 8443) then
+      Result := Result + Space + 'O endereço sem porta já é de outro app deste PC, que continua funcionando.' + NewLine;
+  end;
+
+  Result := Result + NewLine + 'Download' + NewLine;
+  if Download < 0 then
+    Result := Result + Space + 'Até ~3 GB, se os componentes ainda não estiverem neste PC.' + NewLine
+  else if Download < 100 then
+    Result := Result + Space + 'Quase nada (' + FormatMB(Download) + '): os componentes já estão neste PC.' + NewLine +
+      Space + 'Tempo estimado: ~3 minutos.' + NewLine
+  else
+    Result := Result + Space + '~' + FormatMB(Download) + ' de componentes que ainda não estão neste PC.' + NewLine +
+      Space + 'Tempo estimado: ~3 minutos mais o download (~' + IntToStr(Download div 300 + 1) + ' min a 5 MB/s).' + NewLine;
+
+  Result := Result + NewLine + 'Espaço em disco' + NewLine;
+  if Need >= 0 then
+    Result := Result + Space + ExtractFileDrive(Root) + ' (programa e componentes): precisa de ~' + FormatMB(Need) +
+      ', livre ' + FormatMB(FreeMB(Root)) + '.' + NewLine
+  else
+    Result := Result + Space + ExtractFileDrive(Root) + ' (programa e componentes): livre ' + FormatMB(FreeMB(Root)) + '.' + NewLine;
+  Result := Result + Space + ExtractFileDrive(Data) + ' (dados): livre ' + FormatMB(FreeMB(Data)) + '.' + NewLine +
+    Space + 'Cada música ocupa ~50 MB (de 40 a 100 MB), mais 80 MB do modelo de separação, uma vez.' + NewLine;
 end;
 
 { --- instalação ---------------------------------------------------------------- }
@@ -501,16 +606,23 @@ begin
   end
   else
     Params := EngineParams(ExpandConstant('{app}\engine\setup.ps1'), 'Install',
-      Params + ' -DataRoot ' + Quote(Trim(DataPage.Values[0])) + ' -Port ' + Trim(PortPage.Values[0]) +
-      ' -HttpsPort ' + IntToStr(HttpsPort));
+      Params + ' -DataRoot ' + Quote(Trim(DataPage.Values[0])) + ' -Port ' + LocalPort +
+      ' -HttpsPort ' + IntToStr(ChosenHttpsPort));
 
-  WizardForm.ProgressGauge.Style := npbstMarquee;
+  WizardForm.ProgressGauge.Style := npbstNormal;
+  WizardForm.ProgressGauge.Min := 0;
+  WizardForm.ProgressGauge.Max := 1000;
+  WizardForm.ProgressGauge.Position := 0;
   ErrorText := '';
+  StageText := '';
+  ProgressValue := 0;
   LastStep := 'Preparando…';
   WizardForm.StatusLabel.Caption := LastStep;
+  WizardForm.FilenameLabel.Caption := '';
   Succeeded := ExecAndLogOutput(PowerShellExe, Params, '', SW_HIDE, ewWaitUntilTerminated,
     ResultCode, @OnEngineLog) and (ResultCode = 0);
-  WizardForm.ProgressGauge.Style := npbstNormal;
+  if Succeeded then
+    WizardForm.ProgressGauge.Position := 1000;
   if not Succeeded then
   begin
     if ErrorText = '' then

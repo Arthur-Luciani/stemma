@@ -45,6 +45,99 @@ function Write-Step([string]$Message) {
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
+# --- progresso por etapas (instalar e atualizar) -------------------------------------
+# Com o protocolo ligado (setup.ps1, lido pelo instalador), cada etapa sai como
+# `##STAGE Etapa i de n: texto` e o avanço como `##PROGRESS 0..1000`. Sem ele (scripts de
+# console), a etapa sai como um Write-Step e o avanço não aparece.
+
+$script:ProgressProtocol = $false
+$script:Progress = $null
+
+function Set-StemmaProgressProtocol([bool]$Enabled) { $script:ProgressProtocol = $Enabled }
+
+function Start-StemmaProgress {
+    <# Etapas de um fluxo longo: cada uma com Id, Text e Weight (peso relativo no tempo). #>
+    param([Parameter(Mandatory)][object[]]$Stages)
+    $list = @(foreach ($stage in $Stages) { [pscustomobject]@{ Id = $stage.Id; Text = $stage.Text; Weight = [double]$stage.Weight } })
+    $script:Progress = [pscustomobject]@{ Stages = $list; Index = -1; Last = -1 }
+    Write-StemmaProgress 0
+}
+
+function Get-StemmaProgressValue {
+    <# 0..1000: o peso das etapas anteriores mais a fração da atual. #>
+    param([Parameter(Mandatory)][object[]]$Stages, [Parameter(Mandatory)][int]$Index, [double]$Fraction = 0)
+    $total = 0.0
+    $before = 0.0
+    for ($i = 0; $i -lt $Stages.Count; $i++) {
+        $total += $Stages[$i].Weight
+        if ($i -lt $Index) { $before += $Stages[$i].Weight }
+    }
+    if ($total -le 0) { return 0 }
+    $fraction = [Math]::Min(1.0, [Math]::Max(0.0, $Fraction))
+    return [int][Math]::Floor(1000 * ($before + $Stages[$Index].Weight * $fraction) / $total)
+}
+
+function Write-StemmaProgress([int]$Value) {
+    # Nunca volta (uma etapa repesada não pode fazer a barra andar para trás).
+    if (-not $script:ProgressProtocol -or -not $script:Progress) { return }
+    if ($Value -le $script:Progress.Last) { return }
+    $script:Progress.Last = $Value
+    Write-Host "##PROGRESS $Value"
+}
+
+function Write-StemmaStage([string]$Text) {
+    # Também para etapas fora da lista (ex.: o rollback de uma atualização que falhou).
+    if ($script:ProgressProtocol) { Write-Host "##STAGE $Text" } else { Write-Step $Text }
+}
+
+function Enter-StemmaStage {
+    <# Começa a etapa `$Id` ("Etapa 3 de 9: …"). Sem progresso iniciado, só mostra o texto. #>
+    param([Parameter(Mandatory)][string]$Id)
+    if (-not $script:Progress) { return }
+    $stages = $script:Progress.Stages
+    $index = -1
+    for ($i = 0; $i -lt $stages.Count; $i++) { if ($stages[$i].Id -eq $Id) { $index = $i } }
+    if ($index -lt 0) { throw "Etapa desconhecida: $Id" }
+    $script:Progress.Index = $index
+    Write-StemmaStage "Etapa $($index + 1) de $($stages.Count): $($stages[$index].Text)"
+    Write-StemmaProgress (Get-StemmaProgressValue -Stages $stages -Index $index)
+}
+
+function Set-StemmaStageProgress {
+    <# Fração (0..1) da etapa atual; fora de uma etapa não faz nada. #>
+    param([Parameter(Mandatory)][double]$Fraction)
+    if (-not $script:Progress -or $script:Progress.Index -lt 0) { return }
+    Write-StemmaProgress (Get-StemmaProgressValue -Stages $script:Progress.Stages -Index $script:Progress.Index -Fraction $Fraction)
+}
+
+function Set-StemmaStageWeight {
+    <#
+      Repesa uma etapa (ex.: componentes, quando se sabe se vai baixar). As anteriores são
+      reescaladas por (novo + resto) / (antigo + resto), o que mantém exatamente o que a barra
+      já mostra: sem isso, um peso maior derrubaria o valor atual, e a barra (que nunca volta)
+      ficaria parada até o download alcançá-lo.
+    #>
+    param([Parameter(Mandatory)][string]$Id, [Parameter(Mandatory)][double]$Weight)
+    if (-not $script:Progress) { return }
+    $stages = $script:Progress.Stages
+    $index = -1
+    for ($i = 0; $i -lt $stages.Count; $i++) { if ($stages[$i].Id -eq $Id) { $index = $i } }
+    if ($index -lt 0) { return }
+    $rest = 0.0
+    for ($i = $index + 1; $i -lt $stages.Count; $i++) { $rest += $stages[$i].Weight }
+    $old = $stages[$index].Weight
+    if ($old + $rest -gt 0) {
+        $scale = ($Weight + $rest) / ($old + $rest)
+        for ($i = 0; $i -lt $index; $i++) { $stages[$i].Weight *= $scale }
+    }
+    $stages[$index].Weight = $Weight
+}
+
+function Complete-StemmaProgress {
+    Write-StemmaProgress 1000
+    $script:Progress = $null
+}
+
 # --- .env --------------------------------------------------------------------
 
 function Read-DotEnv {
@@ -235,12 +328,22 @@ function Invoke-Native {
       ErrorRecord; com ErrorActionPreference=Stop isso derrubaria o script por um simples log
       (uv, alembic e uvicorn escrevem no stderr). Por isso só o exit code decide.
     #>
-    param([Parameter(Mandatory)][string]$FilePath, [string[]]$Arguments = @(), [string]$WorkingDirectory)
+    param(
+        [Parameter(Mandatory)][string]$FilePath,
+        [string[]]$Arguments = @(),
+        [string]$WorkingDirectory,
+        # Chamado com cada linha de saída (ex.: progresso do download do uv).
+        [scriptblock]$OnLine
+    )
     if ($WorkingDirectory) { Push-Location -LiteralPath $WorkingDirectory }
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        & $FilePath @Arguments 2>&1 | ForEach-Object { "$_" } | Out-Host
+        & $FilePath @Arguments 2>&1 | ForEach-Object {
+            $line = "$_"
+            Out-Host -InputObject $line
+            if ($OnLine) { & $OnLine $line }
+        }
         $code = $LASTEXITCODE
     }
     finally {
@@ -252,6 +355,57 @@ function Invoke-Native {
 
 function Get-ReleasePython([string]$ReleaseDir) {
     return Join-Path $ReleaseDir 'backend\.venv\Scripts\python.exe'
+}
+
+function ConvertFrom-ByteSize {
+    <# '2.3GiB', '12.0MiB', '915KiB' (formato do uv) → bytes. #>
+    param([Parameter(Mandatory)][string]$Text)
+    if ($Text -notmatch '^([\d.]+)\s*(B|KiB|MiB|GiB|TiB)$') { return 0 }
+    $units = @{ B = 1; KiB = 1KB; MiB = 1MB; GiB = 1GB; TiB = 1TB }
+    return [long]([double]::Parse($Matches[1], [Globalization.CultureInfo]::InvariantCulture) * $units[$Matches[2]])
+}
+
+function New-UvDownloadTracker {
+    return [pscustomobject]@{ Announced = @{}; Done = @{} }
+}
+
+function Update-UvDownloadTracker {
+    <#
+      Lê uma linha do uv: `Downloading torch (2.3GiB)` e ` Downloaded torch` (o uv só anuncia
+      os pacotes grandes). Devolve $true se a linha mudou o progresso.
+    #>
+    param([Parameter(Mandatory)]$Tracker, [AllowEmptyString()][string]$Line)
+    if ($Line -match '^\s*Downloading (\S+) \(([^)]+)\)\s*$') {
+        $Tracker.Announced[$Matches[1]] = ConvertFrom-ByteSize $Matches[2]
+        return $true
+    }
+    if ($Line -match '^\s*Downloaded (\S+)\s*$' -and $Tracker.Announced.ContainsKey($Matches[1])) {
+        $Tracker.Done[$Matches[1]] = $true
+        return $true
+    }
+    return $false
+}
+
+function Get-UvDownloadStatus {
+    <# Bytes baixados / anunciados e a fração (0..1). #>
+    param([Parameter(Mandatory)]$Tracker)
+    [long]$total = 0
+    [long]$done = 0
+    foreach ($name in $Tracker.Announced.Keys) {
+        $total += $Tracker.Announced[$name]
+        if ($Tracker.Done.ContainsKey($name)) { $done += $Tracker.Announced[$name] }
+    }
+    $fraction = if ($total -gt 0) { $done / $total } else { 0.0 }
+    return [pscustomobject]@{ Done = $done; Total = $total; Fraction = $fraction }
+}
+
+function Format-StemmaSize {
+    <# Bytes → '2,9 GB' / '340 MB' (para as mensagens do instalador). #>
+    param([Parameter(Mandatory)][double]$Bytes)
+    $culture = [Globalization.CultureInfo]::GetCultureInfo('pt-BR')
+    if ($Bytes -le 0) { return '0 MB' }
+    if ($Bytes -ge 1GB) { return ($Bytes / 1GB).ToString('0.0', $culture) + ' GB' }
+    return [Math]::Max(1, [Math]::Round($Bytes / 1MB)).ToString($culture) + ' MB'
 }
 
 function Sync-ReleaseEnvironment {
@@ -272,8 +426,17 @@ function Sync-ReleaseEnvironment {
         }
         catch { Write-Host "    Faltou algo no cache ($($_.Exception.Message))." }
     }
-    Write-Step 'Baixando componentes (~3 GB na primeira vez)'
-    Invoke-Native -FilePath 'uv' -Arguments $arguments
+    Write-Step 'Baixando o que falta dos componentes (~3 GB na primeira vez)'
+    $tracker = New-UvDownloadTracker
+    Invoke-Native -FilePath 'uv' -Arguments $arguments -OnLine {
+        param($line)
+        if (Update-UvDownloadTracker -Tracker $tracker -Line $line) {
+            $status = Get-UvDownloadStatus -Tracker $tracker
+            # O resto da etapa (instalar no venv) é rápido: o download vale 95%.
+            Set-StemmaStageProgress ($status.Fraction * 0.95)
+            Write-Step "Baixados $(Format-StemmaSize $status.Done) de $(Format-StemmaSize $status.Total)"
+        }
+    }
     return 'download'
 }
 
@@ -404,9 +567,7 @@ function New-ServiceXml {
 }
 
 function Assert-Admin {
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = [Security.Principal.WindowsPrincipal]::new($identity)
-    if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    if (-not (Test-IsAdmin)) {
         throw 'Rode este script num PowerShell como administrador (o serviço do Windows exige).'
     }
 }
@@ -549,9 +710,20 @@ function Install-StemmaTools {
     #>
     param([Parameter(Mandatory)][string]$Root, [string[]]$Names, [switch]$SkipPython)
     if (-not $Names) { $Names = @($script:Tools.Keys) }
-    foreach ($name in $Names) { Install-StemmaTool -Root $Root -Name $name | Out-Null }
+    $done = 0
+    foreach ($name in $Names) {
+        Install-StemmaTool -Root $Root -Name $name | Out-Null
+        $done++
+        Set-StemmaStageProgress ($done / $Names.Count)
+    }
     Set-StemmaToolEnv -Root $Root
     if ($SkipPython) { return }
+    Install-StemmaPython -Root $Root
+}
+
+function Install-StemmaPython {
+    <# Python gerenciado pelo uv em <Root>\tools\python (depois do Set-StemmaToolEnv). #>
+    param([Parameter(Mandatory)][string]$Root)
     Write-Step "Python $script:PythonVersion"
     # Sem executável no ~\.local\bin nem registro no HKCU: nada do Stemma no perfil do usuário.
     Invoke-Native -FilePath (Get-StemmaPaths -Root $Root).Uv -Arguments @('python', 'install', $script:PythonVersion, '--no-bin', '--no-registry')
@@ -612,34 +784,83 @@ function Test-SameVolume([string]$A, [string]$B) {
 }
 
 function Initialize-HardLinkSeeder {
-    if ('Stemma.CacheSeeder' -as [type]) { return }
+    if ('Stemma.UvCacheSeeder' -as [type]) { return }
     Add-Type -TypeDefinition @'
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.AccessControl;
+using System.Security.Principal;
 namespace Stemma {
-    public static class CacheSeeder {
+    public static class UvCacheSeeder {
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
 
-        // Recria a árvore de `source` em `dest` com hardlinks (cópia se o link falhar).
-        // Arquivos que já existem em `dest` ficam como estão. Pastas que são junction (formatos
-        // antigos do cache) não são atravessadas: um processo elevado recusa junctions criadas
-        // pelo usuário ("untrusted mount point"). Uma pasta ilegível não aborta o resto.
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode)]
+        static extern uint SetNamedSecurityInfoW(string pObjectName, int objectType, uint securityInfo,
+            byte[] psidOwner, IntPtr psidGroup, byte[] pDacl, IntPtr pSacl);
+
+        const int SE_FILE_OBJECT = 1;
+        const uint OWNER_SECURITY_INFORMATION = 0x1;
+        const uint DACL_SECURITY_INFORMATION = 0x4;
+        const uint PROTECTED_DACL_SECURITY_INFORMATION = 0x80000000;
+        const int FILE_ALL_ACCESS = 0x1F01FF;
+        const int FILE_READ_EXECUTE = 0x1200A9;
+
+        static byte[] Sid(string value) {
+            var sid = new SecurityIdentifier(value);
+            byte[] bytes = new byte[sid.BinaryLength];
+            sid.GetBinaryForm(bytes, 0);
+            return bytes;
+        }
+
+        // Um hardlink é o mesmo arquivo do cache do usuário, com um descritor de segurança só,
+        // e herdar a ACL do destino não basta: uma propagação de herança pelo outro caminho
+        // (o perfil do usuário) o abriria de novo. Grava uma ACL própria e protegida (sem
+        // herança): SYSTEM e Administradores com controle total, Usuários só leitura; com
+        // setOwner, Administradores como dono. Um arquivo por vez, ao ligar: nada de percorrer
+        // o cache inteiro com o icacls depois.
+        public static bool Protect(string path, bool setOwner) {
+            var acl = new RawAcl(GenericAcl.AclRevision, 3);
+            acl.InsertAce(0, new CommonAce(AceFlags.None, AceQualifier.AccessAllowed, FILE_ALL_ACCESS, new SecurityIdentifier("S-1-5-18"), false, null));
+            acl.InsertAce(1, new CommonAce(AceFlags.None, AceQualifier.AccessAllowed, FILE_ALL_ACCESS, new SecurityIdentifier("S-1-5-32-544"), false, null));
+            acl.InsertAce(2, new CommonAce(AceFlags.None, AceQualifier.AccessAllowed, FILE_READ_EXECUTE, new SecurityIdentifier("S-1-5-32-545"), false, null));
+            byte[] dacl = new byte[acl.BinaryLength];
+            acl.GetBinaryForm(dacl, 0);
+            uint info = DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION;
+            byte[] owner = null;
+            if (setOwner) {
+                owner = Sid("S-1-5-32-544");
+                info |= OWNER_SECURITY_INFORMATION;
+            }
+            return SetNamedSecurityInfoW(path, SE_FILE_OBJECT, info, owner, IntPtr.Zero, dacl, IntPtr.Zero) == 0;
+        }
+
+        // Recria em `dest` as subpastas `roots` de `source` (caminhos relativos) com hardlinks
+        // (cópia se o link falhar), cada arquivo ligado com a ACL protegida acima. Se a ACL
+        // não puder ser trocada, o link é desfeito (o uv baixa o que faltar). Arquivos que já
+        // existem em `dest` ficam como estão. Pastas que são junction (formatos antigos do
+        // cache) não são atravessadas: um processo elevado recusa junctions criadas pelo usuário
+        // ("untrusted mount point"). Uma pasta ilegível não aborta o resto. Primeiro lista,
+        // depois liga, avisando `progress(feitos, total)`.
         // Devolve {linked, copied, skipped, failed}.
-        public static long[] Seed(string source, string dest) {
+        public static long[] Seed(string source, string dest, string[] roots, bool setOwner, Action<long, long> progress) {
             long[] counts = new long[4];
             source = Path.GetFullPath(source).TrimEnd('\\');
             dest = Path.GetFullPath(dest).TrimEnd('\\');
-            var pending = new System.Collections.Generic.Stack<string>();
-            pending.Push(source);
+            var files = new List<string>();
+            var pending = new Stack<string>();
+            foreach (string root in roots) {
+                string relative = root.Replace('/', '\\').Trim('\\');
+                pending.Push(relative.Length == 0 ? source : source + "\\" + relative);
+            }
             while (pending.Count > 0) {
                 string dir = pending.Pop();
-                string targetDir = dest + dir.Substring(source.Length);
-                string[] files, dirs;
+                string[] found, dirs;
                 try {
-                    Directory.CreateDirectory(targetDir);
-                    files = Directory.GetFiles(dir);
+                    Directory.CreateDirectory(dest + dir.Substring(source.Length));
+                    found = Directory.GetFiles(dir);
                     dirs = Directory.GetDirectories(dir);
                 }
                 catch (Exception) { counts[3]++; continue; }
@@ -650,13 +871,31 @@ namespace Stemma {
                     catch (Exception) { counts[3]++; continue; }
                     pending.Push(sub);
                 }
-                foreach (string file in files) {
-                    string target = targetDir + file.Substring(dir.Length);
-                    if (File.Exists(target)) { counts[2]++; continue; }
-                    if (CreateHardLink(target, file, IntPtr.Zero)) { counts[0]++; continue; }
+                files.AddRange(found);
+            }
+            long total = files.Count, done = 0;
+            foreach (string file in files) {
+                string target = dest + file.Substring(source.Length);
+                if (File.Exists(target)) {
+                    // Já estava (nova tentativa, cache de uma versão anterior): protege de novo,
+                    // porque a ACL pode ter sido mudada pelo outro caminho do mesmo arquivo.
+                    Protect(target, setOwner);
+                    counts[2]++;
+                }
+                else if (CreateHardLink(target, file, IntPtr.Zero)) {
+                    if (Protect(target, setOwner)) { counts[0]++; }
+                    else {
+                        try { File.Delete(target); } catch (Exception) { }
+                        counts[3]++;
+                    }
+                }
+                else {
+                    // A cópia é um arquivo novo: já nasce com a ACL herdada do destino.
                     try { File.Copy(file, target); counts[1]++; }
                     catch (Exception) { counts[3]++; }
                 }
+                done++;
+                if (progress != null && (done % 500 == 0 || done == total)) { progress(done, total); }
             }
             return counts;
         }
@@ -665,13 +904,202 @@ namespace Stemma {
 '@
 }
 
+function Test-IsAdmin {
+    $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function ConvertTo-UvPackageKey {
+    <# Chave nome|versão (nome normalizado como no PEP 503). #>
+    param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][string]$Version)
+    return (ConvertTo-UvPackageName $Name) + '|' + $Version
+}
+
+function Get-UvLockPackages {
+    <#
+      Pacotes do uv.lock com o que interessa no Windows x64: a wheel (`win_amd64` ou `any`) e o
+      tamanho dela, quando o índice informa (o do PyTorch não informa). Needed = há wheel para
+      o Windows ou só sdist; pacotes só de Linux (nvidia-*, triton) e o próprio projeto ficam fora.
+    #>
+    param([Parameter(Mandatory)][string]$Path)
+    $text = [IO.File]::ReadAllText($Path)
+    foreach ($block in @($text -split '(?m)^\[\[package\]\]\s*$' | Select-Object -Skip 1)) {
+        if ($block -notmatch '(?m)^name = "([^"]+)"') { continue }
+        $name = $Matches[1]
+        if ($block -notmatch '(?m)^version = "([^"]+)"') { continue }
+        $version = $Matches[1]
+        $wheel = $null
+        $size = $null
+        $wheelLines = [regex]::Matches($block, '\{ url = "([^"]+\.whl)"[^\r\n]*')
+        foreach ($match in $wheelLines) {
+            $file = [Uri]::UnescapeDataString(($match.Groups[1].Value -split '/')[-1])
+            if ($file -match '-(win_amd64|any)\.whl$') {
+                $wheel = $file
+                if ($match.Value -match 'size = (\d+)') { $size = [long]$Matches[1] }
+                break
+            }
+        }
+        $sdistOnly = $wheelLines.Count -eq 0 -and $block -match '(?m)^sdist = '
+        if ($sdistOnly -and $block -match '(?m)^sdist = .*size = (\d+)') { $size = [long]$Matches[1] }
+        [pscustomobject]@{
+            Name    = $name
+            Version = $version
+            Key     = ConvertTo-UvPackageKey $name $version
+            Wheel   = $wheel
+            Size    = $size
+            Needed  = [bool]($wheel -or $sdistOnly)
+        }
+    }
+}
+
+function Get-UvCachePointers {
+    <#
+      Ponteiros do cache do uv: `wheels-v*\…\<pacote>\<versão>-<tags>` é um arquivo texto com
+      `archive-v0/<id>` (a wheel descompactada). Devolve chave nome|versão → archives que existem.
+      Depende do formato interno do uv: se mudar, não acha nada, e quem chama cai no caminho
+      completo (semear tudo, baixar o que faltar).
+    #>
+    param([Parameter(Mandatory)][string]$Cache)
+    $result = @{}
+    if (-not (Test-Path -LiteralPath $Cache -PathType Container)) { return $result }
+    $pending = [Collections.Generic.Stack[IO.DirectoryInfo]]::new()
+    foreach ($bucket in @(Get-ChildItem -LiteralPath $Cache -Directory -Force -Filter 'wheels-v*' -ErrorAction SilentlyContinue)) {
+        if (-not ($bucket.Attributes -band [IO.FileAttributes]::ReparsePoint)) { $pending.Push($bucket) }
+    }
+    while ($pending.Count -gt 0) {
+        $dir = $pending.Pop()
+        try { $children = $dir.GetFileSystemInfos() }
+        catch { continue }
+        foreach ($child in $children) {
+            if ($child.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+            if ($child -is [IO.DirectoryInfo]) { $pending.Push($child); continue }
+            if ($child.Name -match '\.(http|lock|msgpack|rev)$' -or $child.Length -gt 256) { continue }
+            try { $line = "$([IO.File]::ReadAllText($child.FullName))".Trim() }
+            catch { continue }
+            if ($line -notmatch '^archive-v\d+/[\w-]+$') { continue }
+            if (-not (Test-Path -LiteralPath (Join-Path $Cache $line) -PathType Container)) { continue }
+            $key = ConvertTo-UvPackageKey $child.Directory.Name ($child.Name -split '-')[0]
+            if (-not $result.ContainsKey($key)) { $result[$key] = [Collections.Generic.List[string]]::new() }
+            $result[$key].Add($line)
+        }
+    }
+    return $result
+}
+
+function ConvertTo-UvPackageName([string]$Name) { return $Name.ToLowerInvariant() -replace '[-_.]+', '-' }
+
+function Get-BuildBackendNames {
+    <# Nomes (normalizados) do `[build-system] requires` do pyproject (ex.: hatchling). #>
+    param([Parameter(Mandatory)][string]$PyprojectPath)
+    $names = @()
+    if (Test-Path -LiteralPath $PyprojectPath) {
+        $text = [IO.File]::ReadAllText($PyprojectPath)
+        # Só dentro da seção [build-system] (até o próximo cabeçalho), nunca de outra seção.
+        $section = if ($text -match '(?ms)^\[build-system\][ \t]*\r?\n(.*?)(?=^\[|\z)') { $Matches[1] } else { '' }
+        if ($section -match '(?ms)^requires\s*=\s*\[([^\]]*)\]') {
+            foreach ($item in [regex]::Matches($Matches[1], '"([A-Za-z0-9._-]+)')) {
+                $names += ConvertTo-UvPackageName $item.Groups[1].Value
+            }
+        }
+    }
+    # O uv instala o projeto como editável, e o hatchling pede o `editables` só nessa hora
+    # (get_requires_for_build_editable): não está no METADATA dele.
+    if ($names -contains 'hatchling') { $names += 'editables' }
+    return @($names | Sort-Object -Unique)
+}
+
+function Get-WheelRequires {
+    <#
+      Dependências (nomes normalizados) de uma wheel descompactada no cache, pelo `Requires-Dist`
+      do METADATA. Pula as de extras; mantém as com outros marcadores (sobra pouco, nunca falta).
+    #>
+    param([Parameter(Mandatory)][string]$ArchiveDir)
+    $metadata = @(Get-ChildItem -LiteralPath $ArchiveDir -Directory -Filter '*.dist-info' -ErrorAction SilentlyContinue |
+            ForEach-Object { Join-Path $_.FullName 'METADATA' } | Where-Object { Test-Path -LiteralPath $_ })
+    if ($metadata.Count -eq 0) { return @() }
+    $names = foreach ($line in [IO.File]::ReadAllLines($metadata[0])) {
+        if ($line -eq '') { break }  # fim do cabeçalho
+        if ($line -match '^Requires-Dist:\s*([A-Za-z0-9._-]+)' -and $line -notmatch 'extra\s*==') {
+            ConvertTo-UvPackageName $Matches[1]
+        }
+    }
+    return @($names | Sort-Object -Unique)
+}
+
+function Get-BuildBackendArchives {
+    <#
+      Archives do build backend (que o uv usa para construir o próprio projeto no sync e que não
+      está no uv.lock) e das dependências dele, lidas do METADATA no cache, em qualquer versão.
+    #>
+    param([Parameter(Mandatory)][string]$Cache, [Parameter(Mandatory)][hashtable]$Pointers, [string[]]$Names)
+    $byName = @{}
+    foreach ($key in $Pointers.Keys) {
+        $name = ($key -split '\|')[0]
+        if (-not $byName.ContainsKey($name)) { $byName[$name] = [Collections.Generic.List[string]]::new() }
+        foreach ($archive in $Pointers[$key]) { $byName[$name].Add($archive) }
+    }
+    $seen = @{}
+    $archives = [Collections.Generic.List[string]]::new()
+    $pending = [Collections.Generic.Queue[string]]::new()
+    foreach ($name in $Names) { $pending.Enqueue($name) }
+    while ($pending.Count -gt 0) {
+        $name = $pending.Dequeue()
+        if ($seen.ContainsKey($name)) { continue }
+        $seen[$name] = $true
+        if (-not $byName.ContainsKey($name)) { continue }
+        foreach ($archive in $byName[$name]) {
+            $archives.Add($archive)
+            foreach ($dep in (Get-WheelRequires -ArchiveDir (Join-Path $Cache $archive))) { $pending.Enqueue($dep) }
+        }
+    }
+    return @($archives)
+}
+
+function Get-UvCacheSeedPlan {
+    <#
+      O que semear do cache do usuário: as pastas pequenas inteiras (tudo menos `archive-v*`) e,
+      dos archives, só os dos pacotes do uv.lock (o cache do usuário tem os de todos os projetos
+      dele: 225 mil arquivos contra ~25 mil do Stemma). Sem lock, ou num formato de cache que não
+      conhece (sem ponteiros): tudo.
+    #>
+    param([Parameter(Mandatory)][string]$Source, [string]$LockPath)
+    $roots = [Collections.Generic.List[string]]::new()
+    $archiveDirs = @()
+    foreach ($dir in @(Get-ChildItem -LiteralPath $Source -Directory -Force -ErrorAction SilentlyContinue)) {
+        if ($dir.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+        if ($dir.Name -match '^archive-v\d+$') { $archiveDirs += $dir.Name } else { $roots.Add($dir.Name) }
+    }
+    $pointers = @{}
+    $archives = @()
+    if ($LockPath -and (Test-Path -LiteralPath $LockPath)) {
+        $pointers = Get-UvCachePointers -Cache $Source
+        $fromLock = @(foreach ($package in @(Get-UvLockPackages -Path $LockPath)) {
+                if ($pointers.ContainsKey($package.Key)) { $pointers[$package.Key] }
+            })
+        # O uv constrói o próprio projeto no sync, e o build backend não está no uv.lock (sem
+        # ele, o --offline falha só por causa do hatchling e das dependências dele).
+        $build = @(Get-BuildBackendNames -PyprojectPath (Join-Path (Split-Path -Parent $LockPath) 'pyproject.toml'))
+        $fromBuild = @(Get-BuildBackendArchives -Cache $Source -Pointers $pointers -Names $build)
+        $archives = @(@($fromLock + $fromBuild) | Sort-Object -Unique)
+    }
+    # Seletivo sempre que o formato foi reconhecido (há ponteiros), mesmo sem nenhum pacote do
+    # Stemma no cache: aí semeia só as pastas pequenas, e não o cache inteiro do usuário.
+    $selective = $archives.Count -gt 0 -or $pointers.Count -gt 0
+    if (-not $selective) { $archives = $archiveDirs }
+    foreach ($archive in $archives) { $roots.Add($archive) }
+    return [pscustomobject]@{ Roots = @($roots); Selective = $selective; Archives = @($archives).Count }
+}
+
 function Copy-UvCacheSeed {
     <#
       Semeia <Root>\cache\uv com o cache do usuário por hardlink (segundos, sem espaço extra; um
-      `uv cache clean` do usuário não afeta). Em outro volume não semeia: copiar o cache inteiro
-      (dezenas de GB) sai mais caro que baixar o que falta. Devolve um resumo ou $null.
+      `uv cache clean` do usuário não afeta), só com o que o -LockPath usa. Cada arquivo ligado
+      ganha uma ACL própria e protegida (só administradores alteram), que vale também no cache
+      do usuário, porque é o mesmo arquivo. Em outro volume não semeia:
+      copiar o cache inteiro (dezenas de GB) sai mais caro que baixar o que falta. Devolve um
+      resumo ou $null.
     #>
-    param([Parameter(Mandatory)][string]$Source, [Parameter(Mandatory)][string]$Dest)
+    param([Parameter(Mandatory)][string]$Source, [Parameter(Mandatory)][string]$Dest, [string]$LockPath)
     $src = [IO.Path]::GetFullPath($Source).TrimEnd('\')
     $dst = [IO.Path]::GetFullPath($Dest).TrimEnd('\')
     if ($src -eq $dst) { return $null }
@@ -679,12 +1107,64 @@ function Copy-UvCacheSeed {
         Write-Host "    Cache do uv em outro volume ($src): sem semear."
         return $null
     }
-    Write-Step 'Reaproveitando os componentes já baixados neste PC'
+    $plan = Get-UvCacheSeedPlan -Source $src -LockPath $LockPath
+    if ($plan.Selective) { Write-Step "Reaproveitando os componentes já baixados neste PC ($($plan.Archives) pacotes)" }
+    else { Write-Step 'Reaproveitando os componentes já baixados neste PC (cache inteiro)' }
     Initialize-HardLinkSeeder
-    $counts = [Stemma.CacheSeeder]::Seed($src, $dst)
-    $summary = [pscustomobject]@{ Linked = $counts[0]; Copied = $counts[1]; Skipped = $counts[2]; Failed = $counts[3] }
+    $progress = [Action[long, long]] { param($done, $total) Set-StemmaStageProgress ($done / [Math]::Max(1, $total)) }
+    $counts = [Stemma.UvCacheSeeder]::Seed($src, $dst, [string[]]$plan.Roots, (Test-IsAdmin), $progress)
+    $summary = [pscustomobject]@{
+        Linked = $counts[0]; Copied = $counts[1]; Skipped = $counts[2]; Failed = $counts[3]; Selective = $plan.Selective
+    }
     Write-Host "    $($summary.Linked) arquivos ligados, $($summary.Copied) copiados, $($summary.Skipped) já estavam, $($summary.Failed) falharam."
     return $summary
+}
+
+function Get-StemmaCacheDirs {
+    <#
+      Caches que a instalação vai usar: o dela, se já tiver algo (a atualização só semeia de um
+      cache vazio); senão, o do usuário no mesmo volume, que será semeado.
+    #>
+    param([Parameter(Mandatory)][string]$Root, [string]$UserCache)
+    $own = (Get-StemmaPaths -Root $Root).UvCache
+    if (-not (Test-EmptyDirectory $own)) { return @($own) }
+    if ($UserCache -and (Test-SameVolume $UserCache $Root)) { return @($UserCache) }
+    return @()
+}
+
+# Wheels sem tamanho no uv.lock (o índice do PyTorch não informa).
+$script:UnknownWheelSizes = @{ torch = [long]2.9GB }
+$script:UnknownWheelSize = 20MB
+# Ferramentas + Python em <Root>\tools, com folga (medido: ~0,5 GB).
+$script:ToolsBytes = 600MB
+
+function Get-StemmaSpaceEstimate {
+    <#
+      Antes de instalar ou atualizar: quanto vai ser baixado (pacotes do uv.lock que não estão nos
+      caches) e quanto ocupa no drive da raiz (ferramentas, se faltarem, e os pacotes
+      descompactados, ~2x o download). Estimativa, com folga.
+    #>
+    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$LockPath, [string[]]$CacheDirs = @())
+    $present = @{}
+    foreach ($cache in $CacheDirs) {
+        foreach ($key in (Get-UvCachePointers -Cache $cache).Keys) { $present[$key] = $true }
+    }
+    $needed = @(Get-UvLockPackages -Path $LockPath | Where-Object { $_.Needed })
+    $missing = @($needed | Where-Object { -not $present.ContainsKey($_.Key) })
+    [long]$download = 0
+    foreach ($package in $missing) {
+        if ($null -ne $package.Size) { $download += $package.Size }
+        elseif ($script:UnknownWheelSizes.ContainsKey($package.Name)) { $download += $script:UnknownWheelSizes[$package.Name] }
+        else { $download += $script:UnknownWheelSize }
+    }
+    [long]$need = 2 * $download
+    if (-not (Test-Path -LiteralPath (Join-Path $Root 'tools\uv\uv.exe'))) { $need += $script:ToolsBytes }
+    return [pscustomobject]@{
+        DownloadBytes = $download
+        NeedRootBytes = $need
+        Missing       = $missing.Count
+        Needed        = $needed.Count
+    }
 }
 
 # --- .env e dados da instalação ---------------------------------------------------
@@ -1073,12 +1553,36 @@ function Invoke-StemmaInstall {
         [int]$HttpsPort = 443,
         [int]$HealthTimeoutSec = 180
     )
+    $userCache = Find-UserUvCache  # antes do Set-StemmaToolEnv, que troca o UV_CACHE_DIR
+    $seed = $userCache -and (Test-SameVolume $userCache $Root)
+    # Pesos ~ dezenas de segundos medidos na instalação real; os componentes são repesados
+    # depois de semear, quando se sabe quanto falta baixar.
+    $stages = @(
+        @{ Id = 'check'; Text = 'Conferindo o PC'; Weight = 1 }
+        @{ Id = 'protect'; Text = 'Protegendo as pastas'; Weight = 1 }
+        @{ Id = 'package'; Text = 'Extraindo o Stemma'; Weight = 2 }
+        @{ Id = 'tools'; Text = 'Baixando as ferramentas (uv, FFmpeg, Deno)'; Weight = 5 }
+        @{ Id = 'python'; Text = 'Python 3.12'; Weight = 3 }
+    )
+    if ($seed) { $stages += @{ Id = 'seed'; Text = 'Reaproveitando os componentes deste PC'; Weight = 3 } }
+    $stages += @(
+        @{ Id = 'components'; Text = 'Componentes do Stemma'; Weight = 2 }
+        @{ Id = 'database'; Text = 'Banco de dados'; Weight = 1 }
+        @{ Id = 'service'; Text = 'Iniciando o serviço'; Weight = 5 }
+    )
+    Start-StemmaProgress -Stages $stages
+    Enter-StemmaStage 'check'
     if (Test-StemmaService $ServiceId) { throw "O serviço '$ServiceId' já existe. Use a atualização." }
     if (-not $DataRoot) { $DataRoot = Get-DefaultDataRoot }
     Assert-StemmaDataRoot $DataRoot
+    # A porta vem livre do assistente, mas pode ter sido tomada até aqui: passa para a próxima
+    # livre (não há tela de porta para o usuário escolher outra).
     $usage = Get-PortUsage -Port $Port
     if ($usage) {
-        throw "A porta $Port está $usage. Escolha outra (a próxima livre é a $(Find-FreePort -Start ($Port + 1)))."
+        $free = Find-FreePort -Start ($Port + 1)
+        if (-not $free) { throw "A porta $Port está $usage, e não achei outra livre até a $($Port + 200)." }
+        Write-Host "    A porta $Port está $($usage): usando a $free."
+        $Port = $free
     }
     if (-not $SkipTailscale) {
         # Antes de tudo: sem isto, a instalação iria até o fim e falharia no último passo.
@@ -1087,16 +1591,31 @@ function Invoke-StemmaInstall {
             throw "O Tailscale não está pronto ($($tailscale.State)): instale, faça login e ative o HTTPS, ou use -SkipTailscale."
         }
     }
-    $userCache = Find-UserUvCache  # antes do Set-StemmaToolEnv, que troca o UV_CACHE_DIR
-    foreach ($dir in $Root, (Join-Path $Root 'releases'), (Join-Path $Root 'logs'), $DataRoot) {
-        New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    }
-    $paths = Get-StemmaPaths -Root $Root
-    Initialize-StemmaRuntime -Root $Root
-    if ($userCache) { Copy-UvCacheSeed -Source $userCache -Dest $paths.UvCache | Out-Null }
-    # Depois de semear: a proteção vale também para os arquivos ligados do cache.
+
+    # Antes de criar qualquer coisa dentro: tudo o que vier depois (ferramentas, releases, venv)
+    # já nasce herdando a ACL certa, e não é preciso percorrer tudo com o icacls. Os arquivos
+    # ligados do cache do usuário não herdam (hardlink); o seeder protege cada um ao ligar.
+    Enter-StemmaStage 'protect'
+    foreach ($dir in $Root, $DataRoot) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
     Protect-StemmaDirectory -Path $Root
     Protect-StemmaDirectory -Path $DataRoot
+    foreach ($dir in (Join-Path $Root 'releases'), (Join-Path $Root 'logs')) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+    $paths = Get-StemmaPaths -Root $Root
+
+    Enter-StemmaStage 'package'
+    $package = Get-StemmaPackage -Root $Root -Version $Version -ZipPath $ZipPath
+    Write-Step "Extraindo $($package.Tag)"
+    $release = Expand-StemmaPackage -Root $Root -Zip $package.Zip -Tag $package.Tag
+    $lock = Join-Path $release 'backend\uv.lock'
+
+    Enter-StemmaStage 'tools'
+    Initialize-StemmaRuntime -Root $Root -SkipPython
+    Enter-StemmaStage 'python'
+    Install-StemmaPython -Root $Root
+    if ($seed) {
+        Enter-StemmaStage 'seed'
+        Copy-UvCacheSeed -Source $userCache -Dest $paths.UvCache -LockPath $lock | Out-Null
+    }
 
     if (-not (Test-Path -LiteralPath $paths.EnvFile)) {
         Write-Step "Criando $($paths.EnvFile)"
@@ -1109,16 +1628,16 @@ function Invoke-StemmaInstall {
     }
     $context = Get-StemmaContext -Root $Root
 
-    $package = Get-StemmaPackage -Root $Root -Version $Version -ZipPath $ZipPath
-    Write-Step "Extraindo $($package.Tag)"
-    $release = Expand-StemmaPackage -Root $Root -Zip $package.Zip -Tag $package.Tag
+    Set-ComponentsStageWeight -Root $Root -LockPath $lock
+    Enter-StemmaStage 'components'
     Sync-ReleaseEnvironment -ReleaseDir $release -PreferOffline | Out-Null
 
-    Write-Step 'Migrations'
+    Enter-StemmaStage 'database'
     Import-DotEnv -Path $paths.EnvFile | Out-Null
     Invoke-Alembic -ReleaseDir $release -Arguments @('upgrade', 'head')
     Set-CurrentRelease -Root $Root -ReleaseDir $release
 
+    Enter-StemmaStage 'service'
     Register-StemmaService -Root $Root -ServiceId $ServiceId -ReleaseDir $release
     Set-StemmaInstallInfo -Root $Root -ServiceId $ServiceId -TailscaleServe (-not $SkipTailscale) -HttpsPort $HttpsPort
     Start-StemmaService -ServiceId $ServiceId
@@ -1127,10 +1646,20 @@ function Invoke-StemmaInstall {
     }
     # A escolha entre substituir a 443 de outro app ou usar a 8443 é feita antes (tela do Tailscale).
     if (-not $SkipTailscale) { Set-TailscaleServe -Port $context.Port -HttpsPort $HttpsPort }
+    Complete-StemmaProgress
     Write-Step "Stemma $($package.Tag) instalado em $Root"
     return $package.Tag
 }
 
+function Set-ComponentsStageWeight {
+    <# Repesa a etapa dos componentes pelo que falta no cache da instalação (~5 MB/s de download). #>
+    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$LockPath)
+    try {
+        $estimate = Get-StemmaSpaceEstimate -Root $Root -LockPath $LockPath -CacheDirs @((Get-StemmaPaths -Root $Root).UvCache)
+        Set-StemmaStageWeight -Id 'components' -Weight (2 + $estimate.DownloadBytes / 50MB)
+    }
+    catch { Write-Verbose "Estimativa dos componentes: $_" }
+}
 function Restart-StemmaAndCheck {
     param([string]$ServiceId, [int]$Port, [string]$Tag, [int]$HealthTimeoutSec)
     Stop-StemmaService -ServiceId $ServiceId
@@ -1159,22 +1688,39 @@ function Invoke-StemmaUpdate {
     $currentTag = $context.CurrentTag
     $paths = Get-StemmaPaths -Root $Root
     $userCache = Find-UserUvCache  # antes do Set-StemmaToolEnv, que troca o UV_CACHE_DIR
-    # Com o serviço no ar, só o uv e o Python (o serviço usa FFmpeg e Deno; eles vêm depois de parar).
-    Initialize-StemmaRuntime -Root $Root -Names @('uv')
     # Instalação feita pelos scripts da F5 (cache no perfil do usuário): semeia como na instalação.
-    if ($userCache -and (Test-EmptyDirectory $paths.UvCache)) {
-        Copy-UvCacheSeed -Source $userCache -Dest $paths.UvCache | Out-Null
-        Protect-StemmaDirectory -Path $paths.UvCache -Force
-    }
+    $seed = $userCache -and (Test-EmptyDirectory $paths.UvCache) -and (Test-SameVolume $userCache $Root)
+    $stages = @(
+        @{ Id = 'check'; Text = 'Conferindo a instalação'; Weight = 1 }
+        @{ Id = 'tools'; Text = 'Ferramentas'; Weight = 2 }
+        @{ Id = 'package'; Text = 'Extraindo a versão nova'; Weight = 2 }
+    )
+    if ($seed) { $stages += @{ Id = 'seed'; Text = 'Reaproveitando os componentes deste PC'; Weight = 3 } }
+    $stages += @(
+        @{ Id = 'components'; Text = 'Componentes da versão nova'; Weight = 2 }
+        @{ Id = 'stop'; Text = 'Parando o Stemma'; Weight = 1 }
+        @{ Id = 'backup'; Text = 'Backup do banco'; Weight = 1 }
+        @{ Id = 'database'; Text = 'Atualizando o banco'; Weight = 1 }
+        @{ Id = 'service'; Text = 'Iniciando a versão nova'; Weight = 4 }
+        @{ Id = 'cleanup'; Text = 'Limpando versões antigas'; Weight = 1 }
+    )
+    Start-StemmaProgress -Stages $stages
+    Enter-StemmaStage 'check'
+    # Antes de criar qualquer coisa: o que vier depois já herda a ACL (rápido se já protegida).
     Protect-StemmaDirectory -Path $Root
     Protect-StemmaDirectory -Path $context.StorageRoot
+    Enter-StemmaStage 'tools'
+    # Com o serviço no ar, só o uv e o Python (o serviço usa FFmpeg e Deno; eles vêm depois de parar).
+    Initialize-StemmaRuntime -Root $Root -Names @('uv')
     $context = Get-StemmaContext -Root $Root  # o .env pode ter ganhado chaves
 
+    Enter-StemmaStage 'package'
     $package = Get-StemmaPackage -Root $Root -Version $Version -ZipPath $ZipPath
     $target = $package.Tag
     if ($target -eq $currentTag) {
         # Mesma versão (ex.: instalação que falhou no meio e foi rodada de novo): só confere
         # ferramentas, serviço e /health.
+        Enter-StemmaStage 'service'
         Write-Step "Já está na $($target): conferindo"
         Import-DotEnv -Path (Join-Path $Root '.env') | Out-Null
         $running = (Get-Service -Name $ServiceId).Status -eq 'Running'
@@ -1183,19 +1729,29 @@ function Invoke-StemmaUpdate {
         if (-not (Wait-StemmaHealth -Port $context.Port -ExpectedVersion $target -TimeoutSec $HealthTimeoutSec)) {
             throw "A $target não respondeu no /health. Veja os logs em $Root\logs."
         }
+        Complete-StemmaProgress
         return $target
     }
 
     Write-Step "Atualizando $currentTag → $target"
     $release = Expand-StemmaPackage -Root $Root -Zip $package.Zip -Tag $target
+    $lock = Join-Path $release 'backend\uv.lock'
+    if ($seed) {
+        Enter-StemmaStage 'seed'
+        Copy-UvCacheSeed -Source $userCache -Dest $paths.UvCache -LockPath $lock | Out-Null
+    }
+    Set-ComponentsStageWeight -Root $Root -LockPath $lock
+    Enter-StemmaStage 'components'
     Sync-ReleaseEnvironment -ReleaseDir $release -PreferOffline | Out-Null
     Import-DotEnv -Path (Join-Path $Root '.env') | Out-Null
 
+    Enter-StemmaStage 'stop'
     Stop-StemmaService -ServiceId $ServiceId
     $backup = $null
     try {
         # Com o serviço parado: FFmpeg e Deno podem ser trocados (nenhum processo os usa).
         Initialize-StemmaRuntime -Root $Root -Names @('ffmpeg', 'deno') -SkipPython
+        Enter-StemmaStage 'backup'
         if (Test-StemmaDatabase $context) {
             Write-Step 'Backup do banco'
             $dest = New-BackupPath $context.StorageRoot "$currentTag-to-$target"
@@ -1204,9 +1760,11 @@ function Invoke-StemmaUpdate {
             $backup = $dest
         }
         else { Write-Host '    Banco ainda não existe: sem backup.' }
+        Enter-StemmaStage 'database'
         Write-Step 'Migrations'
         Invoke-Alembic -ReleaseDir $release -Arguments @('upgrade', 'head')
         Set-CurrentRelease -Root $Root -ReleaseDir $release
+        Enter-StemmaStage 'service'
         Start-StemmaService -ServiceId $ServiceId
         $expected = if ($SimulateFailure) { 'v0.0.0' } else { $target }
         if ($SimulateFailure) { Write-Warning 'SimulateFailure: a checagem do /health vai falhar de propósito.' }
@@ -1217,7 +1775,7 @@ function Invoke-StemmaUpdate {
     catch {
         $reason = $_.Exception.Message.TrimEnd('.')
         Write-Warning "Falhou: $reason"
-        Write-Step "Voltando para $currentTag"
+        Write-StemmaStage "Deu errado: voltando para $currentTag"
         Stop-StemmaService -ServiceId $ServiceId
         if ($backup -and (Test-Path -LiteralPath $backup)) {
             Write-Step 'Restaurando o banco do backup'
@@ -1231,12 +1789,14 @@ function Invoke-StemmaUpdate {
         throw "A atualização falhou ($reason) e a $currentTag não confirmou no /health. Veja $Root\logs."
     }
 
+    Enter-StemmaStage 'cleanup'
     Write-Step 'Limpando releases antigas'
     $names = @(Get-InstalledReleases -Root $Root | ForEach-Object { $_.Name })
     foreach ($name in (Select-ReleasesToRemove -Names $names -Keep 3 -Protect @($target, $currentTag))) {
         Write-Host "    removendo $name"
         Remove-Item -LiteralPath (Join-Path $Root "releases\$name") -Recurse -Force
     }
+    Complete-StemmaProgress
     Write-Step "Stemma $target no ar"
     return $target
 }

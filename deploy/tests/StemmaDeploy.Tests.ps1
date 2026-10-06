@@ -553,16 +553,41 @@ Describe 'Portas locais' {
         Should -Invoke -ModuleName StemmaDeploy Get-NetTCPConnection -Times 1 -Exactly
     }
 
-    It 'a instalação recusa uma porta em uso antes de mexer em qualquer coisa' {
+    It 'a instalação sem nenhuma porta livre falha antes de mexer em qualquer coisa' {
         Mock -ModuleName StemmaDeploy Test-StemmaService { $false }
         Mock -ModuleName StemmaDeploy Get-PortUsage { 'em uso por python (PID 4120)' }
-        Mock -ModuleName StemmaDeploy Find-FreePort { 8002 }
+        Mock -ModuleName StemmaDeploy Find-FreePort { $null }
         Mock -ModuleName StemmaDeploy Initialize-StemmaRuntime {}
         $root = Join-Path $TestDrive 'porta-ocupada'
-        { Invoke-StemmaInstall -Root $root -DataRoot (Join-Path $TestDrive 'dados') -Port 8001 -SkipTailscale } |
-            Should -Throw '*porta 8001 está em uso por python*8002*'
+        { Invoke-StemmaInstall -Root $root -DataRoot (Join-Path $TestDrive 'dados') -Port 8001 -SkipTailscale 6>$null } |
+            Should -Throw '*porta 8001 está em uso por python*não achei outra livre*'
         Should -Invoke -ModuleName StemmaDeploy Initialize-StemmaRuntime -Times 0 -Exactly
         Test-Path -LiteralPath $root | Should -BeFalse
+    }
+
+    It 'porta tomada entre o assistente e a instalação: usa a próxima livre (sem tela de porta)' {
+        $root = Join-Path $TestDrive 'porta-trocada'
+        Mock -ModuleName StemmaDeploy Test-StemmaService { $false }
+        Mock -ModuleName StemmaDeploy Get-PortUsage { if ($Port -eq 8001) { 'em uso por python (PID 4120)' } }
+        Mock -ModuleName StemmaDeploy Find-FreePort { 8002 }
+        Mock -ModuleName StemmaDeploy Find-UserUvCache { $null }
+        Mock -ModuleName StemmaDeploy Protect-StemmaDirectory {}
+        Mock -ModuleName StemmaDeploy Get-StemmaPackage { [pscustomobject]@{ Tag = 'v1.0.0'; Zip = 'x.zip' } }
+        Mock -ModuleName StemmaDeploy Expand-StemmaPackage { Join-Path $root 'releases\v1.0.0' }
+        Mock -ModuleName StemmaDeploy Initialize-StemmaRuntime {}
+        Mock -ModuleName StemmaDeploy Install-StemmaPython {}
+        Mock -ModuleName StemmaDeploy Set-ComponentsStageWeight {}
+        Mock -ModuleName StemmaDeploy Sync-ReleaseEnvironment { 'cache' }
+        Mock -ModuleName StemmaDeploy Invoke-Alembic {}
+        Mock -ModuleName StemmaDeploy Set-CurrentRelease {}
+        Mock -ModuleName StemmaDeploy Register-StemmaService {}
+        Mock -ModuleName StemmaDeploy Start-StemmaService {}
+        Mock -ModuleName StemmaDeploy Wait-StemmaHealth { $true }
+        Mock -ModuleName StemmaDeploy Write-Step {}
+
+        Invoke-StemmaInstall -Root $root -DataRoot (Join-Path $TestDrive 'dados-porta') -Port 8001 -SkipTailscale 6>$null | Should -Be 'v1.0.0'
+        (Read-DotEnv -Path (Join-Path $root '.env'))['PORT'] | Should -Be '8002'
+        Should -Invoke -ModuleName StemmaDeploy Wait-StemmaHealth -ParameterFilter { $Port -eq 8002 }
     }
 }
 
@@ -579,9 +604,9 @@ Describe 'Copy-UvCacheSeed' {
         $summary = Copy-UvCacheSeed -Source $src -Dest $dst 6>$null
         $summary.Linked | Should -Be 1
         $summary.Skipped | Should -Be 1
-        # Mesmo arquivo: mudar por um lado aparece do outro.
-        Add-Content -LiteralPath (Join-Path $dst 'archive-v0\abc\torch.py') -Value 'mais'
-        (Get-Content -LiteralPath (Join-Path $src 'archive-v0\abc\torch.py')) | Should -Be @('original', 'mais')
+        # Mesmo arquivo: a ACL protegida do link aparece também no cache do usuário.
+        Get-Content -LiteralPath (Join-Path $dst 'archive-v0\abc\torch.py') | Should -Be 'original'
+        (Get-Acl -LiteralPath (Join-Path $src 'archive-v0\abc\torch.py')).AreAccessRulesProtected | Should -BeTrue
         Get-Content -LiteralPath (Join-Path $dst 'archive-v0\abc\ja.py') | Should -Be 'já estava'
     }
 
@@ -604,6 +629,306 @@ Describe 'Copy-UvCacheSeed' {
         Mock -ModuleName StemmaDeploy Test-SameVolume { $false }
         Copy-UvCacheSeed -Source (Join-Path $TestDrive 'a') -Dest (Join-Path $TestDrive 'b') 6>$null | Should -BeNullOrEmpty
         Copy-UvCacheSeed -Source (Join-Path $TestDrive 'a') -Dest (Join-Path $TestDrive 'a') | Should -BeNullOrEmpty
+    }
+}
+
+Describe 'Semeadura seletiva do cache' {
+    BeforeAll {
+        function New-FakeCache([string]$Path, [hashtable]$Archives, [hashtable]$Pointers) {
+            # Archives: id → arquivos; Pointers: 'pacote\versão-tags' → id.
+            foreach ($id in $Archives.Keys) {
+                $dir = Join-Path $Path "archive-v0\$id"
+                New-Item -ItemType Directory -Force -Path $dir | Out-Null
+                foreach ($file in $Archives[$id]) { Set-Content -LiteralPath (Join-Path $dir $file) -Value $file }
+            }
+            foreach ($pointer in $Pointers.Keys) {
+                $file = Join-Path $Path "wheels-v6\index\abc\$pointer"
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $file) | Out-Null
+                [IO.File]::WriteAllText($file, "archive-v0/$($Pointers[$pointer])")
+                Set-Content -LiteralPath "$file.http" -Value 'metadados'
+            }
+            New-Item -ItemType Directory -Force -Path (Join-Path $Path 'simple-v24') | Out-Null
+            Set-Content -LiteralPath (Join-Path $Path 'simple-v24\indice') -Value 'x'
+        }
+        $script:lockText = @'
+version = 1
+
+[[package]]
+name = "Torch"
+version = "2.7.1+cu118"
+source = { registry = "https://download.pytorch.org/whl/cu118" }
+wheels = [
+    { url = "https://download-r2.pytorch.org/whl/cu118/torch-2.7.1%2Bcu118-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:aa" },
+    { url = "https://download-r2.pytorch.org/whl/cu118/torch-2.7.1%2Bcu118-cp312-cp312-win_amd64.whl", hash = "sha256:bb" },
+]
+
+[[package]]
+name = "typing-extensions"
+version = "4.15.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/x/typing_extensions-4.15.0.tar.gz", hash = "sha256:cc", size = 100 }
+wheels = [
+    { url = "https://files.pythonhosted.org/x/typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:dd", size = 44000 },
+]
+
+[[package]]
+name = "triton"
+version = "3.3.1"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/x/triton-3.3.1-cp312-cp312-manylinux_2_27_x86_64.whl", hash = "sha256:ee", size = 9000 },
+]
+
+[[package]]
+name = "so-sdist"
+version = "1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/x/so_sdist-1.0.tar.gz", hash = "sha256:ff", size = 5000 }
+
+[[package]]
+name = "stemma"
+version = "1.4.1"
+source = { editable = "." }
+'@
+    }
+
+    It 'lê do uv.lock a wheel do Windows, o tamanho e o que é preciso' {
+        $lock = Join-Path $TestDrive 'uv.lock'
+        Set-Content -LiteralPath $lock -Value $script:lockText -Encoding UTF8
+        $packages = @(Get-UvLockPackages -Path $lock)
+        $packages.Count | Should -Be 5
+        $torch = $packages | Where-Object Name -EQ 'Torch'
+        $torch.Key | Should -Be 'torch|2.7.1+cu118'
+        $torch.Wheel | Should -Be 'torch-2.7.1+cu118-cp312-cp312-win_amd64.whl'
+        $torch.Size | Should -BeNullOrEmpty
+        ($packages | Where-Object Name -EQ 'typing-extensions').Size | Should -Be 44000
+        ($packages | Where-Object Name -EQ 'so-sdist').Needed | Should -BeTrue
+        ($packages | Where-Object Name -EQ 'so-sdist').Size | Should -Be 5000
+        # Só de Linux e o próprio projeto: fora.
+        ($packages | Where-Object Name -EQ 'triton').Needed | Should -BeFalse
+        ($packages | Where-Object Name -EQ 'stemma').Needed | Should -BeFalse
+    }
+
+    It 'semeia só os archives do lock (mais as pastas pequenas)' {
+        $cache = Join-Path $TestDrive 'cache-plano'
+        New-FakeCache $cache @{ 'idTorch' = @('a.py'); 'idOutroTorch' = @('b.py'); 'idOutroProjeto' = @('c.py') } @{
+            'torch\2.7.1+cu118-cp312-cp312-win_amd64' = 'idTorch'
+            'torch\2.6.0-cp312-cp312-win_amd64'       = 'idOutroTorch'
+            'requests\2.32.0-py3-none-any'            = 'idOutroProjeto'
+        }
+        $lock = Join-Path $TestDrive 'uv-plano.lock'
+        Set-Content -LiteralPath $lock -Value $script:lockText -Encoding UTF8
+        $plan = Get-UvCacheSeedPlan -Source $cache -LockPath $lock
+        $plan.Selective | Should -BeTrue
+        $plan.Archives | Should -Be 1
+        $plan.Roots | Should -Contain 'archive-v0/idTorch'
+        $plan.Roots | Should -Contain 'wheels-v6'
+        $plan.Roots | Should -Contain 'simple-v24'
+        $plan.Roots | Should -Not -Contain 'archive-v0'
+    }
+
+    It 'semeia também o build backend do projeto, que não está no lock (qualquer versão)' {
+        $dir = Join-Path $TestDrive 'projeto-build'
+        $cache = Join-Path $TestDrive 'cache-build'
+        New-FakeCache $cache @{ 'idHatch' = @('h.py'); 'idPluggy' = @('p.py'); 'idTomlkit' = @('t.py'); 'idOutro' = @('o.py') } @{
+            'hatchling\1.32.4-py3-none-any' = 'idHatch'
+            'pluggy\1.6.0-py3-none-any'     = 'idPluggy'
+            'tomlkit\0.15.1-py3-none-any'   = 'idTomlkit'
+            'requests\2.32.0-py3-none-any'  = 'idOutro'
+        }
+        # Dependências do hatchling vêm do METADATA da wheel no cache (as de extras não).
+        foreach ($meta in @(
+                @('idHatch', 'hatchling-1.32.4', @('Requires-Dist: pluggy>=1.0.0', 'Requires-Dist: Tomlkit>=0.11.1', 'Requires-Dist: requests; extra == "web"')),
+                @('idPluggy', 'pluggy-1.6.0', @()))) {
+            $info = Join-Path $cache "archive-v0\$($meta[0])\$($meta[1]).dist-info"
+            New-Item -ItemType Directory -Force -Path $info | Out-Null
+            Set-Content -LiteralPath (Join-Path $info 'METADATA') -Value (@('Metadata-Version: 2.4', "Name: $($meta[1])") + $meta[2] + @('', 'Requires-Dist: requests'))
+        }
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        Set-Content -LiteralPath (Join-Path $dir 'uv.lock') -Value $script:lockText -Encoding UTF8
+        Set-Content -LiteralPath (Join-Path $dir 'pyproject.toml') -Encoding UTF8 -Value @(
+            '[build-system]', 'requires = ["hatchling>=1.25"]', 'build-backend = "hatchling.build"'
+        )
+        $names = Get-BuildBackendNames -PyprojectPath (Join-Path $dir 'pyproject.toml')
+        $names | Should -Contain 'hatchling'
+        $names | Should -Contain 'editables'  # pedido só no build editável
+        $plan = Get-UvCacheSeedPlan -Source $cache -LockPath (Join-Path $dir 'uv.lock')
+        $plan.Roots | Should -Contain 'archive-v0/idHatch'
+        $plan.Roots | Should -Contain 'archive-v0/idPluggy'
+        $plan.Roots | Should -Contain 'archive-v0/idTomlkit'
+        $plan.Roots | Should -Not -Contain 'archive-v0/idOutro'
+    }
+
+    It 'cache reconhecido, mas sem nada do Stemma: só as pastas pequenas, nunca o cache inteiro' {
+        $cache = Join-Path $TestDrive 'cache-de-outros'
+        New-FakeCache $cache @{ 'idOutroProjeto' = @('c.py') } @{ 'requests\2.32.0-py3-none-any' = 'idOutroProjeto' }
+        $lock = Join-Path $TestDrive 'uv-outros.lock'
+        Set-Content -LiteralPath $lock -Value $script:lockText -Encoding UTF8
+        $plan = Get-UvCacheSeedPlan -Source $cache -LockPath $lock
+        $plan.Selective | Should -BeTrue
+        $plan.Roots | Should -Not -Contain 'archive-v0'
+        @($plan.Roots | Where-Object { $_ -like 'archive-v0*' }).Count | Should -Be 0
+    }
+
+    It 'lê o requires só da seção [build-system]' {
+        $file = Join-Path $TestDrive 'pyproject-secoes.toml'
+        Set-Content -LiteralPath $file -Encoding UTF8 -Value @(
+            '[build-system]', 'build-backend = "flit_core.buildapi"', '',
+            '[tool.outro]', 'requires = ["nao-e-backend"]'
+        )
+        Get-BuildBackendNames -PyprojectPath $file | Should -BeNullOrEmpty
+        Set-Content -LiteralPath $file -Encoding UTF8 -Value @('[project]', 'name = "x"', '', '[build-system]', 'requires = ["Flit_Core>=3"]')
+        Get-BuildBackendNames -PyprojectPath $file | Should -Be @('flit-core')
+    }
+
+    It 'na atualização, a estimativa usa só o cache da instalação (o do usuário não é semeado)' {
+        $root = Join-Path $TestDrive 'raiz-caches'
+        $user = Join-Path $TestDrive 'cache-do-usuario'
+        New-Item -ItemType Directory -Force -Path $user | Out-Null
+        Mock -ModuleName StemmaDeploy Test-SameVolume { $true }
+        Get-StemmaCacheDirs -Root $root -UserCache $user | Should -Be @($user)
+        New-Item -ItemType Directory -Force -Path (Join-Path $root 'cache\uv\wheels-v6') | Out-Null
+        Get-StemmaCacheDirs -Root $root -UserCache $user | Should -Be @((Join-Path $root 'cache\uv'))
+    }
+
+    It 'sem ponteiros (formato do cache mudou) semeia o archive inteiro' {
+        $cache = Join-Path $TestDrive 'cache-sem-ponteiro'
+        New-FakeCache $cache @{ 'id1' = @('a.py') } @{}
+        $lock = Join-Path $TestDrive 'uv-sem.lock'
+        Set-Content -LiteralPath $lock -Value $script:lockText -Encoding UTF8
+        $plan = Get-UvCacheSeedPlan -Source $cache -LockPath $lock
+        $plan.Selective | Should -BeFalse
+        $plan.Roots | Should -Contain 'archive-v0'
+    }
+
+    It 'liga só o que o lock usa, e o arquivo ligado ganha uma ACL protegida (Usuários só leitura)' -Skip:(-not $OnWindows) {
+        $src = Join-Path $TestDrive 'cache-acl'
+        $dst = Join-Path $TestDrive 'cache-acl-destino'
+        New-FakeCache $src @{ 'idTorch' = @('torch.py'); 'idOutroProjeto' = @('outro.py') } @{
+            'torch\2.7.1+cu118-cp312-cp312-win_amd64' = 'idTorch'
+            'requests\2.32.0-py3-none-any'            = 'idOutroProjeto'
+        }
+        $file = Join-Path $src 'archive-v0\idTorch\torch.py'
+        # Entrada explícita no arquivo de origem (como as do perfil do usuário).
+        $acl = Get-Acl -LiteralPath $file
+        $everyone = [Security.Principal.SecurityIdentifier]::new('S-1-1-0')
+        $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($everyone, 'Modify', 'Allow'))
+        Set-Acl -LiteralPath $file -AclObject $acl
+        (Get-Acl -LiteralPath $file).Access.Where({ -not $_.IsInherited }).Count | Should -BeGreaterThan 0
+        $lock = Join-Path $TestDrive 'uv-acl.lock'
+        Set-Content -LiteralPath $lock -Value $script:lockText -Encoding UTF8
+        Mock -ModuleName StemmaDeploy Write-Step {}
+
+        $summary = Copy-UvCacheSeed -Source $src -Dest $dst -LockPath $lock 6>$null
+        $summary.Selective | Should -BeTrue
+        $summary.Failed | Should -Be 0
+        Test-Path -LiteralPath (Join-Path $dst 'archive-v0\idTorch\torch.py') | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $dst 'archive-v0\idOutroProjeto') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $dst 'wheels-v6\index\abc\torch\2.7.1+cu118-cp312-cp312-win_amd64') | Should -BeTrue
+        # Mesmo arquivo dos dois lados: sem herança (uma propagação pelo perfil do usuário não o
+        # abre de novo) e só SYSTEM, Administradores e Usuários (leitura).
+        foreach ($path in (Join-Path $dst 'archive-v0\idTorch\torch.py'), $file) {
+            $acl = Get-Acl -LiteralPath $path
+            $acl.AreAccessRulesProtected | Should -BeTrue
+            $rules = @($acl.Access | ForEach-Object {
+                    [pscustomobject]@{ Sid = $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value; Rights = $_.FileSystemRights.ToString() }
+                })
+            @($rules | ForEach-Object Sid | Sort-Object) | Should -Be @('S-1-5-18', 'S-1-5-32-544', 'S-1-5-32-545')
+            ($rules | Where-Object Sid -EQ 'S-1-5-32-545').Rights | Should -Not -Match 'Write|Modify|FullControl'
+        }
+    }
+
+    It 'estima o download pelo que falta nos caches (torch sem tamanho no lock = ~2,9 GB)' {
+        $lock = Join-Path $TestDrive 'uv-estimativa.lock'
+        Set-Content -LiteralPath $lock -Value $script:lockText -Encoding UTF8
+        $root = Join-Path $TestDrive 'raiz-estimativa'
+        $vazio = Get-StemmaSpaceEstimate -Root $root -LockPath $lock
+        $vazio.Needed | Should -Be 3
+        $vazio.Missing | Should -Be 3
+        $vazio.DownloadBytes | Should -Be ([long]2.9GB + 44000 + 5000)
+        $vazio.NeedRootBytes | Should -Be (2 * $vazio.DownloadBytes + 600MB)
+
+        $cache = Join-Path $TestDrive 'cache-estimativa'
+        New-FakeCache $cache @{ 'idTorch' = @('a.py') } @{ 'torch\2.7.1+cu118-cp312-cp312-win_amd64' = 'idTorch' }
+        $comCache = Get-StemmaSpaceEstimate -Root $root -LockPath $lock -CacheDirs @($cache)
+        $comCache.Missing | Should -Be 2
+        $comCache.DownloadBytes | Should -Be (44000 + 5000)
+    }
+}
+
+Describe 'Progresso por etapas' {
+    BeforeEach { Set-StemmaProgressProtocol $true }
+    AfterEach { Set-StemmaProgressProtocol $false }
+
+    It 'calcula o avanço pelo peso das etapas' {
+        $stages = @([pscustomobject]@{ Weight = 1 }, [pscustomobject]@{ Weight = 3 })
+        Get-StemmaProgressValue -Stages $stages -Index 0 | Should -Be 0
+        Get-StemmaProgressValue -Stages $stages -Index 1 | Should -Be 250
+        Get-StemmaProgressValue -Stages $stages -Index 1 -Fraction 0.5 | Should -Be 625
+        Get-StemmaProgressValue -Stages $stages -Index 1 -Fraction 2 | Should -Be 1000
+    }
+
+    It 'numera as etapas e a barra só anda para a frente' {
+        $output = & {
+            Start-StemmaProgress -Stages @(
+                @{ Id = 'a'; Text = 'Primeira'; Weight = 1 }
+                @{ Id = 'b'; Text = 'Segunda'; Weight = 1 }
+            )
+            Enter-StemmaStage 'a'
+            Set-StemmaStageProgress 0.5
+            Set-StemmaStageProgress 0.4  # não volta
+            Enter-StemmaStage 'b'
+            Set-StemmaStageProgress 0.5
+            Complete-StemmaProgress
+        } 6>&1 | ForEach-Object { "$_" }
+        $output | Should -Contain '##STAGE Etapa 1 de 2: Primeira'
+        $output | Should -Contain '##STAGE Etapa 2 de 2: Segunda'
+        $values = @($output | Where-Object { $_ -like '##PROGRESS *' } | ForEach-Object { [int]($_ -split ' ')[1] })
+        $values | Should -Be @(0, 250, 500, 750, 1000)
+    }
+
+    It 'repesar uma etapa mantém o que a barra já mostra e ela continua andando' {
+        $output = & {
+            Start-StemmaProgress -Stages @(
+                @{ Id = 'a'; Text = 'Antes'; Weight = 3 }
+                @{ Id = 'download'; Text = 'Download'; Weight = 1 }
+                @{ Id = 'c'; Text = 'Depois'; Weight = 1 }
+            )
+            Enter-StemmaStage 'a'
+            Set-StemmaStageProgress 1   # 600
+            # Vai baixar muito: o download passa a pesar 30.
+            Set-StemmaStageWeight -Id 'download' -Weight 30
+            Enter-StemmaStage 'download'  # continua 600
+            Set-StemmaStageProgress 0.1   # tem de andar logo, sem esperar o valor antigo
+        } 6>&1 | ForEach-Object { "$_" }
+        $values = @($output | Where-Object { $_ -like '##PROGRESS *' } | ForEach-Object { [int]($_ -split ' ')[1] })
+        $values[1] | Should -Be 600
+        $values[-1] | Should -BeGreaterThan 600
+        $values[-1] | Should -BeLessThan 700
+    }
+
+    It 'sem o protocolo não escreve ##PROGRESS e a etapa vira um Write-Step' {
+        Set-StemmaProgressProtocol $false
+        $output = & {
+            Start-StemmaProgress -Stages @(@{ Id = 'a'; Text = 'Única'; Weight = 1 })
+            Enter-StemmaStage 'a'
+            Complete-StemmaProgress
+        } 6>&1 | ForEach-Object { "$_" }
+        $output | Should -Be @('==> Etapa 1 de 1: Única')
+    }
+
+    It 'acompanha o download do uv pelas linhas Downloading/Downloaded' {
+        $tracker = New-UvDownloadTracker
+        Update-UvDownloadTracker -Tracker $tracker -Line 'Resolved 80 packages in 3ms' | Should -BeFalse
+        Update-UvDownloadTracker -Tracker $tracker -Line 'Downloading torch (3.0GiB)' | Should -BeTrue
+        Update-UvDownloadTracker -Tracker $tracker -Line 'Downloading numpy (1.0GiB)' | Should -BeTrue
+        Update-UvDownloadTracker -Tracker $tracker -Line ' Downloaded numpy' | Should -BeTrue
+        $status = Get-UvDownloadStatus -Tracker $tracker
+        $status.Total | Should -Be 4GB
+        $status.Fraction | Should -Be 0.25
+        Format-StemmaSize $status.Done | Should -Be '1,0 GB'
+        Format-StemmaSize 340MB | Should -Be '340 MB'
+        ConvertFrom-ByteSize '915.5KiB' | Should -Be ([long](915.5 * 1KB))
     }
 }
 
@@ -704,6 +1029,32 @@ Describe 'Invoke-StemmaInstall' {
         { Invoke-StemmaInstall -Root $root -DataRoot (Join-Path $TestDrive 'dados') } | Should -Throw '*Tailscale não está pronto*'
         Should -Invoke -ModuleName StemmaDeploy Initialize-StemmaRuntime -Times 0 -Exactly
         Test-Path -LiteralPath $root | Should -BeFalse
+    }
+
+    It 'protege as pastas antes de criar qualquer coisa e semeia com o lock da release' {
+        $root = Join-Path $TestDrive 'ordem'
+        $script:calls = [Collections.Generic.List[string]]::new()
+        Mock -ModuleName StemmaDeploy Test-StemmaService { $false }
+        Mock -ModuleName StemmaDeploy Get-PortUsage { $null }
+        Mock -ModuleName StemmaDeploy Find-UserUvCache { 'C:\cache-usuario' }
+        Mock -ModuleName StemmaDeploy Test-SameVolume { $true }
+        Mock -ModuleName StemmaDeploy Protect-StemmaDirectory { $script:calls.Add("protect:$(Split-Path -Leaf $Path)") }
+        Mock -ModuleName StemmaDeploy Get-StemmaPackage { [pscustomobject]@{ Tag = 'v1.0.0'; Zip = 'x.zip' } }
+        Mock -ModuleName StemmaDeploy Expand-StemmaPackage { $script:calls.Add('package'); Join-Path $root 'releases\v1.0.0' }
+        Mock -ModuleName StemmaDeploy Initialize-StemmaRuntime { $script:calls.Add('tools') }
+        Mock -ModuleName StemmaDeploy Install-StemmaPython { $script:calls.Add('python') }
+        Mock -ModuleName StemmaDeploy Copy-UvCacheSeed { $script:calls.Add("seed:$(Split-Path -Leaf $LockPath)") }
+        Mock -ModuleName StemmaDeploy Set-ComponentsStageWeight {}
+        Mock -ModuleName StemmaDeploy Sync-ReleaseEnvironment { $script:calls.Add('sync'); 'cache' }
+        Mock -ModuleName StemmaDeploy Invoke-Alembic {}
+        Mock -ModuleName StemmaDeploy Set-CurrentRelease {}
+        Mock -ModuleName StemmaDeploy Register-StemmaService {}
+        Mock -ModuleName StemmaDeploy Start-StemmaService {}
+        Mock -ModuleName StemmaDeploy Wait-StemmaHealth { $true }
+        Mock -ModuleName StemmaDeploy Write-Step {}
+
+        Invoke-StemmaInstall -Root $root -DataRoot (Join-Path $TestDrive 'dados-ordem') -SkipTailscale 6>$null | Should -Be 'v1.0.0'
+        $script:calls | Should -Be @('protect:ordem', 'protect:dados-ordem', 'package', 'tools', 'python', 'seed:uv.lock', 'sync')
     }
 }
 

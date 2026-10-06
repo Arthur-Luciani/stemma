@@ -1,0 +1,112 @@
+.loop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.mark,
+.clearIcon,
+.clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  color: var(--text-body);
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+.mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.clearIcon {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.mark:focus-visible,
+.clearIcon:focus-visible,
+.clear:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 1px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--bg-soft);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.on {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.range {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono-size);
+  color: var(--text-body);
+}
+
+/* Celular: chip de 44px, "Limpar" à direita. */
+.practice .chip {
+  height: var(--touch-min);
+  padding: 0 14px;
+  border-radius: 22px;
+  font-size: 14px;
+}
+
+.practice .range {
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.clear {
+  margin-left: auto;
+  height: var(--touch-min);
+  padding: 0 12px;
+  border: none;
+  border-radius: 22px;
+  background: transparent;
+  font-size: 14px;
+}
+
+@media (hover: hover) {
+  .mark:hover,
+  .clearIcon:hover {
+    background: var(--bg-raised-2);
+    color: var(--text-strong);
+  }
+}

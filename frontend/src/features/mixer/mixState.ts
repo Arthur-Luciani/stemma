@@ -4,6 +4,7 @@
  */
 
 import type { MixPreset, MixState, MixStateIn, Stem, StemMix } from '../../api/types';
+import { effectiveGains } from '../../audio/mixLogic';
 import { STEMS } from '../../audio/stems';
 
 export type StemsMix = Record<Stem, StemMix>;
@@ -115,6 +116,43 @@ export function mixerReducer(state: MixerState, action: MixerAction): MixerState
     case 'loop':
       return { ...state, loop: action.loop };
   }
+}
+
+/** Loop mais curto que isso (s) não vale. */
+export const MIN_LOOP_S = 0.5;
+
+type LoopRange = NonNullable<MixerState['loop']>;
+
+export interface LoopMark {
+  loop: LoopRange | null;
+  /** A marcado esperando o B (só na tela, não é salvo). */
+  pendingA: number | null;
+}
+
+/** Tecla/botão A: com um B à frente, move o A; senão o A fica esperando o B. */
+export function markA(position: number, loop: LoopRange | null): LoopMark {
+  if (loop && position < loop.b - MIN_LOOP_S)
+    return { loop: { a: position, b: loop.b }, pendingA: null };
+  return { loop: null, pendingA: position };
+}
+
+/** Tecla/botão B: fecha o loop a partir do A pendente (ou do A atual, ou do início). */
+export function markB(position: number, loop: LoopRange | null, pendingA: number | null): LoopMark {
+  const a = pendingA ?? loop?.a ?? 0;
+  if (position > a + MIN_LOOP_S) return { loop: { a, b: position }, pendingA: null };
+  return { loop, pendingA };
+}
+
+/** Arrasto na timeline (s, em qualquer ordem): loop se tiver o tamanho mínimo. */
+export function loopFromDrag(from: number, to: number): LoopRange | null {
+  const a = Math.max(0, Math.min(from, to));
+  const b = Math.max(from, to);
+  return b - a >= MIN_LOOP_S ? { a, b } : null;
+}
+
+/** Volume que sai de fato (0–100): mudo, ou fora de um solo, é 0. */
+export function effectiveVolume(stems: StemsMix, stem: Stem): number {
+  return Math.round(effectiveGains(stems)[stem] * 100);
 }
 
 /** Rótulo do pan: `C`, `L30`, `R20`. */

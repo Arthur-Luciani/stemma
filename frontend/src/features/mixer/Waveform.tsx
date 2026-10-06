@@ -11,13 +11,16 @@ const GAP = 1;
 
 interface WaveformProps {
   peaks: readonly number[] | undefined;
-  stem: Stem;
+  /** Cor: a do stem, ou `mix` (waveform única do celular: cinza e âmbar no já tocado). */
+  tone: Stem | 'mix';
   /** Stem mudo: cor a 30% e waveform tracejada. */
   muted?: boolean;
   duration: number;
   loop?: Loop | null;
   /** Toque/clique na waveform: posição em fração (0–1). */
   onSeek?: (ratio: number) => void;
+  /** Sem playhead próprio (quando um playhead atravessa várias waveforms). */
+  playhead?: boolean;
   className?: string;
 }
 
@@ -28,11 +31,12 @@ interface WaveformProps {
  */
 export function Waveform({
   peaks,
-  stem,
+  tone,
   muted = false,
   duration,
   loop,
   onSeek,
+  playhead = true,
   className,
 }: WaveformProps) {
   const rest = useRef<HTMLCanvasElement>(null);
@@ -62,7 +66,7 @@ export function Waveform({
 
   return (
     <div
-      className={cx(styles.wave, styles[stem], muted && styles.muted, className)}
+      className={cx(styles.wave, styles[tone], muted && styles.muted, className)}
       onPointerDown={handlePointer}
       aria-hidden="true"
     >
@@ -77,7 +81,7 @@ export function Waveform({
       )}
       <canvas ref={rest} className={styles.rest} />
       <canvas ref={played} className={styles.played} />
-      <div className={styles.playhead} />
+      {playhead && <div className={styles.playhead} />}
     </div>
   );
 }

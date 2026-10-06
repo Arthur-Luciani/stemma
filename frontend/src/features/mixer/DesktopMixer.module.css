@@ -1,0 +1,231 @@
+.mixer {
+  --lane-header: 280px;
+
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--topbar-height));
+  min-height: 640px;
+  /* O rodapé do layout reserva espaço para o dock; aqui o mixer ocupa a tela. */
+  margin-bottom: -96px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+  padding: 20px var(--space-5) var(--space-4);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: var(--text-display-tracking);
+  color: var(--text-strong);
+}
+
+.meta {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 64px;
+  margin: 0 var(--space-5);
+  padding: 0 var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.time {
+  padding: 0 var(--space-3) 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text-strong);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.total {
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+.divider {
+  flex: none;
+  width: 1px;
+  height: 28px;
+  margin: 0 6px;
+  background: var(--line);
+}
+
+.metrics {
+  margin-left: auto;
+}
+
+.lanesArea {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) 0;
+  overflow-y: auto;
+}
+
+/* A régua só cobre a coluna das waveforms. */
+.ruler {
+  margin-left: calc(var(--lane-header) + 1px);
+}
+
+.lanes {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lane {
+  display: flex;
+  height: 136px;
+  flex: none;
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.laneHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: none;
+  width: var(--lane-header);
+  padding: 14px var(--space-4);
+  box-sizing: border-box;
+  border-right: 1px solid var(--line);
+}
+
+.laneTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.stemName {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.controlRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.controlLabel {
+  width: 32px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.value {
+  width: 40px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-strong);
+}
+
+.wave {
+  flex: 1;
+  min-width: 0;
+  margin: var(--space-2) 0;
+}
+
+.timeline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--lane-header) + 1px);
+  right: 1px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.loop {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent-soft);
+  border-inline: 1px solid var(--accent);
+  pointer-events: none;
+}
+
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--progress, 0) * 100%);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text-strong);
+  pointer-events: none;
+}
+
+.hints {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: none;
+  height: 44px;
+  padding: 0 var(--space-5);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.kbd {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg-soft);
+  color: var(--text-body);
+  font-family: var(--font-mono);
+}

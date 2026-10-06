@@ -1,5 +1,9 @@
 import {
+  effectiveVolume,
   formatPan,
+  loopFromDrag,
+  markA,
+  markB,
   fromServer,
   matchPreset,
   mixerReducer,
@@ -128,5 +132,44 @@ describe('formatPan', () => {
     [-1, 'L100'],
   ])('%s → %s', (pan, label) => {
     expect(formatPan(pan)).toBe(label);
+  });
+});
+
+describe('marcar loop A–B', () => {
+  it('A e depois B fecham o loop', () => {
+    const first = markA(10, null);
+    expect(first).toEqual({ loop: null, pendingA: 10 });
+    expect(markB(20, first.loop, first.pendingA)).toEqual({
+      loop: { a: 10, b: 20 },
+      pendingA: null,
+    });
+  });
+
+  it('A antes do B de um loop existente move o A; depois do B recomeça', () => {
+    const loop = { a: 10, b: 20 };
+    expect(markA(5, loop)).toEqual({ loop: { a: 5, b: 20 }, pendingA: null });
+    expect(markA(25, loop)).toEqual({ loop: null, pendingA: 25 });
+  });
+
+  it('B sem A começa do início; B antes do A é ignorado', () => {
+    expect(markB(8, null, null)).toEqual({ loop: { a: 0, b: 8 }, pendingA: null });
+    expect(markB(9, { a: 10, b: 20 }, null)).toEqual({ loop: { a: 10, b: 20 }, pendingA: null });
+    expect(markB(10.2, null, 10)).toEqual({ loop: null, pendingA: 10 });
+  });
+
+  it('arrasto vira loop em qualquer direção, se tiver o tamanho mínimo', () => {
+    expect(loopFromDrag(30, 12)).toEqual({ a: 12, b: 30 });
+    expect(loopFromDrag(12, 12.2)).toBeNull();
+  });
+});
+
+describe('effectiveVolume', () => {
+  it('é o volume, ou 0 se mudo ou fora do solo', () => {
+    let stems = presetStems('no_drums');
+    expect(effectiveVolume(stems, 'drums')).toBe(0);
+    expect(effectiveVolume(stems, 'vocals')).toBe(100);
+    stems = mixerReducer({ stems, loop: null }, { type: 'solo', stem: 'bass' }).stems;
+    expect(effectiveVolume(stems, 'vocals')).toBe(0);
+    expect(effectiveVolume(stems, 'bass')).toBe(100);
   });
 });

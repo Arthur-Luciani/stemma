@@ -8,6 +8,8 @@ import { useErrorToast } from '../../app/useErrorToast';
 import type { AudioEngine } from '../../audio/AudioEngine';
 import {
   fromServer,
+  markA,
+  markB,
   matchPreset,
   mixerReducer,
   toMixStateIn,
@@ -26,6 +28,10 @@ export interface Mixer {
   dispatch: (action: MixerAction) => void;
   /** Salva agora o que estiver pendente (ex.: antes de exportar). */
   flush: () => Promise<void>;
+  /** A marcado esperando o B (só na tela). */
+  pendingA: number | null;
+  markA: (position: number) => void;
+  markB: (position: number) => void;
 }
 
 /**
@@ -48,6 +54,8 @@ export function useMixer(
   });
 
   const [state, setState] = useState<MixerState | null>(null);
+  const [pendingA, setPendingA] = useState<number | null>(null);
+  const pendingARef = useRef<number | null>(null);
   const stateRef = useRef<MixerState | null>(null);
   /** Corpo (JSON) do último mix salvo ou carregado: igual a ele não precisa salvar. */
   const savedRef = useRef<string | null>(null);
@@ -97,6 +105,11 @@ export function useMixer(
       const next = mixerReducer(current, action);
       stateRef.current = next;
       setState(next);
+      // Mexer no loop (limpar, arrastar) descarta um A que esperava o B.
+      if (action.type === 'loop' && pendingARef.current !== null) {
+        pendingARef.current = null;
+        setPendingA(null);
+      }
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
@@ -104,6 +117,29 @@ export function useMixer(
       }, debounceMs);
     },
     [save, debounceMs],
+  );
+
+  const applyMark = useCallback(
+    (mark: { loop: MixerState['loop']; pendingA: number | null }) => {
+      if (mark.loop !== stateRef.current?.loop) dispatch({ type: 'loop', loop: mark.loop });
+      pendingARef.current = mark.pendingA;
+      setPendingA(mark.pendingA);
+    },
+    [dispatch],
+  );
+
+  const onMarkA = useCallback(
+    (position: number) => {
+      if (stateRef.current) applyMark(markA(position, stateRef.current.loop));
+    },
+    [applyMark],
+  );
+
+  const onMarkB = useCallback(
+    (position: number) => {
+      if (stateRef.current) applyMark(markB(position, stateRef.current.loop, pendingARef.current));
+    },
+    [applyMark],
   );
 
   // Sair da tela, fechar a aba ou mandar o app para o fundo salva o que estiver pendente.
@@ -136,5 +172,8 @@ export function useMixer(
     loadError: query.error,
     dispatch,
     flush: save,
+    pendingA,
+    markA: onMarkA,
+    markB: onMarkB,
   };
 }

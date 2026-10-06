@@ -1,0 +1,57 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: var(--bg-soft);
+  color: var(--text-body);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 1px;
+}
+
+.sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.md {
+  width: var(--touch-min);
+  height: var(--touch-min);
+  font-size: 15px;
+}
+
+.wide {
+  flex: 1;
+  height: var(--touch-min);
+  border-color: var(--line);
+  font-size: 14px;
+}
+
+.mute.active {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: var(--bad-ink);
+}
+
+.solo.active {
+  background: var(--solo);
+  border-color: var(--solo);
+  color: var(--solo-ink);
+}
+
+@media (hover: hover) {
+  .button:not(.active):hover {
+    background: var(--bg-raised-2);
+    color: var(--text-strong);
+  }
+}

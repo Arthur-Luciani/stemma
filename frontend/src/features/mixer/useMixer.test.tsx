@@ -118,6 +118,32 @@ describe('useMixer', () => {
     expect(puts).toHaveLength(1);
   });
 
+  it('marca A e depois B; limpar descarta um A pendente', async () => {
+    const { result } = setup({ debounceMs: 60_000 });
+    await waitFor(() => {
+      expect(result.current.state).not.toBeNull();
+    });
+    act(() => {
+      result.current.markA(30);
+    });
+    expect(result.current.pendingA).toBe(30);
+    expect(result.current.state?.loop).toBeNull();
+    act(() => {
+      result.current.markB(45);
+    });
+    expect(result.current.state?.loop).toEqual({ a: 30, b: 45 });
+    expect(result.current.pendingA).toBeNull();
+
+    act(() => {
+      result.current.markA(50);
+    });
+    expect(result.current.pendingA).toBe(50);
+    act(() => {
+      result.current.dispatch({ type: 'loop', loop: null });
+    });
+    expect(result.current.pendingA).toBeNull();
+  });
+
   it('aplica o mix e o loop no AudioEngine', async () => {
     const engine = { setMix: vi.fn(), setLoop: vi.fn() };
     const { result } = setup({ engine: engine as unknown as AudioEngine });

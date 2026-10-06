@@ -1,0 +1,132 @@
+.transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.skip,
+.play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+.skip {
+  background: var(--bg-soft);
+  color: var(--text-strong);
+}
+
+.play {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.skip:focus-visible,
+.play:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+.skip:disabled,
+.play:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Barra do desktop: ícones 40×40 sem fundo, play 48. */
+.bar .skip {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-body);
+}
+
+.bar .play {
+  width: 48px;
+  height: 48px;
+}
+
+.bar .play span {
+  font-size: 28px;
+}
+
+/* Gaveta do 1e: 52 / 68 / 52. */
+.drawer {
+  gap: 14px;
+}
+
+.drawer .skip {
+  width: 52px;
+  height: 52px;
+}
+
+.drawer .skip span {
+  font-size: 26px;
+}
+
+.drawer .play {
+  width: 68px;
+  height: 68px;
+}
+
+.drawer .play span {
+  font-size: 38px;
+}
+
+/* Modo prática (1f): 68 / 104 / 68, para tocar com o celular na estante. */
+.practice {
+  gap: 24px;
+}
+
+.practice .skip {
+  width: 68px;
+  height: 68px;
+  background: var(--bg-surface);
+  border-color: var(--line);
+}
+
+.practice .skip span {
+  font-size: 32px;
+}
+
+.practice .play {
+  width: 104px;
+  height: 104px;
+}
+
+.practice .play span {
+  font-size: 56px;
+}
+
+/* Paisagem (1g): 48 / 60 / 48. */
+.console {
+  gap: 10px;
+}
+
+.console .skip {
+  width: 48px;
+  height: 48px;
+}
+
+.console .play {
+  width: 60px;
+  height: 60px;
+}
+
+.console .play span {
+  font-size: 34px;
+}
+
+@media (hover: hover) {
+  .bar .skip:not(:disabled):hover {
+    background: var(--bg-soft);
+    color: var(--text-strong);
+  }
+}

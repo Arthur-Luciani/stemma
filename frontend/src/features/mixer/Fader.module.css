@@ -1,0 +1,113 @@
+.fader {
+  --track: 4px;
+  --thumb: 16px;
+
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  outline: none;
+}
+
+.fader:focus-visible .thumb {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+.track,
+.fill,
+.thumb {
+  position: absolute;
+  pointer-events: none;
+}
+
+.track,
+.fill {
+  border-radius: calc(var(--track) / 2);
+}
+
+.track {
+  background: var(--line);
+}
+
+.fill {
+  background: var(--fader-color);
+}
+
+.thumb {
+  background: var(--text-strong);
+}
+
+/* Horizontal: rolar a página na vertical continua funcionando por cima do fader. */
+.horizontal {
+  height: 24px;
+  touch-action: pan-y;
+}
+
+.horizontal .track,
+.horizontal .fill {
+  top: calc(50% - var(--track) / 2);
+  left: 0;
+  height: var(--track);
+}
+
+.horizontal .track {
+  right: 0;
+}
+
+.horizontal .fill {
+  width: calc(var(--fader-value) * 100%);
+}
+
+.horizontal .thumb {
+  top: calc(50% - var(--thumb) / 2);
+  left: calc(var(--fader-value) * 100% - var(--thumb) / 2);
+  width: var(--thumb);
+  height: var(--thumb);
+  border-radius: 50%;
+}
+
+.horizontal.touch {
+  --track: 8px;
+  --thumb: 28px;
+
+  height: var(--touch-min);
+}
+
+.touch .thumb {
+  box-shadow: var(--shadow-float);
+}
+
+/* Vertical (console em paisagem): trilho 6px, thumb 44×18. */
+.vertical {
+  --track: 6px;
+
+  align-self: center;
+  width: var(--touch-min);
+  height: 100%;
+  min-height: 96px;
+  touch-action: none;
+}
+
+.vertical .track,
+.vertical .fill {
+  left: calc(50% - var(--track) / 2);
+  bottom: 0;
+  width: var(--track);
+}
+
+.vertical .track {
+  top: 0;
+}
+
+.vertical .fill {
+  height: calc(var(--fader-value) * 100%);
+}
+
+.vertical .thumb {
+  left: 0;
+  bottom: calc(var(--fader-value) * 100% - 9px);
+  width: 100%;
+  height: 18px;
+  border-radius: 6px;
+}

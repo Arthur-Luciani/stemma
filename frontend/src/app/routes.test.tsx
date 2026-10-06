@@ -2,7 +2,8 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
-import { makeSession } from '../test/fixtures';
+import { stubAudioGlobals } from '../test/audio';
+import { makeMix, makeSession } from '../test/fixtures';
 import { renderApp } from '../test/render';
 import { apiError, server } from '../test/server';
 import { FakeWebSocket } from '../test/websocket';
@@ -58,11 +59,22 @@ describe('rotas e layout', () => {
     expect(await screen.findByText('Página não encontrada')).toBeInTheDocument();
   });
 
-  it('mixer ainda é placeholder com o cabeçalho da sessão', async () => {
+  it('celular: o mixer é tela cheia, sem bottom nav nem pílula', async () => {
+    stubAudioGlobals();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     const session = makeSession({ title: 'Do It', code: 'ST-042' });
-    server.use(http.get('*/api/sessions/:id', () => HttpResponse.json(session)));
+    server.use(
+      http.get('*/api/sessions/:id', () => HttpResponse.json(session)),
+      http.get('*/api/sessions/:id/mix', () => HttpResponse.json(makeMix())),
+      http.get('*/api/sessions/:id/peaks/*', () =>
+        HttpResponse.json({ duration_s: 182, peaks: [0.5] }),
+      ),
+    );
     renderApp(`/sessions/${session.id}/mix`);
     expect(await screen.findByRole('heading', { name: 'Do It' })).toBeInTheDocument();
-    expect(screen.getByText('O mixer chega em breve.')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'Navegação principal' }),
+    ).not.toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 });

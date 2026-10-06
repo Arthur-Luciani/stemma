@@ -1,4 +1,13 @@
-import { formatAgo, formatClock, formatDuration, formatEta, formatShortDate } from './format';
+import {
+  formatAgo,
+  formatBytes,
+  formatClock,
+  formatDb,
+  formatDuration,
+  formatEta,
+  formatShortDate,
+  formatStampDate,
+} from './format';
 
 describe('formatadores', () => {
   it('duração', () => {
@@ -28,5 +37,18 @@ describe('formatadores', () => {
     expect(formatShortDate(new Date(2025, 8, 9).toISOString(), now)).toBe('09/09/25');
     expect(formatAgo(new Date(2026, 9, 5, 21, 11).toISOString(), now)).toBe('há 3 min');
     expect(formatAgo(new Date(2026, 9, 5, 21, 14).toISOString(), now)).toBe('agora mesmo');
+  });
+
+  it('export: data com hora no dia, tamanho e dB', () => {
+    const now = new Date(2026, 9, 5, 22, 0);
+    expect(formatStampDate(new Date(2026, 9, 5, 21, 14).toISOString(), now)).toBe('hoje 21:14');
+    expect(formatStampDate(new Date(2026, 8, 9, 10, 0).toISOString(), now)).toBe('09/09');
+    expect(formatBytes(7_100_000)).toBe('7,1 MB');
+    expect(formatBytes(38_900_000)).toBe('38,9 MB');
+    expect(formatBytes(420_000)).toBe('420 kB');
+    expect(formatBytes(null)).toBe('—');
+    expect(formatDb(-10.64)).toBe('−10.6');
+    expect(formatDb(0.9, true)).toBe('+0.9');
+    expect(formatDb(0, true)).toBe('0.0');
   });
 });

@@ -2,7 +2,7 @@ import type { RouteObject } from 'react-router';
 
 import { DiscoverPage } from '../features/discover/DiscoverPage';
 import { LibraryPage } from '../features/library/LibraryPage';
-import { MixPlaceholderPage } from '../features/session/MixPlaceholderPage';
+import { MixerPage } from '../features/mixer/MixerPage';
 import { SessionPage } from '../features/session/SessionPage';
 import { AppLayout } from './AppLayout';
 import { NotFound, RouteError } from './RouteError';
@@ -20,6 +20,11 @@ const devRoutes: RouteObject[] = import.meta.env.DEV
     ]
   : [];
 
+/** `handle` das rotas: `fullscreen` esconde a bottom nav e a pílula no celular (mixer). */
+export interface RouteHandle {
+  fullscreen?: boolean;
+}
+
 /** Toda tela tem URL. `:id` é sempre o UUID; o `ST-###` só é exibido. */
 export const routes: RouteObject[] = [
   {
@@ -32,7 +37,7 @@ export const routes: RouteObject[] = [
           { index: true, element: <DiscoverPage /> },
           { path: 'sessions', element: <LibraryPage /> },
           { path: 'sessions/:id', element: <SessionPage /> },
-          { path: 'sessions/:id/mix', element: <MixPlaceholderPage /> },
+          { path: 'sessions/:id/mix', element: <MixerPage />, handle: { fullscreen: true } },
           ...devRoutes,
           { path: '*', element: <NotFound /> },
         ],

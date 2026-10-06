@@ -1,7 +1,7 @@
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { useEffect, useState, useSyncExternalStore, type RefObject } from 'react';
 
-import { getPeaks, stemUrl } from '../../api/endpoints';
+import { getPeaks, listExports, stemUrl } from '../../api/endpoints';
 import type { Stem, StemPeaks } from '../../api/types';
 import { queryKeys } from '../../app/queryKeys';
 import { AudioEngine, type EngineStats, type PlaybackState } from '../../audio/AudioEngine';
@@ -69,12 +69,13 @@ export function useEngineStats(engine: AudioEngine | null): EngineStats | null {
 
 /**
  * Playhead por rAF, fora do React: escreve `--progress` (0–1) no `container` e o tempo
- * (`1:12.4`) no `time`, sem re-render.
+ * (`1:12.4`, ou o `format` dado) no `time`, sem re-render.
  */
 export function usePlayhead(
   engine: AudioEngine | null,
   container: RefObject<HTMLElement | null>,
   time?: RefObject<HTMLElement | null>,
+  format: (seconds: number) => string = formatClock,
 ): void {
   useEffect(() => {
     if (!engine) return;
@@ -89,7 +90,7 @@ export function usePlayhead(
           '--progress',
           String(duration > 0 ? position / duration : 0),
         );
-        if (time?.current) time.current.textContent = formatClock(position);
+        if (time?.current) time.current.textContent = format(position);
       }
       frame = requestAnimationFrame(tick);
     };
@@ -97,7 +98,7 @@ export function usePlayhead(
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [engine, container, time]);
+  }, [engine, container, time, format]);
 }
 
 /** Peaks dos 4 stems (arquivos imutáveis enquanto a sessão não for reprocessada). */
@@ -116,4 +117,12 @@ export function usePeaks(sessionId: string | null): Partial<Record<Stem, StemPea
     if (data) out[stem] = data;
   });
   return out;
+}
+
+/** Exports da sessão, mais recentes primeiro; o `/ws` (`export.updated`) mantém ao vivo. */
+export function useExports(sessionId: string) {
+  return useQuery({
+    queryKey: queryKeys.exports(sessionId),
+    queryFn: ({ signal }) => listExports(sessionId, signal),
+  });
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/Arthur-Luciani/stemma/compare/v1.5.0...v1.5.1) (2026-10-07)
+
+
+### Bug Fixes
+
+* cache do uv da instalação só com o que as versões instaladas usam ([#31](https://github.com/Arthur-Luciani/stemma/issues/31)) ([25e8914](https://github.com/Arthur-Luciani/stemma/commit/25e89149389cbd67c91356941c261af6520adcd4))
+
 ## [1.5.0](https://github.com/Arthur-Luciani/stemma/compare/v1.4.1...v1.5.0) (2026-10-07)
 
 

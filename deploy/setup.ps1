@@ -23,12 +23,13 @@
     AppUpdate         tarefa agendada \Stemma\Atualizar (ADR 0015): baixa o instalador da última
                       release, roda em modo silencioso e grava o resultado no banco
                       (-InstallerPath usa um .exe local, para ensaio)
+    PruneCache        deixa no cache do uv só o que as versões instaladas usam (administrador)
     Start / Stop      "Iniciar o Stemma" / "Parar o Stemma" do ícone da bandeja (Stemma.exe): pedem
                       administrador (UAC) sozinhos e mostram um aviso no fim
 #>
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('Check', 'CheckPort', 'TailscaleInstall', 'TailscaleLogin', 'Install', 'Update', 'Uninstall', 'AppUpdate', 'Start', 'Stop')]
+    [ValidateSet('Check', 'CheckPort', 'TailscaleInstall', 'TailscaleLogin', 'Install', 'Update', 'Uninstall', 'AppUpdate', 'PruneCache', 'Start', 'Stop')]
     [string]$Mode,
     [string]$Root = 'C:\stemma',
     [string]$ServiceId = 'stemma',
@@ -223,6 +224,11 @@ try {
             $outcome = Invoke-StemmaAppUpdate -Root $Root -ServiceId $ServiceId -InstallerPath $InstallerPath `
                 -SimulateFailure:$SimulateFailure
             if ($outcome.State -ne 'succeeded') { throw $outcome.Message }
+        }
+        'PruneCache' {
+            Assert-Admin
+            $result = Optimize-StemmaUvCache -Root $Root
+            if ($result) { Write-Result 'files' "$($result.Before)->$($result.After)" }
         }
         'Uninstall' {
             Assert-Admin

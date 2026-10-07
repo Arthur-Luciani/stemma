@@ -95,6 +95,14 @@ Para mudar a porta de uma instalação existente:
 2. Veja a porta HTTPS dela em `C:\stemma\install.json` (`httpsPort`: 443 ou 8443) e rode `tailscale serve --bg --https=<httpsPort> http://127.0.0.1:<nova>`.
 3. Reinicie o Stemma (ícone da bandeja → Parar e depois Iniciar).
 
+## Espaço em disco
+
+O Explorer ("Propriedades") soma cada caminho de um arquivo, e o Stemma usa **hardlinks**: o mesmo arquivo no disco aparece no cache do uv (`cache\uv`), no venv de cada versão (`releases\vX.Y.Z`), no `current` (junction) e no cache do uv do seu usuário. Por isso `C:\stemma` "parece" ter 20+ GB, mas ocupa de verdade ~6 GB, quase tudo torch com CUDA, que é inevitável. As 3 versões guardadas para rollback quase não custam espaço a mais enquanto usam o mesmo torch.
+
+- O instalador e cada atualização **enxugam o cache do uv** (`Optimize-StemmaUvCache`): fica só o que os `uv.lock` das versões instaladas usam.
+- Para enxugar à mão (administrador): `powershell -ExecutionPolicy Bypass -File C:\stemma\setup\engine\setup.ps1 -Mode PruneCache`.
+- O cache do uv do seu usuário (`uv cache dir`) é outra coisa. Ele guarda os pacotes de todos os seus projetos de dev, e o Stemma não depende dele depois de instalado. `uv cache clean` libera o que nenhum venv usa; os venvs continuam funcionando.
+
 ## Layout
 
 ```

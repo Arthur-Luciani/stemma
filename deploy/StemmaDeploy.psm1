@@ -1121,6 +1121,42 @@ function Copy-UvCacheSeed {
     return $summary
 }
 
+function Optimize-StemmaUvCache {
+    <#
+      Deixa em <Root>\cache\uv só o que os uv.lock das versões instaladas usam. A instalação
+      da v1.4.0 semeou o cache do usuário inteiro (pacotes de todos os projetos dele): esses
+      arquivos não ocupam espaço a mais enquanto o cache do usuário também os tem, mas ficam
+      presos aqui quando ele limpa o dele. Monta um cache novo por hardlink a partir do atual
+      (mesmo volume: segundos, sem espaço extra), troca e apaga o antigo. Os venvs não mudam
+      (cada arquivo deles é outro link). Num formato de cache sem ponteiros não mexe em nada.
+    #>
+    param([Parameter(Mandatory)][string]$Root)
+    $paths = Get-StemmaPaths -Root $Root
+    $cache = $paths.UvCache
+    if (Test-EmptyDirectory $cache) { return $null }
+    $locks = @(Get-InstalledReleases -Root $Root | ForEach-Object { Join-Path $_.Path 'backend\uv.lock' } |
+            Where-Object { Test-Path -LiteralPath $_ })
+    if ($locks.Count -eq 0) { return $null }
+    foreach ($lock in $locks) {
+        if (-not (Get-UvCacheSeedPlan -Source $cache -LockPath $lock).Selective) {
+            Write-Host '    Cache do uv num formato desconhecido: mantido como está.'
+            return $null
+        }
+    }
+    $fresh = "$cache.novo"
+    $old = "$cache.antigo"
+    foreach ($dir in $fresh, $old) { Remove-StemmaTree -Path $dir }
+    Write-Step 'Enxugando o cache de componentes (só o que as versões instaladas usam)'
+    foreach ($lock in $locks) { Copy-UvCacheSeed -Source $cache -Dest $fresh -LockPath $lock | Out-Null }
+    [IO.Directory]::Move($cache, $old)
+    [IO.Directory]::Move($fresh, $cache)
+    $before = @(Get-ChildItem -LiteralPath $old -Recurse -File -Force -ErrorAction SilentlyContinue).Count
+    $after = @(Get-ChildItem -LiteralPath $cache -Recurse -File -Force -ErrorAction SilentlyContinue).Count
+    Remove-StemmaTree -Path $old
+    Write-Host "    cache do uv: $before → $after arquivos"
+    return [pscustomobject]@{ Before = $before; After = $after }
+}
+
 function Get-StemmaCacheDirs {
     <#
       Caches que a instalação vai usar: o dela, se já tiver algo (a atualização só semeia de um
@@ -1651,6 +1687,8 @@ function Invoke-StemmaInstall {
     }
     # A escolha entre substituir a 443 de outro app ou usar a 8443 é feita antes (tela do Tailscale).
     if (-not $SkipTailscale) { Set-TailscaleServe -Port $context.Port -HttpsPort $HttpsPort }
+    try { Optimize-StemmaUvCache -Root $Root | Out-Null }
+    catch { Write-Warning "Cache do uv não foi enxugado: $($_.Exception.Message)" }
     Complete-StemmaProgress
     Write-Step "Stemma $($package.Tag) instalado em $Root"
     return $package.Tag
@@ -1806,6 +1844,9 @@ function Invoke-StemmaUpdate {
         Write-Host "    removendo $name"
         Remove-Item -LiteralPath (Join-Path $Root "releases\$name") -Recurse -Force
     }
+    # A versão nova já está no ar: um problema aqui só deixa o cache maior.
+    try { Optimize-StemmaUvCache -Root $Root | Out-Null }
+    catch { Write-Warning "Cache do uv não foi enxugado: $($_.Exception.Message)" }
     Complete-StemmaProgress
     Write-Step "Stemma $target no ar"
     return $target

@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/Arthur-Luciani/stemma/compare/v1.4.1...v1.5.0) (2026-10-07)
+
+
+### Features
+
+* atualizar o Stemma pelo app (F5c) ([#29](https://github.com/Arthur-Luciani/stemma/issues/29)) ([821bd7a](https://github.com/Arthur-Luciani/stemma/commit/821bd7a44f415286830246182705f2f27665b3ec))
+
+
+### Performance Improvements
+
+* instalador mais rápido, com etapas, previsão de espaço e sem perguntas de porta ([#27](https://github.com/Arthur-Luciani/stemma/issues/27)) ([d49d828](https://github.com/Arthur-Luciani/stemma/commit/d49d828358e10e466594278176e8ce6d7e6f6234))
+
 ## [1.4.1](https://github.com/Arthur-Luciani/stemma/compare/v1.4.0...v1.4.1) (2026-10-06)
 
 

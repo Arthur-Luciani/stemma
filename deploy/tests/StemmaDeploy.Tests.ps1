@@ -1290,3 +1290,48 @@ Describe 'Get-ReleaseAssets' {
         { Get-ReleaseAssets -Version 'v1.6.0' -Kind 'installer' } | Should -Throw '*Stemma-Setup-v1.6.0.exe*'
     }
 }
+
+Describe 'Optimize-StemmaUvCache' {
+    BeforeEach {
+        $script:PruneRoot = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $cache = Join-Path $script:PruneRoot 'cache\uv'
+        foreach ($dir in "$cache\archive-v0\usado", "$cache\archive-v0\sobra", "$script:PruneRoot\releases\v1.5.0\backend") {
+            New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        }
+        Set-Content -LiteralPath "$cache\archive-v0\usado\a.dll" -Value 'a'
+        Set-Content -LiteralPath "$cache\archive-v0\sobra\b.dll" -Value 'b'
+        Set-Content -LiteralPath "$script:PruneRoot\releases\v1.5.0\backend\uv.lock" -Value 'version = 1'
+        Mock -ModuleName StemmaDeploy Write-Step {}
+    }
+
+    It 'troca o cache por um só com o que o uv.lock usa e apaga o antigo' {
+        Mock -ModuleName StemmaDeploy Get-UvCacheSeedPlan { [pscustomobject]@{ Selective = $true; Roots = @('archive-v0/usado'); Archives = 1 } }
+        Mock -ModuleName StemmaDeploy Copy-UvCacheSeed {
+            New-Item -ItemType Directory -Force -Path "$Dest\archive-v0\usado" | Out-Null
+            Copy-Item -LiteralPath "$Source\archive-v0\usado\a.dll" -Destination "$Dest\archive-v0\usado\a.dll"
+        }
+        $result = Optimize-StemmaUvCache -Root $script:PruneRoot
+        $result.Before | Should -Be 2
+        $result.After | Should -Be 1
+        Test-Path "$script:PruneRoot\cache\uv\archive-v0\usado\a.dll" | Should -BeTrue
+        Test-Path "$script:PruneRoot\cache\uv\archive-v0\sobra" | Should -BeFalse
+        Test-Path "$script:PruneRoot\cache\uv.antigo" | Should -BeFalse
+        Test-Path "$script:PruneRoot\cache\uv.novo" | Should -BeFalse
+        Should -Invoke -ModuleName StemmaDeploy Copy-UvCacheSeed -Times 1 -ParameterFilter { $LockPath -like '*v1.5.0\backend\uv.lock' }
+    }
+
+    It 'formato de cache desconhecido: não mexe' {
+        Mock -ModuleName StemmaDeploy Get-UvCacheSeedPlan { [pscustomobject]@{ Selective = $false; Roots = @(); Archives = 0 } }
+        Mock -ModuleName StemmaDeploy Copy-UvCacheSeed {}
+        Optimize-StemmaUvCache -Root $script:PruneRoot | Should -BeNullOrEmpty
+        Test-Path "$script:PruneRoot\cache\uv\archive-v0\sobra\b.dll" | Should -BeTrue
+        Should -Invoke -ModuleName StemmaDeploy Copy-UvCacheSeed -Times 0
+    }
+
+    It 'sem versão instalada: não mexe' {
+        Remove-Item -LiteralPath "$script:PruneRoot\releases" -Recurse -Force
+        Mock -ModuleName StemmaDeploy Copy-UvCacheSeed {}
+        Optimize-StemmaUvCache -Root $script:PruneRoot | Should -BeNullOrEmpty
+        Should -Invoke -ModuleName StemmaDeploy Copy-UvCacheSeed -Times 0
+    }
+}

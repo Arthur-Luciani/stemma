@@ -2,6 +2,7 @@
 
 - **Status:** aceita (2026-10-06, F5b)
 - Muda a [ADR 0002](0002-runtime-nativo-windows.md) (conta do serviço e pré-requisitos) e complementa a [ADR 0007](0007-processo-de-release.md) (o que a release publica).
+- Correção de 2026-10-07: a semeadura do cache inteiro (v1.4.0) deixou em `<raiz>\cache\uv` 228 mil arquivos (17 GB aparentes), dos quais só 25 mil são usados. Isso não custava espaço enquanto o cache do usuário tinha os mesmos arquivos, mas os prendia no disco quando ele limpava o dele. Agora instalação e atualização rodam `Optimize-StemmaUvCache`, que deixa só o que os `uv.lock` instalados pedem (a semeadura já era seletiva desde o PR #27).
 - Complementada pela [ADR 0015](0015-atualizar-pelo-app.md) (F5c): o instalador também cria as tarefas agendadas da atualização pelo app e aceita `/NOTRAY` e `/RESULTFILE=`.
 
 ## Contexto

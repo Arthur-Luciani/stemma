@@ -16,7 +16,7 @@ Reescrita do `music-analyzer` sem o inspetor de bateria ([ADR 0001](../decisions
 | F4b Mixer e Export | [F4b-mixer-export.md](F4b-mixer-export.md) | F4a | ✅ concluída — PR #14 (mergeado) |
 | F5 Runtime, PWA e update | [F5-runtime-pwa.md](F5-runtime-pwa.md) | F4b | ✅ concluída — PR #16 (mergeado), release v1.3.0; ensaio real do critério passou para a F5b |
 | F5b Instalador | [F5b-instalador.md](F5b-instalador.md) | F5 | ✅ concluída — PRs #21 e #24 (mergeados), releases v1.4.0 e v1.4.1; rollback pelo `.exe` validado no ensaio da F5c (modo silencioso) |
-| F5c Atualizar pelo app | [F5c-atualizar-pelo-app.md](F5c-atualizar-pelo-app.md) | F5b | 🟡 PR aberto; ensaio no PC ok (atualizar e falha simulada); critério com releases reais depois do merge |
+| F5c Atualizar pelo app | [F5c-atualizar-pelo-app.md](F5c-atualizar-pelo-app.md) | F5b | 🟡 PR #29 (mergeado); ensaio no PC ok; falta o critério com releases reais (v1.5.0 → v1.5.1) |
 | F6 Corte | [F6-corte.md](F6-corte.md) | F5c | ⬜ |
 
 Legenda: ⬜ não iniciada · 🟡 em andamento · ✅ concluída · ⛔ bloqueada

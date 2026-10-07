@@ -31,7 +31,7 @@ Atualização automática sem toque; canal beta.
 Com a versão N instalada pela F5b e a N+1 publicada: o celular mostra o aviso, "Atualizar" leva o PC à N+1 sem tocar no PC, e o app volta sozinho (com o "Recarregar" do PWA). Com falha simulada, o app mostra o erro e a N continua no ar. CI verde.
 
 ## Handoff
-**Status:** implementada e ensaiada no PC em 2026-10-06. O critério de pronto **com releases de verdade** depende de duas releases que já tragam a F5c (v1.5.0 instalada pelo `.exe`, depois a v1.5.1). Isso fica para depois do merge e vai num PR `docs:`.
+**Status:** PR #29 mergeado em 2026-10-06 (CI verde); implementada e ensaiada no PC. O critério de pronto **com releases de verdade** depende de duas releases que já tragam a F5c (v1.5.0 instalada pelo `.exe`, depois a v1.5.1). Isso fica para depois do merge e vai num PR `docs:`.
 
 Ensaio no PC (o `stemma-ensaio` que tinha sobrado do PR #27, na v1.4.3, porta 8000 e 8443 do Tailscale; a instalação real, v1.4.1 na 8001, não foi tocada):
 - **1.4.3 → 9.0.0 pelo `.exe` em modo silencioso** (`/VERYSILENT /NOTRAY /RESULTFILE=`): código 0, `ok|v9.0.0`. As tarefas `\Stemma\Atualizar-stemma-ensaio` e `Bandeja-stemma-ensaio` foram criadas, e o `UPDATE_TASK` foi gravado no `.env`. Isso mostra que uma instalação pré-F5c ganha as tarefas pelo `.exe`.
@@ -73,7 +73,8 @@ Ensaio no PC (o `stemma-ensaio` que tinha sobrado do PR #27, na v1.4.3, porta 80
 
 ### Pendente
 - **Critério real** (depois do merge): instalar a v1.5.0 pelo `.exe` na instalação real → publicar a v1.5.1 → aviso no celular → Atualizar → `/health` 1.5.1 e "Recarregar". A falha simulada já foi coberta no ensaio.
-- **Ensaio que sobrou**: o `stemma-ensaio` está na v9.0.1, com `UPDATE_RELEASES_URL` no `.env` e a tarefa com `-InstallerPath … -SimulateFailure`. Para desligar: rodar o desinstalador "Stemma (stemma-ensaio)". Os dados ficam em `D:\stemma-ensaio-data`.
+- ~~Ensaio que sobrou~~: o `stemma-ensaio` foi desinstalado depois do merge (desinstalador silencioso: serviço, tarefas, `C:\stemma-ensaio` e a 8443 do Tailscale removidos; a 443 → 8001 da instalação real ficou intacta). Os dados continuam em `D:\stemma-ensaio-data`.
+- **Próximo passo do critério**: mergear o PR de release (v1.5.0), instalar a v1.5.0 pela `.exe` da Release na instalação real (ela cria as tarefas), publicar uma v1.5.1 (`fix:`) e atualizar pelo celular. É a primeira vez que o caminho `update-target` → download da tag no GitHub roda de verdade.
 - Herdados: medição do AudioEngine no Android (F4a), branch protection (F0), iPhone (F5), ramos do Tailscale só no Pester (F5b).
 
 ### Decisões

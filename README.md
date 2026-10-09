@@ -1,3 +1,5 @@
+<p align="right"><strong>English</strong> · <a href="README.pt-BR.md">Português</a></p>
+
 <p align="center">
   <img src="docs/assets/logo.svg" width="88" alt="">
 </p>
@@ -5,96 +7,98 @@
 <h1 align="center">stemma</h1>
 
 <p align="center">
-  <strong>Tire a voz. Isole o baixo. Toque junto.</strong><br>
-  Separe qualquer música em voz, bateria, baixo e outros com IA, no seu próprio PC,<br>
-  e mixe cada parte do desktop ou do celular.
+  <strong>Drop the vocals. Isolate the bass. Play along.</strong><br>
+  Split any song into vocals, drums, bass and other with AI, right on your own PC,<br>
+  and mix each part from your desktop or your phone.
 </p>
 
 <p align="center">
-  <a href="https://github.com/Arthur-Luciani/stemma/releases/latest"><img src="https://img.shields.io/github/v/release/Arthur-Luciani/stemma?label=vers%C3%A3o&color=c18a3a" alt="Última versão"></a>
+  <a href="https://github.com/Arthur-Luciani/stemma/releases/latest"><img src="https://img.shields.io/github/v/release/Arthur-Luciani/stemma?label=version&color=c18a3a" alt="Latest version"></a>
   <a href="https://github.com/Arthur-Luciani/stemma/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Arthur-Luciani/stemma/ci.yml?branch=main&label=CI" alt="CI"></a>
-  <img src="https://img.shields.io/badge/Windows-GPU%20NVIDIA-3fb896" alt="Windows com GPU NVIDIA">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/licen%C3%A7a-MIT-6cb8f0" alt="Licença MIT"></a>
+  <img src="https://img.shields.io/badge/Windows-NVIDIA%20GPU-3fb896" alt="Windows with an NVIDIA GPU">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6cb8f0" alt="MIT license"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Arthur-Luciani/stemma/releases/latest"><strong>Baixar para Windows</strong></a>
+  <a href="https://github.com/Arthur-Luciani/stemma/releases/latest"><strong>Download for Windows</strong></a>
   ·
-  <a href="#como-funciona">Como funciona</a>
+  <a href="#how-it-works">How it works</a>
   ·
-  <a href="#instalar">Instalar</a>
+  <a href="#install">Install</a>
 </p>
 
 <p align="center">
-  <img src="docs/assets/mixer-desktop.png" alt="Mixer do Stemma no desktop: quatro faixas (Voz, Bateria, Baixo e Outros) com forma de onda colorida, a voz silenciada pelo preset Sem voz e um loop A–B marcado entre 1:03 e 1:34">
+  <img src="docs/assets/mixer-desktop.png" alt="Stemma's mixer on desktop: four lanes (vocals, drums, bass and other) with colored waveforms, the vocals muted by the No vocals preset and an A–B loop set between 1:03 and 1:34">
 </p>
 
-## Para que serve
+> The interface is in Brazilian Portuguese, so the screenshots are too.
 
-- 🎤 **Cantar por cima**: o preset **Sem voz** transforma qualquer música em karaokê.
-- 🥁 **Tocar no lugar da banda**: tire a bateria, o baixo ou a guitarra e assuma a parte.
-- 🎧 **Tirar de ouvido**: deixe só o baixo em **solo**, marque o trecho difícil e repita em **loop A–B** até sair.
+## What it's for
 
-## Como funciona
+- 🎤 **Sing over it**: the **No vocals** preset turns any song into karaoke.
+- 🥁 **Take the band's place**: drop the drums, the bass or the guitar and play that part yourself.
+- 🎧 **Learn by ear**: **solo** the bass, mark the tricky passage and repeat it in an **A–B loop** until you nail it.
 
-1. **Busque.** Digite o nome da música ou cole um link do YouTube.
-2. **Separe.** O [Demucs](https://github.com/facebookresearch/demucs) roda na sua GPU e divide a música em 4 stems. Uma música de 5 minutos fica pronta em cerca de 1 minuto[^tempo].
-3. **Toque junto.** Abra o mixer, escolha um preset ou ajuste cada stem e dê o play.
+## How it works
 
-## No celular também
+1. **Search.** Type the song's name or paste a YouTube link.
+2. **Split.** [Demucs](https://github.com/facebookresearch/demucs) runs on your GPU and separates the song into 4 stems. A 5-minute song is ready in about a minute[^time].
+3. **Play along.** Open the mixer, pick a preset or tweak each stem, and hit play.
 
-O Stemma roda no seu PC e abre no celular como app (PWA), com HTTPS, pelo [Tailscale](https://tailscale.com/). Não precisa abrir porta no roteador nem expor nada na internet. Para abrir, aponte a câmera para o QR code do app ou do ícone na bandeja do Windows.
+## On your phone, too
+
+Stemma runs on your PC and opens on your phone as an app (PWA), over HTTPS, through [Tailscale](https://tailscale.com/). No router ports to open, nothing exposed to the internet. To open it, point your camera at the QR code in the app or in the Windows tray icon.
 
 <p align="center">
-  <img src="docs/assets/celular-descobrir.png" width="250" alt="Tela Descobrir no celular: campo de busca e lista para continuar de onde parou">
+  <img src="docs/assets/celular-descobrir.png" width="250" alt="Discover screen on the phone: search field and a list to pick up where you left off">
   &nbsp;
-  <img src="docs/assets/celular-mixer.png" width="250" alt="Mixer no celular: presets em botões grandes, loop A–B e botão de play">
+  <img src="docs/assets/celular-mixer.png" width="250" alt="Mixer on the phone: presets as large buttons, an A–B loop and the play button">
   &nbsp;
-  <img src="docs/assets/celular-ajustar.png" width="250" alt="Ajuste fino no celular: fader, pan, mute e solo de cada stem">
+  <img src="docs/assets/celular-ajustar.png" width="250" alt="Fine-tuning on the phone: fader, pan, mute and solo for each stem">
 </p>
 
-## Recursos
+## Features
 
-| Recurso | O que faz |
+| Feature | What it does |
 |---|---|
-| 🎚️ **Mixer por stem** | Volume, pan, mute e solo em voz, bateria, baixo e outros. |
-| ⚡ **Presets de um toque** | Original, Sem voz, Sem bateria, Sem baixo e Só voz. |
-| 🔁 **Loop A–B** | Repita o trecho que você está estudando, quantas vezes quiser. |
-| 💾 **Exportar** | Baixe a sua mixagem em MP3 ou WAV. |
-| 📚 **Biblioteca** | Busca, filtros, e o mix de cada música salvo do jeito que você deixou. |
-| 📊 **Loudness** | LUFS e true peak de cada música. |
-| ⌨️ **Atalhos** | No desktop: espaço toca, 1–4 silenciam, ⇧1–4 dão solo, A/B marcam o loop. |
-| 🔄 **Atualiza sozinho** | Quando sai uma versão nova, o próprio app avisa e se atualiza, sem você ir até o PC. |
+| 🎚️ **Per-stem mixer** | Volume, pan, mute and solo for vocals, drums, bass and other. |
+| ⚡ **One-tap presets** | Original, No vocals, No drums, No bass and Vocals only. |
+| 🔁 **A–B loop** | Repeat the passage you're practicing as many times as you like. |
+| 💾 **Export** | Download your mix as MP3 or WAV. |
+| 📚 **Library** | Search, filters, and every song's mix saved just the way you left it. |
+| 📊 **Loudness** | LUFS and true peak for each song. |
+| ⌨️ **Shortcuts** | On desktop: Space plays, 1–4 mute, ⇧1–4 solo, A/B set the loop. |
+| 🔄 **Self-updating** | When a new version is out, the app tells you and updates itself, no trip to the PC needed. |
 
-## Seu PC, suas músicas
+## Your PC, your music
 
-Tudo roda localmente: o download, a separação e o mixer. Não tem conta, não tem assinatura e nenhum áudio vai para a nuvem. No celular, o acesso fica restrito aos seus dispositivos, dentro da sua rede Tailscale.
+Everything runs locally: the download, the separation and the mixer. No account, no subscription, and no audio ever goes to the cloud. On your phone, access is limited to your own devices, inside your Tailscale network.
 
-## Instalar
+## Install
 
-**Você precisa de:** Windows 11, placa de vídeo NVIDIA com driver instalado e uns 6 GB livres (mais ~50 MB por música). Sem GPU NVIDIA o Stemma funciona, mas a separação na CPU é bem mais lenta.
+**You'll need:** Windows 11, an NVIDIA graphics card with its driver installed, and about 6 GB of free space (plus ~50 MB per song). Stemma works without an NVIDIA GPU, but separation on the CPU is much slower.
 
-1. Baixe o `Stemma-Setup-vX.Y.Z.exe` da [última versão](https://github.com/Arthur-Luciani/stemma/releases/latest).
-2. Abra. O instalador não tem assinatura de código, então o Windows avisa: clique em **Mais informações → Executar assim mesmo**.
-3. Escolha onde guardar as músicas. Portas, HTTPS e Tailscale o instalador resolve sozinho e só pergunta quando precisa de você.
-4. No fim, clique em **Abrir o Stemma** ou aponte o celular para o QR code.
+1. Download `Stemma-Setup-vX.Y.Z.exe` from the [latest release](https://github.com/Arthur-Luciani/stemma/releases/latest).
+2. Run it. The installer isn't code-signed, so Windows will warn you: click **More info → Run anyway**.
+3. Choose where to keep your songs. The installer sorts out ports, HTTPS and Tailscale on its own and only asks when it needs you.
+4. When it's done, click **Abrir o Stemma** (Open Stemma) or point your phone at the QR code.
 
-Para atualizar, é só aceitar o aviso de versão nova no app ou rodar o instalador da versão nova. Se a atualização falhar, ele volta para a versão anterior com o banco intacto. Detalhes, rollback e logs estão em [docs/operacao.md](docs/operacao.md).
+To update, accept the new-version notice in the app or run the new version's installer. If an update fails, it rolls back to the previous version with your database intact. Details, rollback and logs are in [docs/operacao.md](docs/operacao.md) (in Portuguese).
 
-## Feito com
+## Built with
 
-[Demucs](https://github.com/facebookresearch/demucs) (separação) · [yt-dlp](https://github.com/yt-dlp/yt-dlp) (download) · [FFmpeg](https://ffmpeg.org/) · [FastAPI](https://fastapi.tiangolo.com/) · [React](https://react.dev/) + [Vite](https://vite.dev/) · Web Audio API · [Tailscale](https://tailscale.com/)
+[Demucs](https://github.com/facebookresearch/demucs) (separation) · [yt-dlp](https://github.com/yt-dlp/yt-dlp) (download) · [FFmpeg](https://ffmpeg.org/) · [FastAPI](https://fastapi.tiangolo.com/) · [React](https://react.dev/) + [Vite](https://vite.dev/) · Web Audio API · [Tailscale](https://tailscale.com/)
 
-## Uso responsável
+## Responsible use
 
-O Stemma é feito para estudo e uso pessoal. Respeite os direitos autorais e os termos de uso dos serviços de onde vêm as músicas, e não redistribua stems de obras protegidas.
+Stemma is meant for practice and personal use. Respect copyright and the terms of service of wherever your music comes from, and don't redistribute stems of copyrighted works.
 
-## Para desenvolvedores
+## For developers
 
-Backend em FastAPI + SQLite, frontend em React + TypeScript, servidos juntos por um único processo que roda como serviço do Windows. Para rodar em dev, veja [docs/desenvolvimento.md](docs/desenvolvimento.md). Arquitetura, regras e comandos estão no [CLAUDE.md](CLAUDE.md), e as decisões de arquitetura em [docs/decisions](docs/decisions).
+FastAPI + SQLite backend and a React + TypeScript frontend, served together by a single process that runs as a Windows service. To run it in development, see [docs/desenvolvimento.md](docs/desenvolvimento.md). Architecture, rules and commands are in [CLAUDE.md](CLAUDE.md), and architecture decisions in [docs/decisions](docs/decisions). The project docs are in Portuguese.
 
-## Licença
+## License
 
 [MIT](LICENSE) © Arthur Luciani
 
-[^tempo]: Medido no PC de referência, com GPU NVIDIA, contando o download.
+[^time]: Measured on the reference PC, with an NVIDIA GPU, download included.

@@ -14,7 +14,7 @@
   <a href="https://github.com/Arthur-Luciani/stemma/releases/latest"><img src="https://img.shields.io/github/v/release/Arthur-Luciani/stemma?label=vers%C3%A3o&color=c18a3a" alt="Última versão"></a>
   <a href="https://github.com/Arthur-Luciani/stemma/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Arthur-Luciani/stemma/ci.yml?branch=main&label=CI" alt="CI"></a>
   <img src="https://img.shields.io/badge/Windows-GPU%20NVIDIA-3fb896" alt="Windows com GPU NVIDIA">
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/Arthur-Luciani/stemma?label=licen%C3%A7a&color=6cb8f0" alt="Licença MIT"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licen%C3%A7a-MIT-6cb8f0" alt="Licença MIT"></a>
 </p>
 
 <p align="center">
@@ -55,7 +55,7 @@ O Stemma roda no seu PC e abre no celular como app (PWA), com HTTPS, pelo [Tails
 
 ## Recursos
 
-| | |
+| Recurso | O que faz |
 |---|---|
 | 🎚️ **Mixer por stem** | Volume, pan, mute e solo em voz, bateria, baixo e outros. |
 | ⚡ **Presets de um toque** | Original, Sem voz, Sem bateria, Sem baixo e Só voz. |

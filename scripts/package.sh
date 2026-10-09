@@ -28,7 +28,7 @@ tar -C "$repo/backend" --exclude='__pycache__' --exclude='.venv' --exclude='./te
 cp -r "$repo/frontend/dist" "$stage/frontend/dist"
 cp -r "$repo/deploy" "$stage/deploy"
 rm -rf "$stage/deploy/tests"
-cp "$repo/.env.example" "$repo/README.md" "$repo/CHANGELOG.md" "$stage/"
+cp "$repo/.env.example" "$repo/README.md" "$repo/CHANGELOG.md" "$repo/LICENSE" "$stage/"
 
 rm -f "$out/$name.zip"
 (cd "$work" && "$py" -m zipfile -c "$out/$name.zip" "$name")

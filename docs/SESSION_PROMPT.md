@@ -25,6 +25,11 @@ Regras: siga o CLAUDE.md à risca; não expanda o escopo além da fase sem me pe
 **Sessões paralelas (backend e frontend ao mesmo tempo)**: acrescente
 `Trabalhe num git worktree próprio (EnterWorktree). Não altere arquivos fora de <backend/ ou frontend/> além do Handoff da sua fase.`
 
+**Sessão a partir de uma issue**:
+```
+Leia o CLAUDE.md e o docs/issues.md. Tarefa: issue #<N>. Leia a issue com os comentários (gh issue view <N> --comments), confira se o que ela cita ainda existe e me pergunte o que estiver em "Em aberto". Depois plan mode, branch, testes junto e PR com "Closes #<N>".
+```
+
 **Sessão curta de correção**: 
 ```
 Leia o CLAUDE.md. Tarefa: <descrição>. Plan mode primeiro, depois branch + teste que reproduz o problema + correção + PR.

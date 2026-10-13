@@ -19,6 +19,7 @@ Guia para o Claude Code (e humanos) trabalhando neste repositório. Leia inteiro
 | **Projeto de design (fonte da verdade visual)** | Claude Design: https://claude.ai/design/p/e8a6b561-5c39-487b-8fb1-c0ff17dfed7b — arquivos `Stemma - Marca e Sistema`, `Stemma - Celular`, `Stemma - Desktop` |
 | Lógica da v1 a portar | `docs/reference-v1.md` |
 | Prompt padrão das sessões | `docs/SESSION_PROMPT.md` |
+| Abrir e ler issues (tipos, labels, templates) | `docs/issues.md` + `.github/ISSUE_TEMPLATE/` |
 | Instalar (instalador `.exe`), atualizar, parar, rollback, logs (produção) | `docs/operacao.md` |
 
 ## Arquitetura (alvo)
@@ -71,6 +72,7 @@ Um processo uvicorn (1 worker) serve `/api`, `/ws` e o `frontend/dist` na mesma 
 - Handoff, tabela de status e pegadinhas entram **no PR da fase, antes de pedir o merge**. Avise quando o último commit estiver no PR e o CI estiver verde.
 - O que ficar de fora do merge (uma pegadinha achada depois, o status "mergeado", o release) vira **na hora** um PR `docs:` à parte, antes de começar a fase seguinte. Nada fica anotado para depois.
 - Decisão de arquitetura nova ou mudada → ADR em `docs/decisions/`.
+- Issues seguem `docs/issues.md`: abrir pelo template do tipo; antes de implementar uma, ler corpo **e** comentários e resolver o "Em aberto" com o usuário; o PR leva `Closes #N`.
 
 ## Comandos
 

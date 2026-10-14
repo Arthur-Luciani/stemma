@@ -27,6 +27,7 @@ Para separar áudio de verdade (GPU NVIDIA): `cd backend; uv sync --all-groups`.
 - [docs/decisions](decisions): decisões de arquitetura
 - [docs/operacao.md](operacao.md): instalar, atualizar e operar em produção
 - [docs/SESSION_PROMPT.md](SESSION_PROMPT.md): prompt padrão para sessões do Claude Code
+- [docs/issues.md](issues.md): como abrir e ler issues
 
 ## Prints do README
 

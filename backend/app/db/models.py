@@ -16,6 +16,7 @@ from app.domain.enums import (
     JobState,
     MixPreset,
     SessionState,
+    UpdateComponent,
     UpdateState,
 )
 
@@ -166,12 +167,16 @@ class MixStateModel(Base):
 
 
 class SystemUpdateModel(Base):
-    """Atualização do Stemma pedida pelo app (ADR 0015). O backend grava `running`; o CLI,
-    rodado pela tarefa agendada no fim, grava o resultado."""
+    """Atualização do Stemma (ADR 0015) ou só do yt-dlp (ADR 0016). Quem grava `running` é o
+    backend (pedido pelo app) ou o CLI (tarefa diária do yt-dlp); o CLI, rodado pela tarefa
+    agendada no fim, grava o resultado."""
 
     __tablename__ = "system_updates"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    component: Mapped[UpdateComponent] = mapped_column(
+        _enum(UpdateComponent), default=UpdateComponent.APP, server_default=UpdateComponent.APP
+    )
     from_version: Mapped[str] = mapped_column(String(32))
     target_version: Mapped[str] = mapped_column(String(32))
     state: Mapped[UpdateState] = mapped_column(_enum(UpdateState), default=UpdateState.RUNNING)

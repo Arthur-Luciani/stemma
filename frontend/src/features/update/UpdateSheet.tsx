@@ -7,6 +7,7 @@ import { Dialog } from '../../ui/Dialog';
 import { Icon } from '../../ui/Icon';
 import { Spinner } from '../../ui/Spinner';
 import { useIsDesktop } from '../../ui/useMediaQuery';
+import { useYtDlp } from '../ytdlp/hooks';
 import { useStartUpdate, useSystemUpdate } from './hooks';
 import { type UpdateView, updateView } from './status';
 import styles from './Update.module.css';
@@ -21,6 +22,7 @@ export function UpdateSheet() {
   const [param, , close] = useUrlParam(UPDATE_PARAM);
   const { data } = useSystemUpdate();
   const start = useStartUpdate();
+  const ytdlp = useYtDlp().data?.installed_version;
   const open = param === '1' && data !== undefined;
   if (!data) return null;
 
@@ -28,7 +30,12 @@ export function UpdateSheet() {
   const canStart =
     view.kind === 'available' && data.can_update && data.active_jobs === 0 && !start.isPending;
   const offer = view.kind === 'available' && data.can_update;
-  const body = <UpdateBody data={data} view={view} />;
+  const body = (
+    <>
+      <UpdateBody data={data} view={view} />
+      {ytdlp && <p className={styles.muted}>{strings.update.ytdlp(ytdlp)}</p>}
+    </>
+  );
   const actions = offer ? (
     <>
       <Button onClick={close}>{strings.update.later}</Button>

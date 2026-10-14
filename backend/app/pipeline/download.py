@@ -272,6 +272,13 @@ _UNAVAILABLE_KEYS = (
     "is not a valid url",
     "does not exist",
 )
+# O extrator do YouTube quebrou: o yt-dlp pede para conferir se está na última versão.
+_OUTDATED_KEYS = (
+    "unable to extract",
+    "nsig extraction failed",
+    "signature extraction failed",
+    "confirm you are on the latest version",
+)
 _LOGIN_KEYS = ("sign in", "cookies", "login required")
 _NETWORK_KEYS = ("unable to download", "timed out", "connection", "getaddrinfo", "http error 5")
 
@@ -279,10 +286,17 @@ _NETWORK_KEYS = ("unable to download", "timed out", "connection", "getaddrinfo",
 def map_ytdlp_error(error: BaseException | str, *, searching: bool = False) -> AppError:
     message = str(error).lower()
     logger.warning("yt-dlp falhou: %s", error)
+    # Os dois primeiros códigos fazem o app sugerir atualizar o yt-dlp (ADR 0016).
     if any(key in message for key in _FORMAT_KEYS):
         return AppError(
             "youtube_format_unavailable",
-            "O YouTube não liberou o áudio. Atualize o yt-dlp e confira o runtime JS no /health.",
+            "O YouTube não liberou o áudio. Costuma ser o yt-dlp desatualizado.",
+            502,
+        )
+    if any(key in message for key in _OUTDATED_KEYS):
+        return AppError(
+            "ytdlp_outdated",
+            "O yt-dlp não conseguiu ler o YouTube. Costuma ser o yt-dlp desatualizado.",
             502,
         )
     if any(key in message for key in _AGE_KEYS):

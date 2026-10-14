@@ -4,6 +4,7 @@ import { ProcessingDock } from '../features/processing/ProcessingDock';
 import { ProcessingPill } from '../features/processing/ProcessingPill';
 import { UpdateBanner } from '../features/update/UpdateNotice';
 import { UpdateSheet } from '../features/update/UpdateSheet';
+import { YtDlpBanner } from '../features/ytdlp/YtDlpNotice';
 import { ToastProvider } from '../ui/Toast';
 import { useIsDesktop } from '../ui/useMediaQuery';
 import styles from './AppLayout.module.css';
@@ -29,6 +30,7 @@ export function AppLayout() {
       <div className={isDesktop ? styles.desktop : fullscreen ? styles.fullscreen : styles.mobile}>
         {isDesktop && <Topbar />}
         {!isDesktop && onHome && <UpdateBanner />}
+        {!isDesktop && onHome && <YtDlpBanner />}
         <main className={styles.main}>
           <Outlet />
         </main>

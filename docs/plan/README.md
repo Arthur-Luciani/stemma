@@ -42,6 +42,7 @@ Após a F1, a **F3 pode rodar em paralelo** com F2a/F2b em sessões separadas, c
 |---|---|
 | torch cu118 em Python 3.13 | F0 ([ADR 0008](../decisions/0008-python-e-deps.md)) |
 | yt-dlp exigindo runtime JS e cookies | F2b + `/health` |
+| yt-dlp velho (o YouTube muda) | atualização diária e pelo app ([ADR 0016](../decisions/0016-atualizar-yt-dlp.md)) |
 | Sincronia de 4 streams no celular | F4a ([ADR 0006](../decisions/0006-audio-no-celular.md)) |
 | SQLite com worker em thread | F2a (WAL + busy_timeout) |
 | CUDA num serviço com conta do sistema (LocalSystem) | F5b (verificar antes de tudo) |

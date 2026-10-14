@@ -111,8 +111,15 @@ class SessionSort(StrEnum):
 
 
 class UpdateState(StrEnum):
-    """Atualização do Stemma disparada pelo app (ADR 0015)."""
+    """Atualização disparada pelo app ou pela tarefa agendada (ADR 0015 e 0016)."""
 
     RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+
+
+class UpdateComponent(StrEnum):
+    """O que uma linha de `system_updates` atualiza."""
+
+    APP = "app"  # o Stemma inteiro, pelo instalador (ADR 0015)
+    YTDLP = "ytdlp"  # só o yt-dlp do venv no ar (ADR 0016)

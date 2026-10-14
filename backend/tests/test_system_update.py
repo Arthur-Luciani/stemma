@@ -15,10 +15,11 @@ from app.cli import main
 from app.config import Settings, get_settings
 from app.db.models import SystemUpdateModel
 from app.db.types import utcnow
-from app.domain.enums import UpdateState
+from app.domain.enums import UpdateComponent, UpdateState
 from app.domain.releases import format_version, parse_version
 from app.pipeline.updater import FAILURE_TTL_S, GitHubReleases, UpdateTask, UpdateTaskError
-from app.services.system_update import RUNNING_TIMEOUT, record_update_result
+from app.services.system_update import record_update_result
+from app.services.update_guard import RUNNING_TIMEOUTS
 from tests.conftest import create_session, open_db, process_session
 
 CURRENT = parse_version(__version__)
@@ -329,7 +330,7 @@ def test_running_velho_vira_falha_e_libera_nova_tentativa(
                 from_version=__version__,
                 target_version=NEXT,
                 state=UpdateState.RUNNING,
-                created_at=utcnow() - RUNNING_TIMEOUT - timedelta(minutes=1),
+                created_at=utcnow() - RUNNING_TIMEOUTS[UpdateComponent.APP] - timedelta(minutes=1),
             )
         )
         db.commit()

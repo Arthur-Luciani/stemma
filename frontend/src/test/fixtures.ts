@@ -8,6 +8,7 @@ import type {
   SessionState,
   SystemUpdate,
   UpdateRun,
+  YtDlpStatus,
 } from '../api/types';
 
 let seq = 0;
@@ -159,6 +160,23 @@ export function makeUpdateRun(overrides: Partial<UpdateRun> = {}): UpdateRun {
     message: null,
     created_at: '2026-10-06T18:00:00Z',
     finished_at: null,
+    ...overrides,
+  };
+}
+
+/** `GET /api/system/ytdlp` em dia (o padrão do servidor de teste). */
+export function makeYtDlpStatus(overrides: Partial<YtDlpStatus> = {}): YtDlpStatus {
+  return {
+    installed_version: '2025.07.06',
+    check: 'ok',
+    checked_at: '2026-10-06T18:00:00Z',
+    latest_version: '2025.07.06',
+    latest_published_at: '2025-07-06T18:00:00Z',
+    available: false,
+    stale: false,
+    can_update: true,
+    active_jobs: 0,
+    last_run: null,
     ...overrides,
   };
 }

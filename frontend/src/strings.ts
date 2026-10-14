@@ -35,6 +35,17 @@ export const strings = {
     updatedHint: 'Toque em Recarregar no aviso de nova versão para abrir a versão nova.',
     failed: 'Não deu certo',
     stillRunning: (version: string) => `A v${version} continua no ar.`,
+    ytdlp: (version: string) => `yt-dlp ${version}`,
+  },
+  ytdlp: {
+    update: 'Atualizar yt-dlp',
+    newer: (version: string) => `Já saiu o yt-dlp ${version}. Atualizar costuma resolver.`,
+    updating: (version: string) =>
+      `Atualizando o yt-dlp para ${version}. O Stemma fica fora do ar por uns 30 s.`,
+    updated: (version: string) => `yt-dlp atualizado para ${version}. Tente de novo.`,
+    jobsActive: 'Espere o processamento terminar para atualizar.',
+    stale: 'yt-dlp desatualizado',
+    updatingShort: 'Atualizando o yt-dlp…',
   },
   nav: {
     label: 'Navegação principal',

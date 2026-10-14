@@ -1,5 +1,6 @@
-"""Atualização pelo app (ADR 0015): consulta às releases do GitHub e disparo da tarefa
-agendada que roda o instalador. Aqui só há I/O; as regras ficam no `SystemUpdateService`."""
+"""Atualização pelo app: consulta às releases do GitHub (ADR 0015) e à última versão do yt-dlp
+no PyPI (ADR 0016), e disparo das tarefas agendadas que atualizam. Aqui só há I/O; as regras
+ficam no `SystemUpdateService` e no `YtDlpUpdateService`."""
 
 import json
 import logging
@@ -14,7 +15,7 @@ from typing import Any
 
 from app import __version__
 from app.db.types import utcnow
-from app.domain.releases import Version, parse_version
+from app.domain.releases import Version, parse_version, parse_ytdlp_version
 from app.pipeline.proc import BinaryNotFoundError, ProcessTimeoutError, run_process
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ class ReleaseList:
 
 
 Fetch = Callable[[str, float], Any]
+_FETCH_ERRORS = (urllib.error.URLError, TimeoutError, OSError, ValueError)
 
 
 def _fetch_json(url: str, timeout: float) -> Any:
@@ -54,10 +56,31 @@ def _fetch_json(url: str, timeout: float) -> Any:
         return json.load(response)
 
 
-class GitHubReleases:
-    """Releases publicadas (sem rascunho nem pré-release), com cache em memória.
+class _Cached[T]:
+    """Resultado de uma consulta externa, guardado por `ttl_s` (ou `FAILURE_TTL_S` se ela
+    falhou, com None). Guarda só dado externo, nunca estado do app (ADR 0015)."""
 
-    O cache guarda só a resposta do GitHub (dado externo), não estado do app (ADR 0015)."""
+    def __init__(
+        self, load: Callable[[], T | None], ttl_s: float, clock: Callable[[], float]
+    ) -> None:
+        self._load = load
+        self.ttl_s = ttl_s
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._value: T | None = None
+        self._expires_at = 0.0
+
+    def get(self) -> T | None:
+        with self._lock:
+            if self._clock() < self._expires_at:
+                return self._value
+            self._value = self._load()
+            self._expires_at = self._clock() + (self.ttl_s if self._value else FAILURE_TTL_S)
+            return self._value
+
+
+class GitHubReleases:
+    """Releases publicadas (sem rascunho nem pré-release), com cache em memória."""
 
     def __init__(
         self,
@@ -71,29 +94,19 @@ class GitHubReleases:
         now: Callable[[], datetime] | None = None,
     ) -> None:
         self.url = url or f"https://api.github.com/repos/{repo}/releases?per_page=30"
-        self.ttl_s = ttl_s
         self.timeout_s = timeout_s
         self._fetch = fetch
-        self._clock = clock
         self._now = now
-        self._lock = threading.Lock()
-        self._cached: ReleaseList | None = None
-        self._expires_at = 0.0
+        self._cache = _Cached(self._load, ttl_s, clock)
 
     def list(self) -> ReleaseList | None:
         """None = não foi possível consultar (rede, limite da API, resposta estranha)."""
-        with self._lock:
-            if self._clock() < self._expires_at:
-                return self._cached
-            result = self._load()
-            self._cached = result
-            self._expires_at = self._clock() + (self.ttl_s if result else FAILURE_TTL_S)
-            return result
+        return self._cache.get()
 
     def _load(self) -> ReleaseList | None:
         try:
             data = self._fetch(self.url, self.timeout_s)
-        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+        except _FETCH_ERRORS as exc:
             logger.warning("Não foi possível consultar as releases: %s", exc)
             return None
         if not isinstance(data, list):
@@ -132,13 +145,74 @@ def _parse_release(item: Any) -> Release | None:
     )
 
 
+@dataclass(frozen=True)
+class YtDlpLatest:
+    """Última versão do yt-dlp publicada no PyPI."""
+
+    version: str
+    published_at: datetime | None
+    checked_at: datetime
+
+
+class YtDlpReleases:
+    """Última versão do yt-dlp no PyPI, com cache em memória (curto: quando o YouTube quebra,
+    o yt-dlp costuma soltar a correção em horas)."""
+
+    def __init__(
+        self,
+        *,
+        ttl_s: float,
+        url: str = "",
+        timeout_s: float = 5.0,
+        fetch: Fetch = _fetch_json,
+        clock: Callable[[], float] = time.monotonic,
+        now: Callable[[], datetime] | None = None,
+    ) -> None:
+        self.url = url or "https://pypi.org/pypi/yt-dlp/json"
+        self.timeout_s = timeout_s
+        self._fetch = fetch
+        self._now = now
+        self._cache = _Cached(self._load, ttl_s, clock)
+
+    def latest(self) -> YtDlpLatest | None:
+        """None = não foi possível consultar (rede, resposta estranha)."""
+        return self._cache.get()
+
+    def _load(self) -> YtDlpLatest | None:
+        try:
+            data = self._fetch(self.url, self.timeout_s)
+            version = str(data["info"]["version"])
+        except (*_FETCH_ERRORS, KeyError, TypeError) as exc:
+            logger.warning("Não foi possível consultar o yt-dlp no PyPI: %s", exc)
+            return None
+        if parse_ytdlp_version(version) is None:
+            logger.warning("Versão do yt-dlp estranha no PyPI: %r", version)
+            return None
+        return YtDlpLatest(version, _upload_time(data), (self._now or utcnow)())
+
+
+def _upload_time(data: Any) -> datetime | None:
+    """Quando os arquivos da última versão subiram (o mais antigo deles)."""
+    files = data.get("urls") if isinstance(data, dict) else None
+    times: list[datetime] = []
+    for item in files if isinstance(files, list) else []:
+        stamp = item.get("upload_time_iso_8601") if isinstance(item, dict) else None
+        if not isinstance(stamp, str):
+            continue
+        try:
+            times.append(datetime.fromisoformat(stamp))
+        except ValueError:
+            continue
+    return min(times) if times else None
+
+
 class UpdateTaskError(Exception):
     """A tarefa agendada não pôde ser disparada (mensagem já em PT-BR)."""
 
 
 class UpdateTask:
-    """Dispara a tarefa agendada `\\Stemma\\Atualizar` (`schtasks /run`). Nome vazio = sem
-    tarefa (dev, CI, instalação antiga)."""
+    """Dispara uma tarefa agendada (`schtasks /run`): `\\Stemma\\Atualizar` ou
+    `\\Stemma\\AtualizarYtDlp`. Nome vazio = sem tarefa (dev, CI, instalação antiga)."""
 
     def __init__(self, schtasks_bin: str, task_name: str, timeout_s: float = 30.0) -> None:
         self.schtasks_bin = schtasks_bin

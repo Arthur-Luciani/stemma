@@ -12,6 +12,12 @@
   gap: var(--space-3) var(--space-4);
 }
 
+/* Celular: "Sobre o Stemma" no canto do cabeçalho. */
+.about {
+  margin-left: auto;
+  align-self: center;
+}
+
 .title {
   margin: 0;
   font-size: 28px;

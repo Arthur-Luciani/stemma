@@ -44,7 +44,7 @@ describe('aviso de versão nova', () => {
     const banner = text.closest('[role="status"]') as HTMLElement;
     await userEvent.click(within(banner).getByRole('button', { name: 'Ver' }));
 
-    const sheet = await screen.findByRole('dialog', { name: 'Atualizar o Stemma' });
+    const sheet = await screen.findByRole('dialog', { name: 'Sobre o Stemma' });
     expect(router.state.location.search).toBe('?atualizacao=1');
     expect(within(sheet).getByText('v1.5.0')).toBeInTheDocument();
     expect(within(sheet).getByText('v1.5.1')).toBeInTheDocument();
@@ -81,7 +81,7 @@ describe('aviso de versão nova', () => {
     renderApp('/', { desktop: true });
 
     await userEvent.click(await screen.findByRole('button', { name: 'v1.5.1 disponível' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Atualizar o Stemma' });
+    const dialog = await screen.findByRole('dialog', { name: 'Sobre o Stemma' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Atualizar' }));
 
     expect(await within(dialog).findByText(/Instalando a v1.5.1/)).toBeInTheDocument();
@@ -93,7 +93,7 @@ describe('aviso de versão nova', () => {
     serveStatus(available({ active_jobs: 2 }));
     renderApp('/?atualizacao=1', { desktop: true });
 
-    const dialog = await screen.findByRole('dialog', { name: 'Atualizar o Stemma' });
+    const dialog = await screen.findByRole('dialog', { name: 'Sobre o Stemma' });
     expect(within(dialog).getByRole('button', { name: 'Atualizar' })).toBeDisabled();
     expect(within(dialog).getByText(/Há 2 músicas sendo processadas/)).toBeInTheDocument();
   });
@@ -102,7 +102,7 @@ describe('aviso de versão nova', () => {
     serveStatus(available({ can_update: false }));
     renderApp('/?atualizacao=1', { desktop: true });
 
-    const dialog = await screen.findByRole('dialog', { name: 'Atualizar o Stemma' });
+    const dialog = await screen.findByRole('dialog', { name: 'Sobre o Stemma' });
     expect(within(dialog).getByText(/não atualiza pelo app/)).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Atualizar' })).not.toBeInTheDocument();
   });
@@ -128,7 +128,7 @@ describe('aviso de versão nova', () => {
   it('servidor fora do ar durante a atualização: continua em "Atualizando…"', async () => {
     serveStatus(available({ last_run: makeUpdateRun() }));
     const { client } = renderApp('/?atualizacao=1', { desktop: true });
-    const dialog = await screen.findByRole('dialog', { name: 'Atualizar o Stemma' });
+    const dialog = await screen.findByRole('dialog', { name: 'Sobre o Stemma' });
     expect(within(dialog).getByText(/Instalando a v1.5.1/)).toBeInTheDocument();
 
     server.use(http.get('*/api/system/update', () => HttpResponse.error()));
@@ -149,6 +149,83 @@ describe('aviso de versão nova', () => {
 
     expect(await screen.findByText('Stemma atualizado para a v1.5.1.')).toBeInTheDocument();
     expect(screen.queryByText(/disponível/)).not.toBeInTheDocument();
+  });
+});
+
+describe('Sobre o Stemma e verificar atualizações', () => {
+  it('desktop: botão Sobre na topbar abre o dialog com a versão e a última verificação', async () => {
+    serveStatus(makeSystemUpdate({ checked_at: new Date(Date.now() - 3 * 60_000).toISOString() }));
+    const { router } = renderApp('/', { desktop: true });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sobre o Stemma' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Sobre o Stemma' });
+    expect(router.state.location.search).toBe('?atualizacao=1');
+    expect(within(dialog).getByText(/Instalada: v1.5.0/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Verificado há 3 min/)).toBeInTheDocument();
+  });
+
+  it('celular: ícone no cabeçalho da Biblioteca abre o sheet', async () => {
+    serveStatus(makeSystemUpdate());
+    renderApp('/sessions');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sobre o Stemma' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Sobre o Stemma' })).toBeInTheDocument();
+  });
+
+  it('versão nova publicada depois da última consulta aparece na hora, no chip também', async () => {
+    serveStatus(makeSystemUpdate());
+    server.use(http.post('*/api/system/update/check', () => HttpResponse.json(available())));
+    renderApp('/?atualizacao=1', { desktop: true });
+
+    const dialog = await screen.findByRole('dialog', { name: 'Sobre o Stemma' });
+    expect(within(dialog).getByText(/mais recente \(v1.5.0\)/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Verificar atualizações' }));
+
+    expect(await within(dialog).findByText('atualizar pelo app')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Atualizar' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'v1.5.1 disponível' })).toBeInTheDocument();
+  });
+
+  it('sem novidade: confirma que está na versão mais recente', async () => {
+    serveStatus(makeSystemUpdate());
+    server.use(
+      http.post('*/api/system/update/check', () =>
+        HttpResponse.json(makeSystemUpdate({ checked_at: new Date().toISOString() })),
+      ),
+    );
+    renderApp('/?atualizacao=1', { desktop: true });
+
+    const dialog = await screen.findByRole('dialog', { name: 'Sobre o Stemma' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Verificar atualizações' }));
+
+    expect(await within(dialog).findByText(/Verificado agora mesmo/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/mais recente \(v1.5.0\)/)).toBeInTheDocument();
+  });
+
+  it('sem conseguir consultar o GitHub: avisa e o app segue funcionando', async () => {
+    serveStatus(makeSystemUpdate());
+    server.use(
+      http.post('*/api/system/update/check', () =>
+        HttpResponse.json(makeSystemUpdate({ check: 'unavailable', checked_at: null })),
+      ),
+    );
+    renderApp('/?atualizacao=1', { desktop: true });
+
+    const dialog = await screen.findByRole('dialog', { name: 'Sobre o Stemma' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Verificar atualizações' }));
+
+    expect(await within(dialog).findByText(/Não foi possível verificar/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Verificar atualizações' })).toBeEnabled();
+  });
+
+  it('durante a atualização o botão Verificar fica desabilitado', async () => {
+    serveStatus(available({ last_run: makeUpdateRun() }));
+    renderApp('/?atualizacao=1', { desktop: true });
+
+    const dialog = await screen.findByRole('dialog', { name: 'Sobre o Stemma' });
+    expect(within(dialog).getByRole('button', { name: 'Verificar atualizações' })).toBeDisabled();
   });
 });
 

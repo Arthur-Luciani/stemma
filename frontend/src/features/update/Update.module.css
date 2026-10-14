@@ -211,3 +211,12 @@
 .bad p {
   margin: 0;
 }
+
+/* "Sobre o Stemma": versão, última verificação e o botão Verificar. */
+.checkRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}

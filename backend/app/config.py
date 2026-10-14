@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     update_repo: str = "Arthur-Luciani/stemma"
     # Só para ensaio: URL da lista de releases no lugar da API do GitHub (aceita file://).
     update_releases_url: str = ""
-    update_check_ttl_s: float = Field(default=6 * 3600, gt=0)
+    update_check_ttl_s: float = Field(default=3600, gt=0)
     # Atualização do yt-dlp (ADR 0016): tarefa agendada (diária e sob demanda) que atualiza só o
     # yt-dlp do venv no ar; vazio = sem atualização pelo app. O instalador grava
     # `\Stemma\AtualizarYtDlp`.

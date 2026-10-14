@@ -139,6 +139,11 @@ export function getSystemUpdate(signal?: AbortSignal): Promise<SystemUpdate> {
   return call(() => apiClient.GET('/api/system/update', { signal }));
 }
 
+/** Consulta o GitHub agora, ignorando o cache (o servidor limita a uma por minuto). */
+export function checkSystemUpdate(): Promise<SystemUpdate> {
+  return call(() => apiClient.POST('/api/system/update/check'));
+}
+
 /** Dispara a atualização (responde na hora; o servidor sai do ar por ~1 min). */
 export function startSystemUpdate(): Promise<UpdateRun> {
   return call(() => apiClient.POST('/api/system/update'));

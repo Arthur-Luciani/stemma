@@ -48,9 +48,13 @@ class SystemUpdateService:
         self.current_version = current_version
         self.clock = clock
 
-    def status(self) -> SystemUpdateOut:
+    def check(self) -> SystemUpdateOut:
+        """Como `status`, mas consulta o GitHub agora (respeita o intervalo mínimo)."""
+        return self.status(force=True)
+
+    def status(self, *, force: bool = False) -> SystemUpdateOut:
         run = self._last_run()
-        listing = self.releases.list()
+        listing = self.releases.list(force=force)
         current = parse_version(self.current_version)
         latest = _latest_installable(listing.releases) if listing else None
         available = bool(latest and current and latest.version > current)

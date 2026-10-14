@@ -15,6 +15,7 @@ import { SegmentedControl } from '../../ui/SegmentedControl';
 import { SkeletonList } from '../../ui/Skeleton';
 import { useIsDesktop } from '../../ui/useMediaQuery';
 import { useJobs } from '../processing/hooks';
+import { AboutButton } from '../update/UpdateNotice';
 import { useMenuItems, type SessionAct } from './actions';
 import {
   FILTERS,
@@ -269,6 +270,11 @@ export function LibraryPage() {
       <div className={styles.head}>
         <h1 className={styles.title}>{strings.library.title}</h1>
         {counts && <span className={styles.count}>{strings.library.count(total)}</span>}
+        {!isDesktop && (
+          <span className={styles.about}>
+            <AboutButton />
+          </span>
+        )}
         <label className={styles.search}>
           <Icon name="search" size={20} className={styles.searchIcon} />
           <input

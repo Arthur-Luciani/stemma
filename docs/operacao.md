@@ -42,7 +42,7 @@ Quando sai uma release nova (com o instalador já anexado), o app mostra **"vX.Y
 - o app fica fora do ar por ~1 min, mostra "Atualizando…" e volta sozinho. Depois aparece o "Recarregar" do PWA;
 - se falhar, o app mostra o motivo e a versão anterior continua no ar;
 - não começa com música sendo processada ou exportada (o botão fica desabilitado);
-- a consulta ao GitHub tem cache de 6 h no servidor: uma release nova pode levar até 6 h para aparecer (ou reinicie o serviço);
+- a consulta ao GitHub tem cache de 1 h no servidor. Para ver uma release recém-publicada na hora, abra **Sobre o Stemma** (ícone ⓘ) e toque em **Verificar atualizações** (no máximo uma consulta por minuto); não precisa reiniciar o serviço;
 - as tarefas (`Atualizar` e `Bandeja`, que reabre o ícone da bandeja) são criadas pelo instalador. Uma instalação anterior à F5c ganha as tarefas no próximo `.exe` rodado à mão.
 
 Linha de comando do instalador usada pela tarefa: `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOTRAY /RESULTFILE=<arq> /LOG=<arq>`. O código de saída é 1 na falha.

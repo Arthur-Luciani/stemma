@@ -21,6 +21,23 @@ function useNotice() {
   };
 }
 
+/** Botão "Sobre o Stemma": abre o sheet/dialog de atualização, sempre disponível. */
+export function AboutButton() {
+  const [, open] = useUrlParam(UPDATE_PARAM);
+  return (
+    <Button
+      variant="ghost"
+      icon="info"
+      iconOnly
+      label={strings.update.about}
+      aria-haspopup="dialog"
+      onClick={() => {
+        open('1');
+      }}
+    />
+  );
+}
+
 /** Desktop: chip discreto na topbar, ao lado do QR. */
 export function UpdateChip() {
   const { view, open } = useNotice();

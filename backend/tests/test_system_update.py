@@ -17,7 +17,13 @@ from app.db.models import SystemUpdateModel
 from app.db.types import utcnow
 from app.domain.enums import UpdateComponent, UpdateState
 from app.domain.releases import format_version, parse_version
-from app.pipeline.updater import FAILURE_TTL_S, GitHubReleases, UpdateTask, UpdateTaskError
+from app.pipeline.updater import (
+    FAILURE_TTL_S,
+    FORCE_MIN_INTERVAL_S,
+    GitHubReleases,
+    UpdateTask,
+    UpdateTaskError,
+)
 from app.services.system_update import record_update_result
 from app.services.update_guard import RUNNING_TIMEOUTS
 from tests.conftest import create_session, open_db, process_session
@@ -116,6 +122,35 @@ def test_releases_usa_cache_ate_o_ttl() -> None:
     assert fetch.calls == 2
 
 
+def test_consulta_forcada_ignora_o_cache_mas_respeita_o_intervalo_minimo() -> None:
+    clock = Clock()
+    fetch = FakeGitHub([release(NEXT)])
+    releases = GitHubReleases("x/y", ttl_s=3600, fetch=fetch, clock=clock)
+
+    releases.list()
+    clock.now = FORCE_MIN_INTERVAL_S - 1
+    releases.list(force=True)
+    assert fetch.calls == 1
+    clock.now = FORCE_MIN_INTERVAL_S + 1
+    releases.list(force=True)
+    assert fetch.calls == 2
+    releases.list(force=True)
+    assert fetch.calls == 2
+
+
+def test_consulta_forcada_que_falha_devolve_none_e_nao_martela_a_api() -> None:
+    clock = Clock()
+    fetch = FakeGitHub([release(NEXT)])
+    releases = GitHubReleases("x/y", ttl_s=3600, fetch=fetch, clock=clock)
+    releases.list()
+    fetch.data = urllib.error.URLError("sem rede")
+    clock.now = FORCE_MIN_INTERVAL_S + 1
+
+    assert releases.list(force=True) is None
+    assert releases.list(force=True) is None
+    assert fetch.calls == 2
+
+
 def test_falha_de_rede_e_cacheada_por_pouco_tempo() -> None:
     clock = Clock()
     fetch = FakeGitHub(urllib.error.URLError("sem rede"))
@@ -211,6 +246,60 @@ def test_status_sem_novidade(client: TestClient, task: FakeTask) -> None:
     assert body["available"] is False
     assert body["latest_version"] == __version__
     assert body["notes"] == []
+
+
+def test_verificar_mostra_release_publicada_depois_da_ultima_consulta(
+    client: TestClient, task: FakeTask
+) -> None:
+    clock = Clock()
+    fake = FakeGitHub([release(__version__)])
+    client.app.state.releases = GitHubReleases(  # type: ignore[attr-defined]
+        "x/y", ttl_s=3600, fetch=fake, clock=clock
+    )
+    assert client.get("/api/system/update").json()["available"] is False
+
+    fake.data = [release(NEXT), release(__version__)]
+    assert client.get("/api/system/update").json()["available"] is False
+    clock.now = FORCE_MIN_INTERVAL_S + 1
+    body = client.post("/api/system/update/check").json()
+
+    assert body["available"] is True
+    assert body["latest_version"] == NEXT
+    assert client.get("/api/system/update").json()["latest_version"] == NEXT
+
+
+def test_verificar_duas_vezes_seguidas_consulta_o_github_uma_vez(
+    client: TestClient, task: FakeTask
+) -> None:
+    fake = FakeGitHub([release(__version__)])
+    client.app.state.releases = GitHubReleases(  # type: ignore[attr-defined]
+        "x/y", ttl_s=3600, fetch=fake, clock=Clock()
+    )
+
+    assert client.post("/api/system/update/check").status_code == 200
+    assert client.post("/api/system/update/check").status_code == 200
+    assert fake.calls == 1
+
+
+def test_verificar_sem_rede_nunca_da_500(client: TestClient, task: FakeTask) -> None:
+    use_releases(client, TimeoutError("timeout"))
+
+    response = client.post("/api/system/update/check")
+
+    assert response.status_code == 200
+    assert response.json()["check"] == "unavailable"
+
+
+def test_verificar_com_atualizacao_em_andamento_devolve_o_running(
+    client: TestClient, task: FakeTask
+) -> None:
+    use_releases(client, [release(NEXT)])
+    assert client.post("/api/system/update").status_code == 202
+
+    body = client.post("/api/system/update/check").json()
+
+    assert body["last_run"]["state"] == "running"
+    assert body["available"] is True
 
 
 def test_status_sem_rede_nunca_da_500(client: TestClient, task: FakeTask) -> None:

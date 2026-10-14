@@ -235,7 +235,7 @@ it('a versão do yt-dlp aparece no sheet de atualização do Stemma', async () =
     ),
   );
   renderApp('/sessions?atualizacao=1');
-  const sheet = await screen.findByRole('dialog', { name: 'Atualizar o Stemma' });
+  const sheet = await screen.findByRole('dialog', { name: 'Sobre o Stemma' });
   await waitFor(() => {
     expect(within(sheet).getByText('yt-dlp 2025.07.06')).toBeInTheDocument();
   });

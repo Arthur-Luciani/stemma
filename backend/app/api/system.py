@@ -12,6 +12,11 @@ def get_update(service: SystemUpdateServiceDep) -> SystemUpdateOut:
     return service.status()
 
 
+@router.post("/update/check")
+def check_update(service: SystemUpdateServiceDep) -> SystemUpdateOut:
+    return service.check()
+
+
 @router.post("/update", status_code=status.HTTP_202_ACCEPTED)
 def start_update(service: SystemUpdateServiceDep) -> UpdateRunOut:
     return service.start()

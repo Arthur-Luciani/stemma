@@ -3,12 +3,13 @@ import { useUrlParam } from '../../app/useUrlParam';
 import { strings } from '../../strings';
 import { BottomSheet } from '../../ui/BottomSheet';
 import { Button } from '../../ui/Button';
+import { formatAgo } from '../../lib/format';
 import { Dialog } from '../../ui/Dialog';
 import { Icon } from '../../ui/Icon';
 import { Spinner } from '../../ui/Spinner';
 import { useIsDesktop } from '../../ui/useMediaQuery';
 import { useYtDlp } from '../ytdlp/hooks';
-import { useStartUpdate, useSystemUpdate } from './hooks';
+import { useCheckUpdate, useStartUpdate, useSystemUpdate } from './hooks';
 import { type UpdateView, updateView } from './status';
 import styles from './Update.module.css';
 import { UPDATE_PARAM } from './UpdateNotice';
@@ -22,6 +23,7 @@ export function UpdateSheet() {
   const [param, , close] = useUrlParam(UPDATE_PARAM);
   const { data } = useSystemUpdate();
   const start = useStartUpdate();
+  const check = useCheckUpdate();
   const ytdlp = useYtDlp().data?.installed_version;
   const open = param === '1' && data !== undefined;
   if (!data) return null;
@@ -33,6 +35,14 @@ export function UpdateSheet() {
   const body = (
     <>
       <UpdateBody data={data} view={view} />
+      <CheckRow
+        data={data}
+        view={view}
+        pending={check.isPending}
+        onCheck={() => {
+          check.mutate();
+        }}
+      />
       {ytdlp && <p className={styles.muted}>{strings.update.ytdlp(ytdlp)}</p>}
     </>
   );
@@ -124,6 +134,33 @@ function UpdateBody({ data, view }: { data: SystemUpdate; view: UpdateView }) {
     case 'unknown':
       return <p className={styles.muted}>{strings.update.checkFailed}</p>;
   }
+}
+
+/** Versão instalada, "verificado há X" e o botão que consulta o GitHub agora. */
+function CheckRow({
+  data,
+  view,
+  pending,
+  onCheck,
+}: {
+  data: SystemUpdate;
+  view: UpdateView;
+  pending: boolean;
+  onCheck: () => void;
+}) {
+  const showVersion = view.kind !== 'running';
+  const info = [
+    showVersion ? strings.update.installed(data.current_version) : null,
+    data.checked_at ? strings.update.checkedAgo(formatAgo(data.checked_at)) : null,
+  ].filter((part) => part !== null);
+  return (
+    <div className={styles.checkRow}>
+      {info.length > 0 && <p className={styles.muted}>{info.join(' · ')}</p>}
+      <Button icon="refresh" disabled={pending || view.kind === 'running'} onClick={onCheck}>
+        {pending ? strings.update.checking : strings.update.check}
+      </Button>
+    </div>
+  );
 }
 
 function Versions({ from, to }: { from: string; to: string }) {

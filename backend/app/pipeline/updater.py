@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 
 # Uma consulta que falhou vale por pouco tempo: a rede pode voltar logo.
 FAILURE_TTL_S = 300.0
+# Consulta forçada ("Verificar atualizações"): dentro deste intervalo devolve o cache. A API do
+# GitHub sem token permite 60 requisições/h por IP.
+FORCE_MIN_INTERVAL_S = 60.0
 
 
 @dataclass(frozen=True)
@@ -69,13 +72,21 @@ class _Cached[T]:
         self._lock = threading.Lock()
         self._value: T | None = None
         self._expires_at = 0.0
+        self._loaded_at: float | None = None
 
-    def get(self) -> T | None:
+    def get(self, *, force: bool = False) -> T | None:
+        """`force` ignora o TTL, mas não o intervalo mínimo desde a última consulta (sucesso
+        ou falha): clicar várias vezes não vira várias requisições."""
         with self._lock:
-            if self._clock() < self._expires_at:
+            now = self._clock()
+            if now < self._expires_at and not force:
+                return self._value
+            recent = self._loaded_at is not None and now - self._loaded_at < FORCE_MIN_INTERVAL_S
+            if force and recent:
                 return self._value
             self._value = self._load()
-            self._expires_at = self._clock() + (self.ttl_s if self._value else FAILURE_TTL_S)
+            self._loaded_at = self._clock()
+            self._expires_at = self._loaded_at + (self.ttl_s if self._value else FAILURE_TTL_S)
             return self._value
 
 
@@ -99,9 +110,10 @@ class GitHubReleases:
         self._now = now
         self._cache = _Cached(self._load, ttl_s, clock)
 
-    def list(self) -> ReleaseList | None:
-        """None = não foi possível consultar (rede, limite da API, resposta estranha)."""
-        return self._cache.get()
+    def list(self, *, force: bool = False) -> ReleaseList | None:
+        """None = não foi possível consultar (rede, limite da API, resposta estranha).
+        `force` ignora o cache (respeitando `FORCE_MIN_INTERVAL_S`)."""
+        return self._cache.get(force=force)
 
     def _load(self) -> ReleaseList | None:
         try:

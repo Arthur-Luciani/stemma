@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { getSystemUpdate, startSystemUpdate } from '../../api/endpoints';
+import { checkSystemUpdate, getSystemUpdate, startSystemUpdate } from '../../api/endpoints';
 import type { SystemUpdate } from '../../api/types';
 import { queryKeys } from '../../app/queryKeys';
 import { useErrorToast } from '../../app/useErrorToast';
@@ -23,6 +23,21 @@ export function useSystemUpdate() {
       query.state.data?.last_run?.state === 'running' ? UPDATE_POLL_MS : UPDATE_CHECK_MS,
     refetchIntervalInBackground: false,
     retry: false,
+  });
+}
+
+/** "Verificar atualizações": o resultado vai direto para o cache, e o chip/faixa reagem. */
+export function useCheckUpdate() {
+  const client = useQueryClient();
+  const onError = useErrorToast();
+  return useMutation({
+    mutationFn: checkSystemUpdate,
+    onSuccess: async (data) => {
+      // Um refetch em andamento não pode chegar depois e sobrescrever o resultado mais novo.
+      await client.cancelQueries({ queryKey: queryKeys.systemUpdate });
+      client.setQueryData<SystemUpdate>(queryKeys.systemUpdate, data);
+    },
+    onError,
   });
 }
 

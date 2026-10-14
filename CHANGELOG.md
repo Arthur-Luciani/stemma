@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.0](https://github.com/Arthur-Luciani/stemma/compare/v1.6.0...v1.7.0) (2026-10-14)
+
+
+### Features
+
+* atualizar o yt-dlp sozinho todo dia e pelo app quando ele quebrar ([#52](https://github.com/Arthur-Luciani/stemma/issues/52)) ([e8a3d72](https://github.com/Arthur-Luciani/stemma/commit/e8a3d72327c99c1ecea0969faa6b3f04d33eaead)), closes [#35](https://github.com/Arthur-Luciani/stemma/issues/35)
+* verificar atualizações na hora pelo Sobre o Stemma ([#54](https://github.com/Arthur-Luciani/stemma/issues/54)) ([c217225](https://github.com/Arthur-Luciani/stemma/commit/c2172253cf7f0416e05e81268e3aff5ff7e51782))
+
 ## [1.6.0](https://github.com/Arthur-Luciani/stemma/compare/v1.5.1...v1.6.0) (2026-10-14)
 
 

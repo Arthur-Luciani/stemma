@@ -1,4 +1,5 @@
 import type {
+  DiskUsage,
   Export,
   Job,
   MixState,
@@ -160,6 +161,20 @@ export function makeUpdateRun(overrides: Partial<UpdateRun> = {}): UpdateRun {
     message: null,
     created_at: '2026-10-06T18:00:00Z',
     finished_at: null,
+    ...overrides,
+  };
+}
+
+/** `GET /api/system/disk` (o padrão do servidor de teste). */
+export function makeDiskUsage(overrides: Partial<DiskUsage> = {}): DiskUsage {
+  return {
+    total_bytes: 500_000_000_000,
+    free_bytes: 123_400_000_000,
+    stems_bytes: 294_200_000,
+    exports_bytes: 87_000_000,
+    backups_bytes: 300_000,
+    exports_keep: 5,
+    backups_keep: 5,
     ...overrides,
   };
 }

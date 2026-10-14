@@ -63,7 +63,11 @@ function fakeBackend(sessionOverrides = {}) {
       return HttpResponse.json(created, { status: 201 });
     }),
   );
-  return { session, puts, calls, getExports: () => exports };
+  /** O servidor grava o export antes de avisar pelo `/ws` (o app refaz a lista ao ficar pronto). */
+  const saveExport = (item: Export) => {
+    exports = exports.map((e) => (e.id === item.id ? item : e));
+  };
+  return { session, puts, calls, getExports: () => exports, saveExport };
 }
 
 describe('Mixer', () => {
@@ -185,7 +189,7 @@ describe('Mixer', () => {
   });
 
   it('desktop: exportar salva o mix antes, mostra o progresso ao vivo e deixa baixar', async () => {
-    const { session, calls, getExports } = fakeBackend();
+    const { session, calls, getExports, saveExport } = fakeBackend();
     const { router } = await openDesktop(`/sessions/${session.id}/mix`);
 
     await userEvent.click(screen.getByRole('button', { name: 'Solo de Baixo' }));
@@ -211,11 +215,10 @@ describe('Mixer', () => {
     expect(await within(popover).findByText('Gerando MP3…')).toBeInTheDocument();
     expect(within(popover).getByText('64%')).toBeInTheDocument();
 
+    const done = { ...created, state: 'done' as const, progress: 100, size_bytes: 7_100_000 };
+    saveExport(done);
     act(() => {
-      FakeWebSocket.latest().receive({
-        type: 'export.updated',
-        data: { export: { ...created, state: 'done', progress: 100, size_bytes: 7_100_000 } },
-      });
+      FakeWebSocket.latest().receive({ type: 'export.updated', data: { export: done } });
     });
     const link = await within(popover).findByRole('link', {
       name: 'Baixar Nelly Furtado - Do It.mp3',

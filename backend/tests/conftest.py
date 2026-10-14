@@ -1,18 +1,21 @@
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.config import BACKEND_DIR, Settings
-from app.db.models import JobModel, SessionModel
-from app.domain.enums import JobKind, JobState
+from app.db.models import ExportModel, JobModel, SessionModel
+from app.domain.enums import ExportFormat, ExportState, JobKind, JobState, SessionState
 from app.main import create_app
 from app.pipeline.probe import GpuProbe
+from app.storage import Storage
 from tests.fakes import ControlledHandler
 
 
@@ -127,3 +130,62 @@ def session_row(client: TestClient, session_id: object) -> SessionModel:
 
 def job_state(client: TestClient, job_id: object) -> JobState:
     return job_row(client, job_id).state
+
+
+def ready_session_row(client: TestClient) -> uuid.UUID:
+    """Sessão pronta (com stems no banco) sem passar pelo pipeline."""
+    session_id = uuid.UUID(str(create_session(client)["id"]))
+    with open_db(client) as db:
+        db.execute(
+            update(SessionModel)
+            .where(SessionModel.id == session_id)
+            .values(state=SessionState.READY, stems={"vocals": "x"})
+        )
+        db.commit()
+    return session_id
+
+
+def add_export(
+    client: TestClient,
+    root: Path,
+    session_id: uuid.UUID,
+    *,
+    age_min: int,
+    state: ExportState = ExportState.DONE,
+    size: int = 10,
+) -> ExportModel:
+    """Export com `age_min` minutos de idade e, se pronto, o arquivo no disco."""
+    export_id = uuid.uuid4()
+    rel = Storage.export_file(session_id, export_id, "mp3")
+    done = state is ExportState.DONE
+    with open_db(client) as db:
+        export = ExportModel(
+            id=export_id,
+            session_id=session_id,
+            format=ExportFormat.MP3,
+            levels={},
+            state=state,
+            path=rel if done else None,
+            size_bytes=size if done else None,
+            created_at=datetime.now(UTC) - timedelta(minutes=age_min),
+        )
+        db.add(export)
+        db.commit()
+        db.refresh(export)
+        db.expunge(export)
+    if done:
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x" * size)
+    return export
+
+
+def export_ids(client: TestClient, session_id: uuid.UUID) -> list[uuid.UUID]:
+    with open_db(client) as db:
+        return list(
+            db.scalars(
+                select(ExportModel.id)
+                .where(ExportModel.session_id == session_id)
+                .order_by(ExportModel.created_at.desc())
+            )
+        )

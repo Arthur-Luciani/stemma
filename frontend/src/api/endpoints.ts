@@ -14,6 +14,7 @@ import type {
   SessionPatch,
   Stem,
   StemPeaks,
+  DiskUsage,
   SystemUpdate,
   UpdateRun,
   YtDlpStatus,
@@ -147,6 +148,11 @@ export function checkSystemUpdate(): Promise<SystemUpdate> {
 /** Dispara a atualização (responde na hora; o servidor sai do ar por ~1 min). */
 export function startSystemUpdate(): Promise<UpdateRun> {
   return call(() => apiClient.POST('/api/system/update'));
+}
+
+/** Uso de disco do STORAGE_ROOT por categoria e espaço livre do volume. */
+export function getDiskUsage(signal?: AbortSignal): Promise<DiskUsage> {
+  return call(() => apiClient.GET('/api/system/disk', { signal }));
 }
 
 /** yt-dlp instalado, o último do PyPI e a última atualização dele (ADR 0016). */

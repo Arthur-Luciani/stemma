@@ -89,7 +89,8 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy app
 uv run alembic upgrade head             # cria/atualiza o banco (o dev.ps1 já roda)
 uv run alembic revision --autogenerate -m "descrição"   # após mudar app/db/models.py
 uv run uvicorn app.main:app --reload --port 8010
-uv run python -m app.cli cleanup --dry-run   # órfãos no STORAGE_ROOT parados há 60+ min (sem --dry-run apaga)
+uv run python -m app.cli cleanup --dry-run   # órfãos parados há 60+ min + exports/backups além de EXPORTS_KEEP/BACKUPS_KEEP (sem --dry-run apaga)
+uv run python -m app.cli prune-backups --dry-run   # só os backups do banco além de BACKUPS_KEEP
 
 # frontend (Node >= 22.12)
 cd frontend && npm ci

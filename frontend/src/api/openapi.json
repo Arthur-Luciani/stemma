@@ -19,6 +19,50 @@
         "title": "ArtistOut",
         "type": "object"
       },
+      "DiskUsageOut": {
+        "description": "Uso de disco do `STORAGE_ROOT` por categoria e espaço do volume dele (em bytes).",
+        "properties": {
+          "backups_bytes": {
+            "title": "Backups Bytes",
+            "type": "integer"
+          },
+          "backups_keep": {
+            "title": "Backups Keep",
+            "type": "integer"
+          },
+          "exports_bytes": {
+            "title": "Exports Bytes",
+            "type": "integer"
+          },
+          "exports_keep": {
+            "title": "Exports Keep",
+            "type": "integer"
+          },
+          "free_bytes": {
+            "title": "Free Bytes",
+            "type": "integer"
+          },
+          "stems_bytes": {
+            "title": "Stems Bytes",
+            "type": "integer"
+          },
+          "total_bytes": {
+            "title": "Total Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_bytes",
+          "free_bytes",
+          "stems_bytes",
+          "exports_bytes",
+          "backups_bytes",
+          "exports_keep",
+          "backups_keep"
+        ],
+        "title": "DiskUsageOut",
+        "type": "object"
+      },
       "ErrorDetail": {
         "properties": {
           "code": {
@@ -2823,6 +2867,57 @@
         "summary": "Stem Audio",
         "tags": [
           "media"
+        ]
+      }
+    },
+    "/api/system/disk": {
+      "get": {
+        "operationId": "get_disk_usage_api_system_disk_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiskUsageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Get Disk Usage",
+        "tags": [
+          "system"
         ]
       }
     },

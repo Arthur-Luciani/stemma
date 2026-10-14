@@ -42,6 +42,17 @@ export const strings = {
     stillRunning: (version: string) => `A v${version} continua no ar.`,
     ytdlp: (version: string) => `yt-dlp ${version}`,
   },
+  disk: {
+    title: 'Espaço em disco',
+    stems: 'Stems',
+    exports: 'Exportações',
+    backups: 'Backups do banco',
+    free: 'Livre',
+    freeOf: (free: string, total: string) => `${free} de ${total}`,
+    retention: (exports: number, backups: number) =>
+      `Ficam as ${String(exports)} exportações mais recentes de cada música e os ${String(backups)} backups mais novos.`,
+    unavailable: 'Não foi possível medir o espaço em disco agora.',
+  },
   ytdlp: {
     update: 'Atualizar yt-dlp',
     newer: (version: string) => `Já saiu o yt-dlp ${version}. Atualizar costuma resolver.`,

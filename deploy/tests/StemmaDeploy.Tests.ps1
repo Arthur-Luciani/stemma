@@ -986,6 +986,30 @@ Describe 'Invoke-StemmaUpdate' {
         Should -Invoke -ModuleName StemmaDeploy Wait-StemmaHealth -Times 1 -Exactly -ParameterFilter { $Port -eq 8001 -and $ExpectedVersion -eq 'v1.1.0' }
     }
 
+    It 'poda os backups antigos só depois da versão nova no ar, com o CLI dela' {
+        $script:order = [Collections.Generic.List[string]]::new()
+        Mock -ModuleName StemmaDeploy Wait-StemmaHealth { $script:order.Add('health'); $true }
+        Mock -ModuleName StemmaDeploy Invoke-StemmaCli {
+            $script:order.Add($Arguments[0])
+            if ($Arguments[0] -eq 'backup') { New-Item -ItemType File -Force -Path $Arguments[2] | Out-Null }
+        }
+        Invoke-StemmaUpdate -Root $root -ServiceId 'teste' 6>$null | Out-Null
+        Should -Invoke -ModuleName StemmaDeploy Invoke-StemmaCli -Times 1 -Exactly -ParameterFilter { $Arguments[0] -eq 'prune-backups' -and $ReleaseDir -eq $script:next }
+        $script:order | Should -Be @('backup', 'health', 'prune-backups')
+    }
+
+    It 'falha ao podar os backups só avisa: a atualização continua concluída' {
+        Mock -ModuleName StemmaDeploy Wait-StemmaHealth { $true }
+        Mock -ModuleName StemmaDeploy Invoke-StemmaCli {
+            if ($Arguments[0] -eq 'backup') { New-Item -ItemType File -Force -Path $Arguments[2] | Out-Null }
+            if ($Arguments[0] -eq 'prune-backups') { throw 'disco ocupado' }
+        }
+        $saida = @(Invoke-StemmaUpdate -Root $root -ServiceId 'teste' 3>&1 6>$null)
+        $saida | Where-Object { $_ -is [string] } | Should -Be 'v1.1.0'
+        $avisos = @($saida | Where-Object { $_ -is [Management.Automation.WarningRecord] } | ForEach-Object { $_.Message })
+        ($avisos -join ' ') | Should -BeLike '*Backups antigos não foram podados*disco ocupado*'
+    }
+
     It 'com falha simulada restaura o banco, volta o current e avisa que a anterior continua' {
         Mock -ModuleName StemmaDeploy Wait-StemmaHealth { $ExpectedVersion -eq 'v1.0.0' }
         { Invoke-StemmaUpdate -Root $root -ServiceId 'teste' -SimulateFailure -WarningAction SilentlyContinue 6>$null } |
@@ -993,6 +1017,8 @@ Describe 'Invoke-StemmaUpdate' {
         Should -Invoke -ModuleName StemmaDeploy Wait-StemmaHealth -ParameterFilter { $ExpectedVersion -eq 'v0.0.0' }
         Should -Invoke -ModuleName StemmaDeploy Invoke-StemmaCli -Times 1 -Exactly -ParameterFilter { $Arguments[0] -eq 'restore' -and $ReleaseDir -eq $script:current }
         Should -Invoke -ModuleName StemmaDeploy Set-CurrentRelease -Times 1 -Exactly -ParameterFilter { $ReleaseDir -eq $script:current }
+        # Atualização que deu errado nunca poda backups: o rollback precisa deles.
+        Should -Invoke -ModuleName StemmaDeploy Invoke-StemmaCli -Times 0 -Exactly -ParameterFilter { $Arguments[0] -eq 'prune-backups' }
     }
 
     It 'mantém no venv novo o yt-dlp da anterior, se for mais novo que o do uv.lock' {

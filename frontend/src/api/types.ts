@@ -21,6 +21,7 @@ export type Export = Schemas['ExportOut'];
 export type ExportFormat = Schemas['ExportFormat'];
 export type ExportState = Schemas['ExportState'];
 export type SystemUpdate = Schemas['SystemUpdateOut'];
+export type DiskUsage = Schemas['DiskUsageOut'];
 export type UpdateRun = Schemas['UpdateRunOut'];
 export type YtDlpStatus = Schemas['YtDlpStatusOut'];
 export type ReleaseNotes = Schemas['ReleaseNotes'];

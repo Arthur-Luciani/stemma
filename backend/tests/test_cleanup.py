@@ -11,7 +11,8 @@ from app.config import Settings, get_settings
 from app.db.models import ExportModel, JobModel, SessionModel
 from app.domain.enums import ExportFormat, JobState, SessionState
 from app.storage import Storage
-from tests.conftest import create_session, open_db
+from tests.conftest import add_export, create_session, export_ids, open_db, ready_session_row
+from tests.test_retention import make_backups
 
 
 def touch(path: Path) -> Path:
@@ -101,3 +102,58 @@ def test_cleanup_poupa_o_que_e_recente(layout: dict[str, Path], cli_env: None) -
     assert main(["cleanup"]) == 0
 
     assert all(path.exists() for path in layout.values())
+
+
+def test_cleanup_aplica_a_retencao_de_exports_e_backups(
+    client: TestClient, migrated: Settings, cli_env: None
+) -> None:
+    root = migrated.storage_root
+    session_id = ready_session_row(client)
+    exports = [add_export(client, root, session_id, age_min=30 - i) for i in range(7)]
+    backups = make_backups(root, 8)
+
+    # Os 5 mais novos ficam mesmo com a idade mínima em 60 min (os recém-criados incluídos).
+    assert main(["cleanup"]) == 0
+
+    ids = export_ids(client, session_id)
+    assert ids == [e.id for e in reversed(exports[2:])]
+    assert [(root / str(e.path)).exists() for e in exports] == [False, False] + [True] * 5
+    assert [b.exists() for b in backups] == [False] * 3 + [True] * 5
+
+
+def test_cleanup_dry_run_nao_aplica_a_retencao(
+    client: TestClient, migrated: Settings, cli_env: None
+) -> None:
+    root = migrated.storage_root
+    session_id = ready_session_row(client)
+    exports = [add_export(client, root, session_id, age_min=30 - i) for i in range(7)]
+    backups = make_backups(root, 8)
+
+    assert main(["cleanup", "--dry-run"]) == 0
+
+    assert len(export_ids(client, session_id)) == 7
+    assert all((root / str(e.path)).exists() for e in exports)
+    assert all(b.exists() for b in backups)
+
+
+def test_cleanup_com_arquivo_de_export_que_ja_sumiu(
+    client: TestClient, migrated: Settings, cli_env: None
+) -> None:
+    root = migrated.storage_root
+    session_id = ready_session_row(client)
+    exports = [add_export(client, root, session_id, age_min=30 - i) for i in range(6)]
+    (root / str(exports[0].path)).unlink()
+
+    assert main(["cleanup"]) == 0
+
+    assert exports[0].id not in export_ids(client, session_id)
+
+
+def test_prune_backups_pela_cli(migrated: Settings, cli_env: None) -> None:
+    backups = make_backups(migrated.storage_root, 7)
+
+    assert main(["prune-backups", "--dry-run"]) == 0
+    assert all(b.exists() for b in backups)
+
+    assert main(["prune-backups"]) == 0
+    assert [b.exists() for b in backups] == [False, False] + [True] * 5

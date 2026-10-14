@@ -9,6 +9,7 @@ from app.pipeline.download import YtDlpClient
 from app.pipeline.probe import GpuProbe
 from app.pipeline.queue import JobRunner
 from app.pipeline.updater import GitHubReleases, UpdateTask, YtDlpReleases
+from app.services.disk import DiskUsageService
 from app.services.events import EventBus, EventPublisher
 from app.services.exports import ExportService
 from app.services.health import HealthService
@@ -79,8 +80,16 @@ def get_job_service(
 def get_export_service(
     sessions: Annotated[SessionService, Depends(get_session_service)],
     runner: Annotated[JobRunner, Depends(get_job_runner)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> ExportService:
-    return ExportService(sessions, MixService(sessions), sessions.events, runner, sessions.storage)
+    return ExportService(
+        sessions,
+        MixService(sessions),
+        sessions.events,
+        runner,
+        sessions.storage,
+        settings.exports_keep,
+    )
 
 
 def get_media_service(
@@ -116,6 +125,13 @@ def get_system_update_service(
     return SystemUpdateService(jobs.db, releases, task, jobs)
 
 
+def get_disk_usage_service(
+    storage: Annotated[Storage, Depends(get_storage)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> DiskUsageService:
+    return DiskUsageService(storage, settings.exports_keep, settings.backups_keep)
+
+
 def get_ytdlp_update_service(request: Request, db: DbSession) -> YtDlpUpdateService:
     releases: YtDlpReleases = request.app.state.ytdlp_releases
     task: UpdateTask = request.app.state.ytdlp_update_task
@@ -131,4 +147,5 @@ ExportServiceDep = Annotated[ExportService, Depends(get_export_service)]
 MediaServiceDep = Annotated[MediaService, Depends(get_media_service)]
 SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
 SystemUpdateServiceDep = Annotated[SystemUpdateService, Depends(get_system_update_service)]
+DiskUsageServiceDep = Annotated[DiskUsageService, Depends(get_disk_usage_service)]
 YtDlpUpdateServiceDep = Annotated[YtDlpUpdateService, Depends(get_ytdlp_update_service)]

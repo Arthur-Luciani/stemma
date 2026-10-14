@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     ytdlp_releases_url: str = ""
     # Curto: quando o YouTube quebra, a correção do yt-dlp costuma sair em horas.
     ytdlp_check_ttl_s: float = Field(default=3600, gt=0)
+    # Retenção em disco. Mínimo 1: o backup mais novo (o da última atualização) nunca sai.
+    backups_keep: int = Field(default=5, ge=1)
+    # Exports prontos guardados por sessão (os mais recentes).
+    exports_keep: int = Field(default=5, ge=1)
 
     @field_validator("ytdlp_js_runtime", mode="before")
     @classmethod

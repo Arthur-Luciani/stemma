@@ -46,6 +46,8 @@ describe('formatadores', () => {
     expect(formatBytes(7_100_000)).toBe('7,1 MB');
     expect(formatBytes(38_900_000)).toBe('38,9 MB');
     expect(formatBytes(420_000)).toBe('420 kB');
+    expect(formatBytes(2_340_000_000)).toBe('2,3 GB');
+    expect(formatBytes(0)).toBe('0 kB');
     expect(formatBytes(null)).toBe('—');
     expect(formatDb(-10.64)).toBe('−10.6');
     expect(formatDb(0.9, true)).toBe('+0.9');

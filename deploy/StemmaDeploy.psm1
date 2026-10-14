@@ -1849,6 +1849,9 @@ function Invoke-StemmaUpdate {
     # A versão nova já está no ar: um problema aqui só deixa o cache maior.
     try { Optimize-StemmaUvCache -Root $Root | Out-Null }
     catch { Write-Warning "Cache do uv não foi enxugado: $($_.Exception.Message)" }
+    # Backups além dos BACKUPS_KEEP mais novos (o desta atualização é o mais novo, nunca sai).
+    try { Invoke-StemmaCli -ReleaseDir $release -Arguments @('prune-backups') }
+    catch { Write-Warning "Backups antigos não foram podados: $($_.Exception.Message)" }
     Complete-StemmaProgress
     Write-Step "Stemma $target no ar"
     return $target

@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 
-import { makeSystemUpdate, makeYtDlpStatus, sessionList } from './fixtures';
+import { makeDiskUsage, makeSystemUpdate, makeYtDlpStatus, sessionList } from './fixtures';
 
 /** Respostas padrão "vazias"; cada teste sobrescreve com `server.use(...)`. */
 export const server = setupServer(
@@ -9,6 +9,7 @@ export const server = setupServer(
   http.get('*/api/sessions', () => HttpResponse.json(sessionList([]))),
   http.get('*/api/artists', () => HttpResponse.json([])),
   http.get('*/api/system/update', () => HttpResponse.json(makeSystemUpdate())),
+  http.get('*/api/system/disk', () => HttpResponse.json(makeDiskUsage())),
   http.get('*/api/system/ytdlp', () => HttpResponse.json(makeYtDlpStatus())),
 );
 

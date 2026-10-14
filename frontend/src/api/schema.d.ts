@@ -263,6 +263,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/disk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Disk Usage */
+        get: operations["get_disk_usage_api_system_disk_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system/update": {
         parameters: {
             query?: never;
@@ -343,6 +360,26 @@ export interface components {
             name: string;
             /** Sessions */
             sessions: number;
+        };
+        /**
+         * DiskUsageOut
+         * @description Uso de disco do `STORAGE_ROOT` por categoria e espaço do volume dele (em bytes).
+         */
+        DiskUsageOut: {
+            /** Backups Bytes */
+            backups_bytes: number;
+            /** Backups Keep */
+            backups_keep: number;
+            /** Exports Bytes */
+            exports_bytes: number;
+            /** Exports Keep */
+            exports_keep: number;
+            /** Free Bytes */
+            free_bytes: number;
+            /** Stems Bytes */
+            stems_bytes: number;
+            /** Total Bytes */
+            total_bytes: number;
         };
         /** ErrorDetail */
         ErrorDetail: {
@@ -1774,6 +1811,53 @@ export interface operations {
                 };
                 content: {
                     "audio/mpeg": unknown;
+                };
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    get_disk_usage_api_system_disk_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiskUsageOut"];
                 };
             };
             /** @description Não encontrado */

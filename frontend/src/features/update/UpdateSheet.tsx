@@ -8,6 +8,7 @@ import { Dialog } from '../../ui/Dialog';
 import { Icon } from '../../ui/Icon';
 import { Spinner } from '../../ui/Spinner';
 import { useIsDesktop } from '../../ui/useMediaQuery';
+import { DiskUsage } from '../disk/DiskUsage';
 import { useYtDlp } from '../ytdlp/hooks';
 import { useCheckUpdate, useStartUpdate, useSystemUpdate } from './hooks';
 import { type UpdateView, updateView } from './status';
@@ -43,6 +44,7 @@ export function UpdateSheet() {
           check.mutate();
         }}
       />
+      <DiskUsage enabled={open} />
       {ytdlp && <p className={styles.muted}>{strings.update.ytdlp(ytdlp)}</p>}
     </>
   );

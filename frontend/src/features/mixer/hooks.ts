@@ -6,6 +6,7 @@ import type { Stem, StemPeaks } from '../../api/types';
 import { queryKeys } from '../../app/queryKeys';
 import { AudioEngine, type EngineStats, type PlaybackState } from '../../audio/AudioEngine';
 import { STEMS } from '../../audio/stems';
+import { keepScreenOnWhilePlaying } from '../../audio/wakeLock';
 import { formatClock } from '../../lib/format';
 
 interface EngineHandle {
@@ -15,7 +16,8 @@ interface EngineHandle {
 
 /**
  * Cria o AudioEngine da sessão e o descarta (fechando o `AudioContext`) ao sair ou trocar
- * de sessão. Devolve o engine só depois de os 4 stems terem metadados.
+ * de sessão. Devolve o engine só depois de os 4 stems terem metadados. Enquanto ele toca, a
+ * tela fica acesa.
  */
 export function useAudioEngine(sessionId: string | null): EngineHandle {
   const [handle, setHandle] = useState<EngineHandle>({ engine: null, error: null });
@@ -23,6 +25,7 @@ export function useAudioEngine(sessionId: string | null): EngineHandle {
   useEffect(() => {
     if (!sessionId) return;
     const engine = new AudioEngine();
+    const stopWakeLock = keepScreenOnWhilePlaying(engine);
     let alive = true;
     const urls = Object.fromEntries(
       STEMS.map((stem) => [stem, stemUrl(sessionId, stem)]),
@@ -41,6 +44,7 @@ export function useAudioEngine(sessionId: string | null): EngineHandle {
     );
     return () => {
       alive = false;
+      stopWakeLock();
       engine.dispose();
       setHandle({ engine: null, error: null });
     };

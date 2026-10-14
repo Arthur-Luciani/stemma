@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.6.0](https://github.com/Arthur-Luciani/stemma/compare/v1.5.1...v1.6.0) (2026-10-14)
+
+
+### Features
+
+* manter a tela acesa enquanto toca ([#48](https://github.com/Arthur-Luciani/stemma/issues/48)) ([46b39d2](https://github.com/Arthur-Luciani/stemma/commit/46b39d2182c1bfabede40acfd25429a9cfec5e5d)), closes [#47](https://github.com/Arthur-Luciani/stemma/issues/47)
+
+
+### Bug Fixes
+
+* pan da gaveta do mixer do celular responde ao toque ([#50](https://github.com/Arthur-Luciani/stemma/issues/50)) ([b0a0512](https://github.com/Arthur-Luciani/stemma/commit/b0a05121c5c5f85d4d38e5b4812e6510d7eb4c95)), closes [#42](https://github.com/Arthur-Luciani/stemma/issues/42)
+
 ## [1.5.1](https://github.com/Arthur-Luciani/stemma/compare/v1.5.0...v1.5.1) (2026-10-07)
 
 

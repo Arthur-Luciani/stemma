@@ -266,9 +266,25 @@ describe('Mixer', () => {
     // Pan fino num sheet com URL própria.
     await userEvent.click(screen.getByRole('button', { name: 'Pan de Baixo: C' }));
     const sheet = screen.getByRole('dialog', { name: 'Pan de Baixo' });
-    within(sheet).getByRole('slider', { name: 'Pan de Baixo' }).focus();
+    const pan = within(sheet).getByRole('slider', { name: 'Pan de Baixo' });
+    pan.focus();
     await userEvent.keyboard('{ArrowRight}{ArrowRight}');
     expect(screen.getByRole('button', { name: 'Pan de Baixo: R2' })).toBeInTheDocument();
+    // Toque e arrasto na gaveta (issue #42).
+    vi.spyOn(pan, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      right: 200,
+      bottom: 44,
+      width: 200,
+      height: 44,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    fireEvent.pointerDown(pan, { clientX: 150, pointerId: 1, button: 0 });
+    fireEvent.pointerMove(pan, { clientX: 20, pointerId: 1 });
+    expect(screen.getByRole('button', { name: 'Pan de Baixo: L80' })).toBeInTheDocument();
     act(() => {
       void router.navigate(-1);
     });

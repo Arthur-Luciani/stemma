@@ -274,8 +274,12 @@
   color: var(--text-strong);
 }
 
-.panSheetSlider {
+/* O .slider do PanControl tem flex: 1; na coluna da gaveta isso age na altura (basis 0) e
+   zera a área de toque. Seletor composto para vencer a ordem de carga dos CSS Modules. */
+.panSheet .panSheetSlider {
+  flex: none;
   height: var(--touch-min);
+  touch-action: none;
 }
 
 /* ---------------------------------------------------------------- 1g Paisagem */

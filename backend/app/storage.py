@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath
 from app.domain.errors import AppError
 
 SESSIONS_DIR = "sessions"
+BACKUPS_DIR = "backups"
 
 
 class Storage:

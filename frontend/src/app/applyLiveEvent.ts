@@ -84,6 +84,13 @@ export function createLiveEventHandler(
         queryClient.setQueryData<Export[]>(queryKeys.exports(item.session_id), (exports) =>
           exports ? upsertExport(exports, item) : exports,
         );
+        // Pedir um export apaga os mais antigos no servidor: refaz a lista para tirá-los.
+        if (item.state === 'done') {
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.exports(item.session_id),
+            exact: true,
+          });
+        }
         break;
       }
     }

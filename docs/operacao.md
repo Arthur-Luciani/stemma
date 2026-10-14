@@ -26,7 +26,7 @@ Pré-requisito que o instalador só confere: driver da NVIDIA (`nvidia-smi`). Se
 
 Baixe e rode o `Stemma-Setup-vX.Y.Z.exe` da versão nova. Ele detecta a instalação, mostra a tela **Pronto para instalar** (versão atual → nova, download e espaço) com o botão **Atualizar** e segue em etapas numeradas:
 
-download conferido (já vem dentro do `.exe`) → ambiente da versão nova (com o serviço ainda no ar) → para o serviço → **backup do banco** em `<dados>\backups\` → migrations → `current` aponta para a nova → sobe → espera o `/health` responder com a versão nova (até 3 min). Ficam as 3 versões mais novas.
+download conferido (já vem dentro do `.exe`) → ambiente da versão nova (com o serviço ainda no ar) → para o serviço → **backup do banco** em `<dados>\backups\` → migrations → `current` aponta para a nova → sobe → espera o `/health` responder com a versão nova (até 3 min). Ficam as 3 versões mais novas e os 5 backups mais novos (`BACKUPS_KEEP`).
 
 **Se algo falhar depois de parar o serviço**, o instalador restaura o banco do backup, volta o `current`, sobe a versão anterior e mostra "Não deu certo… A versão anterior continua no ar".
 
@@ -101,6 +101,11 @@ O Explorer ("Propriedades") soma cada caminho de um arquivo, e o Stemma usa **ha
 
 - O instalador e cada atualização **enxugam o cache do uv** (`Optimize-StemmaUvCache`): fica só o que os `uv.lock` das versões instaladas usam.
 - Para enxugar à mão (administrador): `powershell -ExecutionPolicy Bypass -File C:\stemma\setup\engine\setup.ps1 -Mode PruneCache`.
+- **Quanto o Stemma guarda de dados** (`<dados>`, ex. `D:\stemma-data`; `Sobre o Stemma` mostra stems, exportações, backups e o espaço livre do volume):
+  - **Backups do banco**: ficam os `BACKUPS_KEEP` mais novos (padrão 5, mínimo 1; o da última atualização nunca sai). A poda roda no fim de cada atualização bem-sucedida (`prune-backups`) e no `cleanup`. Atualização que falha ou volta (rollback) nunca poda.
+  - **Exportações**: ficam as `EXPORTS_KEEP` mais recentes **prontas** de cada música (padrão 5, mínimo 1). Ao pedir um export novo, o mais antigo além do limite é apagado (arquivo e registro) e a lista "Anteriores" do mixer acompanha. Export na fila, rodando ou que falhou não conta nem é apagado. Se o Windows não deixar apagar o arquivo (em download), ele fica para a próxima poda.
+  - Os dois limites vão no `C:\stemma\.env` (`BACKUPS_KEEP`, `EXPORTS_KEEP`; reinicie o serviço).
+  - **Aplicar agora** (e pegar o que já existia): `uv run python -m app.cli cleanup --dry-run` mostra o que sairia (órfãos, exportações e backups além do limite); sem `--dry-run` apaga. Só os backups: `uv run python -m app.cli prune-backups [--dry-run]`.
 - O cache do uv do seu usuário (`uv cache dir`) é outra coisa. Ele guarda os pacotes de todos os seus projetos de dev, e o Stemma não depende dele depois de instalado. `uv cache clean` libera o que nenhum venv usa; os venvs continuam funcionando.
 
 ## Layout
@@ -120,7 +125,7 @@ C:\stemma\
                         ytdlp-update.log (tarefa diária do yt-dlp)
   downloads\            instalador baixado pela atualização pelo app
 D:\stemma-data\         STORAGE_ROOT: banco, stems, exports, cache do torch
-  backups\              backups do banco feitos antes de cada atualização
+  backups\              backups do banco feitos antes de cada atualização (ficam os `BACKUPS_KEEP` mais novos)
 ```
 
 - O serviço `stemma` roda como **LocalSystem** (não pede senha) e executa `current\deploy\start.ps1`: põe `tools\` no `PATH`, carrega o `.env`, aplica as migrations e sobe o uvicorn (1 worker) em `127.0.0.1:<porta>`, servindo também o `frontend\dist` da versão.

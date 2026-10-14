@@ -14,6 +14,7 @@ from app.pipeline.queue import JobRunner
 from app.schemas.exports import ExportCreate, ExportOut
 from app.services.events import EventPublisher, build_export_out
 from app.services.mix import MixService
+from app.services.retention import prune_exports
 from app.services.sessions import SessionService
 from app.services.update_guard import ensure_not_updating
 from app.storage import Storage
@@ -29,6 +30,7 @@ class ExportService:
         events: EventPublisher,
         runner: JobRunner,
         storage: Storage,
+        exports_keep: int,
     ) -> None:
         self.sessions = sessions
         self.db = sessions.db
@@ -36,6 +38,7 @@ class ExportService:
         self.events = events
         self.runner = runner
         self.storage = storage
+        self.exports_keep = exports_keep
 
     def create(self, session_id: uuid.UUID, data: ExportCreate) -> ExportOut:
         session = self.sessions.get(session_id)
@@ -53,6 +56,9 @@ class ExportService:
         available = {stem for stem in STEMS if stem.value in session.stems}
         if not active_stems(levels, available=available):
             raise no_active_stems()
+
+        # Abre espaço: com o novo pronto, a sessão fica com `exports_keep` exports.
+        prune_exports(self.db, self.storage, session_id, self.exports_keep - 1)
 
         export = ExportModel(
             session_id=session_id,

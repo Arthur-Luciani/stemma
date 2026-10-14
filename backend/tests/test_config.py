@@ -29,3 +29,12 @@ def test_torch_home_padrao_fica_no_storage(tmp_path: Path) -> None:
 
     assert settings.torch_home == tmp_path / "cache" / "torch"
     assert settings.ytdlp_cookie_file is None
+
+
+def test_retencao_padrao_e_minimo_de_um(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = Settings(_env_file=None)
+    assert (settings.backups_keep, settings.exports_keep) == (5, 5)
+
+    monkeypatch.setenv("BACKUPS_KEEP", "0")
+    with pytest.raises(ValueError):
+        Settings(_env_file=None)

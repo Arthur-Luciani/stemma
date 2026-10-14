@@ -14,6 +14,7 @@ export const queryKeys = {
   jobs: ['jobs'] as const,
   systemUpdate: ['system', 'update'] as const,
   ytdlp: ['system', 'ytdlp'] as const,
+  diskUsage: ['system', 'disk'] as const,
   search: (q: string) => ['search', q] as const,
   artists: (q: string) => ['artists', q] as const,
 };

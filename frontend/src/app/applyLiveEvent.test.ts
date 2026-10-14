@@ -111,6 +111,20 @@ describe('applyLiveEvent', () => {
     expect(client.getQueryData(queryKeys.exports(other.session_id))).toBeUndefined();
   });
 
+  it('export pronto invalida a lista (o servidor apaga os mais antigos ao pedir outro)', () => {
+    const { client, handler } = setup();
+    const sessionId = makeSession().id;
+    const old = makeExport({ session_id: sessionId, created_at: '2026-10-01T10:00:00Z' });
+    client.setQueryData(queryKeys.exports(sessionId), [old]);
+
+    const running = makeExport({ session_id: sessionId, state: 'running', progress: 10 });
+    handler.handle({ type: 'export.updated', data: { export: running } });
+    expect(client.getQueryState(queryKeys.exports(sessionId))?.isInvalidated).toBe(false);
+
+    handler.handle({ type: 'export.updated', data: { export: { ...running, state: 'done' } } });
+    expect(client.getQueryState(queryKeys.exports(sessionId))?.isInvalidated).toBe(true);
+  });
+
   it('resync invalida tudo (eventos perdidos na queda)', () => {
     const { client, handler } = setup();
     client.setQueryData(queryKeys.jobs, []);

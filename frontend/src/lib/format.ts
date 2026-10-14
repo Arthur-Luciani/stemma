@@ -69,7 +69,9 @@ export function formatStampDate(iso: string, now: Date = new Date()): string {
 /** Tamanho de arquivo: `7100000` → `7,1 MB`; abaixo de 1 MB, em kB. */
 export function formatBytes(bytes: number | null | undefined): string {
   if (bytes === null || bytes === undefined || !Number.isFinite(bytes)) return '—';
+  if (bytes === 0) return '0 kB';
   if (bytes < 1_000_000) return `${String(Math.max(1, Math.round(bytes / 1000)))} kB`;
+  if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1).replace('.', ',')} GB`;
   return `${(bytes / 1_000_000).toFixed(1).replace('.', ',')} MB`;
 }
 

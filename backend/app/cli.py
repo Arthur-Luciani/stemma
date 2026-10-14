@@ -3,6 +3,8 @@
 - `uv run python -m app.cli cleanup [--dry-run]`
 - `uv run python -m app.cli backup --dest <arquivo>` / `restore --src <arquivo>` (usados pelo
   `deploy/update.ps1`)
+- `uv run python -m app.cli prune-backups [--dry-run]`: mantém os `BACKUPS_KEEP` backups mais
+  novos (usado pelo `deploy/update.ps1` no fim de uma atualização bem-sucedida)
 - `uv run python -m app.cli update-result --state succeeded|failed [--message <texto>]` (usado
   pela tarefa agendada no fim da atualização pelo app, ADR 0015)
 - `uv run python -m app.cli update-target`: imprime a versão escolhida pelo app (`1.5.1`) da
@@ -26,6 +28,7 @@ from app.logging_setup import configure_logging
 from app.pipeline.updater import UpdateTask, YtDlpReleases
 from app.services.backup import backup_database, restore_database
 from app.services.cleanup import CleanupService
+from app.services.retention import prune_backups
 from app.services.system_update import record_update_result
 from app.services.update_guard import is_running, latest_update
 from app.services.ytdlp_update import YtDlpUpdateService, record_ytdlp_result
@@ -49,6 +52,10 @@ def main(argv: list[str] | None = None) -> int:
     backup.add_argument("--dest", type=Path, required=True, help="arquivo de destino (novo)")
     restore = commands.add_parser("restore", help="sobrescreve o banco com um backup (app parado)")
     restore.add_argument("--src", type=Path, required=True, help="arquivo de backup")
+    prune = commands.add_parser(
+        "prune-backups", help="apaga os backups do banco além dos BACKUPS_KEEP mais novos"
+    )
+    prune.add_argument("--dry-run", action="store_true", help="só lista o que seria removido")
     commands.add_parser("update-target", help="versão da atualização em andamento")
     result = commands.add_parser(
         "update-result", help="grava o resultado da atualização pedida pelo app"
@@ -76,6 +83,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "restore":
             restore_database(settings.database_url, args.src)
             return 0
+        if args.command == "prune-backups":
+            return _prune_backups(settings, dry_run=args.dry_run)
         if args.command == "update-target":
             return _update_target(settings.database_url)
         if args.command == "update-result":
@@ -87,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     except AppError as exc:
         logger.error("%s", exc.message)
         return 1
-    return _cleanup(settings.database_url, settings.storage_root, args)
+    return _cleanup(settings, args)
 
 
 def _update_target(database_url: str) -> int:
@@ -147,13 +156,32 @@ def _ytdlp_result(database_url: str, state: UpdateState, message: str | None) ->
     return 0
 
 
-def _cleanup(database_url: str, storage_root: Path, args: argparse.Namespace) -> int:
-    engine = make_engine(database_url)
+def _prune_backups(settings: Settings, *, dry_run: bool) -> int:
+    report = prune_backups(Storage(settings.storage_root), settings.backups_keep, dry_run=dry_run)
+    verb = "Seriam removidos" if dry_run else "Removidos"
+    logger.info(
+        "%s %d backups (%.1f MB), ficam os %d mais novos",
+        verb,
+        len(report.removed),
+        report.freed_bytes / 1_000_000,
+        settings.backups_keep,
+    )
+    for rel in report.removed:
+        logger.info("  %s", rel)
+    return 0
+
+
+def _cleanup(settings: Settings, args: argparse.Namespace) -> int:
+    storage_root = settings.storage_root
+    engine = make_engine(settings.database_url)
     try:
         with make_sessionmaker(engine)() as db:
-            report = CleanupService(db, Storage(storage_root)).run(
-                dry_run=args.dry_run, min_age_s=args.min_age_minutes * 60
-            )
+            report = CleanupService(
+                db,
+                Storage(storage_root),
+                exports_keep=settings.exports_keep,
+                backups_keep=settings.backups_keep,
+            ).run(dry_run=args.dry_run, min_age_s=args.min_age_minutes * 60)
     finally:
         engine.dispose()
 

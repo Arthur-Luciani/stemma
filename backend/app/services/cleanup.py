@@ -2,7 +2,9 @@
 
 Remove o que nenhuma linha do banco referencia: pastas de sessões excluídas, a lixeira,
 sobras de processamento (`raw/`, `work/`) de sessões paradas, stems de sessões que não
-estão prontas e arquivos de export sem registro.
+estão prontas e arquivos de export sem registro. Aplica também a retenção: exports prontos
+além dos `exports_keep` mais recentes de cada sessão e backups do banco além dos
+`backups_keep` mais novos (a idade mínima não vale para isso: os mais novos sempre ficam).
 
 A CLI pode rodar com o servidor no ar: o retrato do banco é tirado uma vez, então só sai o
 que está parado há mais de `min_age_s` (um job ou export que começou depois do retrato
@@ -21,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import ExportModel, JobModel, SessionModel
 from app.domain.enums import ACTIVE_JOB_STATES, SessionState
+from app.services.retention import prune_backups, prune_exports
 from app.services.sessions import TRASH_DIR
 from app.storage import SESSIONS_DIR, Storage
 
@@ -37,9 +40,13 @@ class CleanupReport:
 
 
 class CleanupService:
-    def __init__(self, db: Session, storage: Storage) -> None:
+    def __init__(
+        self, db: Session, storage: Storage, *, exports_keep: int, backups_keep: int
+    ) -> None:
         self.db = db
         self.storage = storage
+        self.exports_keep = exports_keep
+        self.backups_keep = backups_keep
 
     def run(self, *, dry_run: bool = False, min_age_s: float = DEFAULT_MIN_AGE_S) -> CleanupReport:
         report = CleanupReport()
@@ -78,6 +85,17 @@ class CleanupService:
             for file in sorted(exports.iterdir()) if exports.exists() else []:
                 if self.storage.relative(file) not in export_paths:
                     self._remove(file, report, dry_run)
+
+        for session_id, state in sessions.items():
+            if state is SessionState.READY and session_id not in busy:
+                pruned = prune_exports(
+                    self.db, self.storage, session_id, self.exports_keep, dry_run=dry_run
+                )
+                report.removed.extend(pruned.removed)
+                report.freed_bytes += pruned.freed_bytes
+        backups = prune_backups(self.storage, self.backups_keep, dry_run=dry_run)
+        report.removed.extend(backups.removed)
+        report.freed_bytes += backups.freed_bytes
         return report
 
     def _remove(self, path: Path, report: CleanupReport, dry_run: bool) -> None:

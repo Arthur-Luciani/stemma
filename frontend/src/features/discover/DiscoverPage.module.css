@@ -212,3 +212,11 @@
     padding-top: var(--space-4);
   }
 }
+
+/* Erro da busca: sugestão do yt-dlp (quando houver) acima do "Tentar de novo". */
+.errorActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}

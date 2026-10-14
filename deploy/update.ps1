@@ -21,7 +21,7 @@
 .EXAMPLE
   ... update.ps1 -Rollback       # volta para a release anterior
 .EXAMPLE
-  ... update.ps1 -YtDlpOnly      # só atualiza o yt-dlp do venv atual
+  ... update.ps1 -YtDlpOnly      # yt-dlp agora (o que a tarefa diária faz; ADR 0016)
 
 .PARAMETER Version
   Tag de destino (ex.: v1.4.1). Padrão: a última release.
@@ -30,7 +30,8 @@
 .PARAMETER Rollback
   Volta para a release instalada imediatamente anterior, desfazendo as migrations dela.
 .PARAMETER YtDlpOnly
-  Atualiza só o yt-dlp do venv atual e reinicia o serviço.
+  Atualiza só o yt-dlp do venv atual para a última versão do PyPI, com o serviço parado no
+  meio, e volta a anterior se ele não subir. Pula se já estiver em dia ou se houver job ativo.
 .PARAMETER SimulateFailure
   Teste do rollback: faz a checagem do /health da versão nova falhar.
 #>
@@ -52,8 +53,8 @@ Import-Module (Join-Path $PSScriptRoot 'StemmaDeploy.psm1') -Force
 Assert-Admin
 try {
     if ($YtDlpOnly) {
-        Update-StemmaYtDlp -Root $Root -ServiceId $ServiceId -HealthTimeoutSec $HealthTimeoutSec
-        Write-Host '    O próximo update volta o yt-dlp para a versão do uv.lock da release.'
+        $outcome = Invoke-StemmaYtDlpUpdate -Root $Root -ServiceId $ServiceId -HealthTimeoutSec $HealthTimeoutSec
+        if ($outcome.State -eq 'failed') { throw $outcome.Message }
     }
     elseif ($Rollback) {
         Invoke-StemmaRollback -Root $Root -ServiceId $ServiceId -HealthTimeoutSec $HealthTimeoutSec | Out-Null

@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     # Só para ensaio: URL da lista de releases no lugar da API do GitHub (aceita file://).
     update_releases_url: str = ""
     update_check_ttl_s: float = Field(default=6 * 3600, gt=0)
+    # Atualização do yt-dlp (ADR 0016): tarefa agendada (diária e sob demanda) que atualiza só o
+    # yt-dlp do venv no ar; vazio = sem atualização pelo app. O instalador grava
+    # `\Stemma\AtualizarYtDlp`.
+    ytdlp_update_task: str = ""
+    # Só para ensaio: URL do JSON do yt-dlp no PyPI (aceita file://).
+    ytdlp_releases_url: str = ""
+    # Curto: quando o YouTube quebra, a correção do yt-dlp costuma sair em horas.
+    ytdlp_check_ttl_s: float = Field(default=3600, gt=0)
 
     @field_validator("ytdlp_js_runtime", mode="before")
     @classmethod

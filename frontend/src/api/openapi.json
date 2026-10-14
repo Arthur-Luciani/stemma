@@ -1385,7 +1385,7 @@
         "type": "object"
       },
       "UpdateRunOut": {
-        "description": "Uma atualização pedida pelo app.",
+        "description": "Uma atualização (do Stemma ou do yt-dlp) pedida pelo app ou pela tarefa diária.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -1444,7 +1444,7 @@
         "type": "object"
       },
       "UpdateState": {
-        "description": "Atualização do Stemma disparada pelo app (ADR 0015).",
+        "description": "Atualização disparada pelo app ou pela tarefa agendada (ADR 0015 e 0016).",
         "enum": [
           "running",
           "succeeded",
@@ -1452,6 +1452,98 @@
         ],
         "title": "UpdateState",
         "type": "string"
+      },
+      "YtDlpStatusOut": {
+        "description": "yt-dlp instalado e o último publicado no PyPI (ADR 0016).",
+        "properties": {
+          "active_jobs": {
+            "title": "Active Jobs",
+            "type": "integer"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "can_update": {
+            "title": "Can Update",
+            "type": "boolean"
+          },
+          "check": {
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Check",
+            "type": "string"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "installed_version": {
+            "title": "Installed Version",
+            "type": "string"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateRunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest_published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Published At"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "installed_version",
+          "check",
+          "checked_at",
+          "latest_version",
+          "latest_published_at",
+          "available",
+          "stale",
+          "can_update",
+          "active_jobs",
+          "last_run"
+        ],
+        "title": "YtDlpStatusOut",
+        "type": "object"
       }
     }
   },
@@ -2829,6 +2921,106 @@
           }
         },
         "summary": "Start Update",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/ytdlp": {
+      "get": {
+        "operationId": "get_ytdlp_api_system_ytdlp_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YtDlpStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Get Ytdlp",
+        "tags": [
+          "system"
+        ]
+      },
+      "post": {
+        "operationId": "start_ytdlp_update_api_system_ytdlp_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Start Ytdlp Update",
         "tags": [
           "system"
         ]

@@ -7,6 +7,9 @@
   pela tarefa agendada no fim da atualização pelo app, ADR 0015)
 - `uv run python -m app.cli update-target`: imprime a versão escolhida pelo app (`1.5.1`) da
   atualização em andamento; sai com 1 se não houver (a tarefa instala exatamente essa)
+- `uv run python -m app.cli ytdlp-begin`: início da tarefa do yt-dlp (ADR 0016); imprime
+  `run|<versão atual>|<versão alvo>` ou `skip|<motivo>`
+- `uv run python -m app.cli ytdlp-result --state succeeded|failed [--message <texto>]`
 """
 
 import argparse
@@ -14,16 +17,18 @@ import logging
 import sys
 from pathlib import Path
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.db.engine import make_engine, make_sessionmaker
 from app.db.types import utcnow
-from app.domain.enums import UpdateState
+from app.domain.enums import UpdateComponent, UpdateState
 from app.domain.errors import AppError
 from app.logging_setup import configure_logging
+from app.pipeline.updater import UpdateTask, YtDlpReleases
 from app.services.backup import backup_database, restore_database
 from app.services.cleanup import CleanupService
 from app.services.system_update import record_update_result
 from app.services.update_guard import is_running, latest_update
+from app.services.ytdlp_update import YtDlpUpdateService, record_ytdlp_result
 from app.storage import Storage
 
 logger = logging.getLogger("app.cli")
@@ -52,6 +57,14 @@ def main(argv: list[str] | None = None) -> int:
         "--state", required=True, choices=[UpdateState.SUCCEEDED, UpdateState.FAILED]
     )
     result.add_argument("--message", default=None, help="motivo da falha (PT-BR)")
+    commands.add_parser("ytdlp-begin", help="decide se a tarefa do yt-dlp atualiza, e para qual")
+    ytdlp_result = commands.add_parser(
+        "ytdlp-result", help="grava o resultado da atualização do yt-dlp"
+    )
+    ytdlp_result.add_argument(
+        "--state", required=True, choices=[UpdateState.SUCCEEDED, UpdateState.FAILED]
+    )
+    ytdlp_result.add_argument("--message", default=None, help="motivo da falha (PT-BR)")
     args = parser.parse_args(argv)
 
     settings = get_settings()
@@ -67,6 +80,10 @@ def main(argv: list[str] | None = None) -> int:
             return _update_target(settings.database_url)
         if args.command == "update-result":
             return _update_result(settings.database_url, UpdateState(args.state), args.message)
+        if args.command == "ytdlp-begin":
+            return _ytdlp_begin(settings)
+        if args.command == "ytdlp-result":
+            return _ytdlp_result(settings.database_url, UpdateState(args.state), args.message)
     except AppError as exc:
         logger.error("%s", exc.message)
         return 1
@@ -77,7 +94,7 @@ def _update_target(database_url: str) -> int:
     engine = make_engine(database_url)
     try:
         with make_sessionmaker(engine)() as db:
-            run = latest_update(db)
+            run = latest_update(db, UpdateComponent.APP)
             if not is_running(run, utcnow()):
                 logger.error("Nenhuma atualização em andamento")
                 return 1
@@ -94,6 +111,37 @@ def _update_result(database_url: str, state: UpdateState, message: str | None) -
     try:
         with make_sessionmaker(engine)() as db:
             record_update_result(db, state, message)
+    finally:
+        engine.dispose()
+    return 0
+
+
+def _ytdlp_begin(settings: Settings) -> int:
+    engine = make_engine(settings.database_url)
+    try:
+        with make_sessionmaker(engine)() as db:
+            service = YtDlpUpdateService(
+                db,
+                YtDlpReleases(ttl_s=settings.ytdlp_check_ttl_s, url=settings.ytdlp_releases_url),
+                UpdateTask(settings.schtasks_bin, settings.ytdlp_update_task),
+            )
+            start = service.begin_task()
+    finally:
+        engine.dispose()
+    # stdout: lido pelo motor (Invoke-StemmaYtDlpUpdate); o log vai para o stderr.
+    if start.target is None:
+        logger.info("Atualização do yt-dlp pulada: %s", start.skip_reason)
+        sys.stdout.write(f"skip|{start.skip_reason}\n")
+    else:
+        sys.stdout.write(f"run|{start.from_version}|{start.target}\n")
+    return 0
+
+
+def _ytdlp_result(database_url: str, state: UpdateState, message: str | None) -> int:
+    engine = make_engine(database_url)
+    try:
+        with make_sessionmaker(engine)() as db:
+            record_ytdlp_result(db, state, message)
     finally:
         engine.dispose()
     return 0

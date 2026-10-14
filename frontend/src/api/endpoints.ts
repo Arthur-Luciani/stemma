@@ -16,6 +16,7 @@ import type {
   StemPeaks,
   SystemUpdate,
   UpdateRun,
+  YtDlpStatus,
 } from './types';
 
 const path = (id: string) => ({ params: { path: { session_id: id } } });
@@ -141,4 +142,14 @@ export function getSystemUpdate(signal?: AbortSignal): Promise<SystemUpdate> {
 /** Dispara a atualização (responde na hora; o servidor sai do ar por ~1 min). */
 export function startSystemUpdate(): Promise<UpdateRun> {
   return call(() => apiClient.POST('/api/system/update'));
+}
+
+/** yt-dlp instalado, o último do PyPI e a última atualização dele (ADR 0016). */
+export function getYtDlp(signal?: AbortSignal): Promise<YtDlpStatus> {
+  return call(() => apiClient.GET('/api/system/ytdlp', { signal }));
+}
+
+/** Dispara a atualização do yt-dlp (responde na hora; o servidor sai do ar por ~30 s). */
+export function startYtDlpUpdate(): Promise<UpdateRun> {
+  return call(() => apiClient.POST('/api/system/ytdlp'));
 }

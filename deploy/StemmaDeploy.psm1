@@ -503,24 +503,30 @@ function Set-CurrentRelease {
 # --- serviço e /health ----------------------------------------------------------
 
 function Wait-StemmaHealth {
-    <# Espera o /health responder com a versão esperada. Devolve $true/$false. #>
+    <#
+      Espera o /health responder com a versão esperada (e, com -ExpectedYtDlp, com esse
+      yt-dlp). Devolve $true/$false.
+    #>
     param(
         [Parameter(Mandatory)][int]$Port,
         [Parameter(Mandatory)][string]$ExpectedVersion,
+        [string]$ExpectedYtDlp,
         [int]$TimeoutSec = 180,
         [int]$IntervalSec = 2
     )
     $expected = $ExpectedVersion.TrimStart('v')
+    $ytdlp = if ($ExpectedYtDlp) { ConvertTo-YtDlpVersion $ExpectedYtDlp } else { $null }
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
     $last = 'sem resposta'
     do {
         try {
             $health = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 5
-            if ($health.version -eq $expected) {
+            $ytdlpOk = (-not $ytdlp) -or ((ConvertTo-YtDlpVersion "$($health.ytdlp)") -eq $ytdlp)
+            if ($health.version -eq $expected -and $ytdlpOk) {
                 Write-Host "    /health: versão $($health.version), status $($health.status), gpu $($health.gpu), yt-dlp $($health.ytdlp)"
                 return $true
             }
-            $last = "versão $($health.version)"
+            $last = "versão $($health.version), yt-dlp $($health.ytdlp)"
         }
         catch { $last = $_.Exception.Message }
         Start-Sleep -Seconds $IntervalSec
@@ -1703,12 +1709,6 @@ function Set-ComponentsStageWeight {
     }
     catch { Write-Verbose "Estimativa dos componentes: $_" }
 }
-function Restart-StemmaAndCheck {
-    param([string]$ServiceId, [int]$Port, [string]$Tag, [int]$HealthTimeoutSec)
-    Stop-StemmaService -ServiceId $ServiceId
-    Start-StemmaService -ServiceId $ServiceId
-    return Wait-StemmaHealth -Port $Port -ExpectedVersion $Tag -TimeoutSec $HealthTimeoutSec
-}
 
 function Invoke-StemmaUpdate {
     <#
@@ -1791,6 +1791,8 @@ function Invoke-StemmaUpdate {
     Set-ComponentsStageWeight -Root $Root -LockPath $lock
     Enter-StemmaStage 'components'
     Sync-ReleaseEnvironment -ReleaseDir $release -PreferOffline | Out-Null
+    # O uv.lock da versão nova pode trazer um yt-dlp mais velho que o atualizado pelo app.
+    Sync-StemmaYtDlpFloor -ReleaseDir $release -PreviousDir $current | Out-Null
     Import-DotEnv -Path (Join-Path $Root '.env') | Out-Null
 
     Enter-StemmaStage 'stop'
@@ -1902,16 +1904,159 @@ function Invoke-StemmaRollback {
     return $previous.Name
 }
 
-function Update-StemmaYtDlp {
-    <# Só o yt-dlp do venv atual (até o próximo update, que volta para o do uv.lock). #>
+# --- yt-dlp (ADR 0016) -----------------------------------------------------------------
+
+function ConvertTo-YtDlpVersion {
+    <# `2025.07.06` ou `2025.10.22.1` → [version], que compara sem ligar para os zeros à esquerda do PyPI; outra coisa → $null. #>
+    param([AllowEmptyString()][string]$Text)
+    $value = "$Text".Trim()
+    if ($value -notmatch '^\d+(\.\d+){2,3}$') { return $null }
+    return [version]$value
+}
+
+function Get-ReleaseYtDlpVersion {
+    <# yt-dlp instalado no venv de uma release (ex.: 2026.08.19), ou $null. #>
+    param([Parameter(Mandatory)][string]$ReleaseDir)
+    $python = Get-ReleasePython $ReleaseDir
+    if (-not (Test-Path -LiteralPath $python)) { return $null }
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & $python -c 'from yt_dlp.version import __version__; print(__version__)' 2>$null
+        $code = $LASTEXITCODE
+    }
+    finally { $ErrorActionPreference = $previous }
+    if ($code -ne 0 -or -not $output) { return $null }
+    return "$(@($output)[-1])".Trim()
+}
+
+function Install-ReleaseYtDlp {
+    <# Instala exatamente essa versão do yt-dlp (com os extras do `[default]`) no venv da release. #>
+    param([Parameter(Mandatory)][string]$ReleaseDir, [Parameter(Mandatory)][string]$Version)
+    Invoke-Native -FilePath 'uv' -Arguments @('pip', 'install', '--python', (Get-ReleasePython $ReleaseDir), "yt-dlp[default]==$Version")
+}
+
+function Sync-StemmaYtDlpFloor {
+    <#
+      Venv da release nova: se a anterior tem um yt-dlp mais novo que o do uv.lock (atualizado
+      pelo app ou pela tarefa diária), instala esse. Assim atualizar o Stemma nunca volta o
+      yt-dlp. Falha só avisa: a tarefa diária corrige. Devolve a versão instalada, ou $null.
+    #>
+    param([Parameter(Mandatory)][string]$ReleaseDir, [Parameter(Mandatory)][string]$PreviousDir)
+    try {
+        $previous = Get-ReleaseYtDlpVersion -ReleaseDir $PreviousDir
+        $locked = Get-ReleaseYtDlpVersion -ReleaseDir $ReleaseDir
+        $previousVersion = ConvertTo-YtDlpVersion $previous
+        $lockedVersion = ConvertTo-YtDlpVersion $locked
+        if (-not $previousVersion -or -not $lockedVersion -or $previousVersion -le $lockedVersion) { return $null }
+        Write-Step "Mantendo o yt-dlp $previous da versão anterior (o uv.lock traz o $locked)"
+        Install-ReleaseYtDlp -ReleaseDir $ReleaseDir -Version $previous
+        return $previous
+    }
+    catch {
+        Write-Warning "Não deu para manter o yt-dlp da versão anterior ($($_.Exception.Message)). A atualização diária resolve."
+        return $null
+    }
+}
+
+function ConvertFrom-YtDlpBegin {
+    <# Saída do CLI `ytdlp-begin`: `run|<atual>|<alvo>` ou `skip|<motivo>` (as outras linhas são log). #>
+    param([AllowEmptyCollection()][string[]]$Lines)
+    foreach ($line in $Lines) {
+        $text = "$line".Trim()
+        if ($text -match '^run\|([^|]+)\|([^|]+)$') {
+            return [pscustomobject]@{ Run = $true; From = $Matches[1]; Target = $Matches[2]; Reason = $null }
+        }
+        if ($text -match '^skip\|(.*)$') {
+            return [pscustomobject]@{ Run = $false; From = $null; Target = $null; Reason = $Matches[1] }
+        }
+    }
+    throw 'o CLI ytdlp-begin não disse o que fazer'
+}
+
+function Get-StemmaYtDlpPlan {
+    <# Roda o CLI `ytdlp-begin` da release no ar (que grava `running` se for atualizar). #>
+    param([Parameter(Mandatory)][string]$ReleaseDir)
+    $lines = [Collections.Generic.List[string]]::new()
+    Invoke-Native -FilePath (Get-ReleasePython $ReleaseDir) -Arguments @('-m', 'app.cli', 'ytdlp-begin') `
+        -WorkingDirectory (Join-Path $ReleaseDir 'backend') -OnLine { param($line) $lines.Add($line) }
+    return ConvertFrom-YtDlpBegin @($lines)
+}
+
+function Invoke-StemmaYtDlpUpdate {
+    <#
+      Tarefa `\Stemma\AtualizarYtDlp` (ADR 0016): diária, sob demanda pelo app e pelo
+      `update.ps1 -YtDlpOnly`. O CLI `ytdlp-begin` decide se atualiza (pedido do app, ou versão
+      nova sem job ativo) e para qual versão, e grava `running`. Aqui: para o serviço, instala
+      essa versão exata (com o serviço parado nenhum arquivo do venv fica preso), sobe e confere
+      o /health com o yt-dlp novo. Falhou → volta a versão anterior. O resultado vai para o
+      banco (`ytdlp-result`). Não lança: devolve State = skipped, succeeded ou failed.
+    #>
     param([string]$Root = 'C:\stemma', [string]$ServiceId = 'stemma', [int]$HealthTimeoutSec = 180)
-    $context = Get-StemmaContext -Root $Root
-    if (-not $context.Current) { throw "Nenhuma release em $Root\current." }
-    Set-StemmaToolEnv -Root $Root
-    Write-Step "Atualizando o yt-dlp de $($context.CurrentTag)"
-    Invoke-Native -FilePath 'uv' -Arguments @('pip', 'install', '--python', (Get-ReleasePython $context.Current), '--upgrade', 'yt-dlp[default]')
-    if (-not (Restart-StemmaAndCheck -ServiceId $ServiceId -Port $context.Port -Tag $context.CurrentTag -HealthTimeoutSec $HealthTimeoutSec)) {
-        throw 'O serviço não voltou depois de atualizar o yt-dlp. Veja os logs.'
+    $state = 'failed'
+    $message = $null
+    $context = $null
+    $begin = $null
+    try {
+        Set-StemmaToolEnv -Root $Root
+        Import-DotEnv -Path (Join-Path $Root '.env') | Out-Null
+        $context = Get-StemmaContext -Root $Root
+        if (-not $context.Current) { throw "nenhuma release em $Root\current" }
+        $begin = Get-StemmaYtDlpPlan -ReleaseDir $context.Current
+    }
+    catch { $message = "A atualização do yt-dlp não começou: $($_.Exception.Message.TrimEnd('.'))." }
+    if ($begin -and -not $begin.Run) {
+        Write-Step "yt-dlp: nada a fazer ($($begin.Reason))"
+        return [pscustomobject]@{ State = 'skipped'; Message = $begin.Reason }
+    }
+
+    if ($begin) {
+        Write-Step "Atualizando o yt-dlp $($begin.From) → $($begin.Target)"
+        try {
+            Stop-StemmaService -ServiceId $ServiceId
+            try { Install-ReleaseYtDlp -ReleaseDir $context.Current -Version $begin.Target }
+            finally { Start-StemmaService -ServiceId $ServiceId }
+            if (-not (Wait-StemmaHealth -Port $context.Port -ExpectedVersion $context.CurrentTag -ExpectedYtDlp $begin.Target -TimeoutSec $HealthTimeoutSec)) {
+                throw "o Stemma não voltou com o yt-dlp $($begin.Target)"
+            }
+            $state = 'succeeded'
+        }
+        catch {
+            $message = "A atualização do yt-dlp para $($begin.Target) falhou: $($_.Exception.Message.TrimEnd('.'))."
+            Write-Warning $message
+            $message += ' ' + (Restore-StemmaYtDlp -Context $context -ServiceId $ServiceId -Version $begin.From -HealthTimeoutSec $HealthTimeoutSec)
+        }
+    }
+    Write-Step "Resultado: $state $message"
+
+    # Sem pedido gravado (o begin falhou antes), o CLI não muda nada.
+    if ($context -and $context.Current) {
+        try {
+            $cliArgs = @('ytdlp-result', '--state', $state)
+            if ($message) { $cliArgs += @('--message', (ConvertTo-CliText $message)) }
+            Invoke-StemmaCli -ReleaseDir $context.Current -Arguments $cliArgs
+        }
+        catch { Write-Warning "Não deu para gravar o resultado no banco: $($_.Exception.Message)" }
+    }
+    return [pscustomobject]@{ State = $state; Message = $message }
+}
+
+function Restore-StemmaYtDlp {
+    <# Depois de uma falha: volta o yt-dlp anterior e sobe o serviço. Devolve o complemento da mensagem. #>
+    param([Parameter(Mandatory)]$Context, [string]$ServiceId, [string]$Version, [int]$HealthTimeoutSec)
+    try {
+        Stop-StemmaService -ServiceId $ServiceId
+        try { Install-ReleaseYtDlp -ReleaseDir $Context.Current -Version $Version }
+        finally { Start-StemmaService -ServiceId $ServiceId }
+        if (Wait-StemmaHealth -Port $Context.Port -ExpectedVersion $Context.CurrentTag -ExpectedYtDlp $Version -TimeoutSec $HealthTimeoutSec) {
+            return "O yt-dlp $Version continua no ar."
+        }
+        return "O Stemma não voltou com o yt-dlp ${Version}: veja os logs."
+    }
+    catch {
+        Write-Warning "Voltar o yt-dlp ${Version}: $($_.Exception.Message)"
+        try { Start-StemmaService -ServiceId $ServiceId } catch { Write-Warning "Serviço: $($_.Exception.Message)" }
+        return "Não deu para voltar o yt-dlp ${Version}: veja os logs."
     }
 }
 
@@ -1920,30 +2065,38 @@ function Update-StemmaYtDlp {
 function Get-StemmaTaskNames {
     <#
       Tarefas agendadas da instalação: `\Stemma\Atualizar` (SYSTEM, roda o instalador da versão
-      nova) e `\Stemma\Bandeja` (abre o Stemma.exe na sessão de quem está logado). Um ensaio
-      paralelo (outro ServiceId) leva o id no nome.
+      nova), `\Stemma\AtualizarYtDlp` (SYSTEM, diária e sob demanda, só o yt-dlp; ADR 0016) e
+      `\Stemma\Bandeja` (abre o Stemma.exe na sessão de quem está logado). Um ensaio paralelo
+      (outro ServiceId) leva o id no nome.
     #>
     param([Parameter(Mandatory)][string]$ServiceId)
     $suffix = if ($ServiceId -eq 'stemma') { '' } else { "-$ServiceId" }
     return [pscustomobject]@{
         Path       = '\Stemma\'
         Update     = "Atualizar$suffix"
+        YtDlp      = "AtualizarYtDlp$suffix"
         Tray       = "Bandeja$suffix"
         UpdateFull = "\Stemma\Atualizar$suffix"
+        YtDlpFull  = "\Stemma\AtualizarYtDlp$suffix"
     }
 }
 
 function Get-AppUpdateArguments {
-    <# Linha de comando da tarefa `Atualizar`: o setup.ps1 que o instalador deixou em <raiz>\setup\engine. #>
-    param([Parameter(Mandatory)][string]$EngineDir, [Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$ServiceId)
+    <# Linha de comando das tarefas `Atualizar` e `AtualizarYtDlp`: o setup.ps1 que o instalador deixou em <raiz>\setup\engine. #>
+    param(
+        [Parameter(Mandatory)][string]$EngineDir,
+        [Parameter(Mandatory)][string]$Root,
+        [Parameter(Mandatory)][string]$ServiceId,
+        [ValidateSet('AppUpdate', 'YtDlpUpdate')][string]$Mode = 'AppUpdate'
+    )
     $setup = Join-Path $EngineDir 'setup.ps1'
-    return "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$setup`" -Mode AppUpdate -Root `"$Root`" -ServiceId `"$ServiceId`""
+    return "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$setup`" -Mode $Mode -Root `"$Root`" -ServiceId `"$ServiceId`""
 }
 
 function Register-StemmaTasks {
     <#
-      Cria (ou recria) as tarefas e grava `UPDATE_TASK` no .env, para o backend saber que pode
-      atualizar. Chamado pelo instalador antes de (re)iniciar o serviço.
+      Cria (ou recria) as tarefas e grava `UPDATE_TASK` e `YTDLP_UPDATE_TASK` no .env, para o
+      backend saber que pode atualizar. Chamado pelo instalador antes de (re)iniciar o serviço.
     #>
     param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$ServiceId, [Parameter(Mandatory)][string]$EngineDir)
     $names = Get-StemmaTaskNames -ServiceId $ServiceId
@@ -1955,6 +2108,15 @@ function Register-StemmaTasks {
     Register-ScheduledTask -TaskPath $names.Path -TaskName $names.Update -Action $update -Principal $system `
         -Settings $settings -Description 'Atualiza o Stemma para a última versão (pedido pelo app).' -Force | Out-Null
 
+    # yt-dlp: todo dia às 5h (ou assim que o PC ligar, se estava desligado) e quando o app pede.
+    # Até 20 min (o backend dá a atualização por perdida com 30).
+    $ytdlp = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument (Get-AppUpdateArguments -EngineDir $EngineDir -Root $Root -ServiceId $ServiceId -Mode YtDlpUpdate)
+    $daily = New-ScheduledTaskTrigger -Daily -At '05:00'
+    $ytdlpSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
+        -ExecutionTimeLimit (New-TimeSpan -Minutes 20) -MultipleInstances IgnoreNew
+    Register-ScheduledTask -TaskPath $names.Path -TaskName $names.YtDlp -Action $ytdlp -Trigger $daily -Principal $system `
+        -Settings $ytdlpSettings -Description 'Atualiza o yt-dlp do Stemma (todo dia e quando o app pede).' -Force | Out-Null
+
     $tray = Join-Path $Root 'setup\Stemma.exe'
     $trayAction = New-ScheduledTaskAction -Execute $tray -Argument "--root `"$Root`" --service `"$ServiceId`""
     # Grupo Usuários (SID, para não depender do idioma do Windows): roda na sessão de quem está logado.
@@ -1964,13 +2126,15 @@ function Register-StemmaTasks {
     Register-ScheduledTask -TaskPath $names.Path -TaskName $names.Tray -Action $trayAction -Principal $users `
         -Settings $traySettings -Description 'Abre o ícone do Stemma na bandeja depois de atualizar pelo app.' -Force | Out-Null
 
-    Set-DotEnvValue -Path (Get-StemmaPaths -Root $Root).EnvFile -Key 'UPDATE_TASK' -Value $names.UpdateFull
+    $envFile = (Get-StemmaPaths -Root $Root).EnvFile
+    Set-DotEnvValue -Path $envFile -Key 'UPDATE_TASK' -Value $names.UpdateFull
+    Set-DotEnvValue -Path $envFile -Key 'YTDLP_UPDATE_TASK' -Value $names.YtDlpFull
 }
 
 function Unregister-StemmaTasks {
     param([Parameter(Mandatory)][string]$ServiceId)
     $names = Get-StemmaTaskNames -ServiceId $ServiceId
-    foreach ($name in $names.Update, $names.Tray) {
+    foreach ($name in $names.Update, $names.YtDlp, $names.Tray) {
         $task = Get-ScheduledTask -TaskPath $names.Path -TaskName $name -ErrorAction SilentlyContinue
         if ($task) { Unregister-ScheduledTask -TaskPath $names.Path -TaskName $name -Confirm:$false }
     }

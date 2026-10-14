@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app import __version__
 from app.db.models import SystemUpdateModel
 from app.db.types import utcnow
-from app.domain.enums import UpdateState
+from app.domain.enums import UpdateComponent, UpdateState
 from app.domain.errors import AppError, ConflictError
 from app.domain.releases import format_version, parse_release_notes, parse_version
 from app.pipeline.updater import GitHubReleases, Release, UpdateTask, UpdateTaskError
@@ -25,14 +25,9 @@ from app.schemas.system import (
     UpdateRunOut,
 )
 from app.services.jobs import JobService
-from app.services.update_guard import RUNNING_TIMEOUT, is_running, latest_update
+from app.services.update_guard import last_run, record_result, running_update
 
 logger = logging.getLogger(__name__)
-
-STALE_MESSAGE = (
-    "A atualização não terminou (o PC pode ter desligado no meio). "
-    "Veja os logs na pasta logs da instalação."
-)
 
 
 class SystemUpdateService:
@@ -78,13 +73,13 @@ class SystemUpdateService:
             notes=notes,
             can_update=self.task.configured,
             active_jobs=self.jobs.count_active(),
-            last_run=_run_out(run) if run else None,
+            last_run=run_out(run) if run else None,
         )
 
     def start(self) -> UpdateRunOut:
         """Grava `running` e dispara a tarefa. Responde na hora; quem atualiza é a tarefa."""
-        run = self._last_run()
-        if run is not None and run.state == UpdateState.RUNNING:
+        self._last_run()  # expira um `running` que não terminou
+        if running_update(self.db, self.clock()) is not None:
             raise ConflictError("update_running", "Já há uma atualização em andamento.")
         if not self.task.configured:
             raise ConflictError(
@@ -110,6 +105,7 @@ class SystemUpdateService:
 
         target = format_version(latest.version)
         row = SystemUpdateModel(
+            component=UpdateComponent.APP,
             from_version=self.current_version,
             target_version=target,
             state=UpdateState.RUNNING,
@@ -126,21 +122,10 @@ class SystemUpdateService:
             row.finished_at = self.clock()
             self.db.commit()
             raise AppError("update_start_failed", row.message, 502) from exc
-        return _run_out(row)
+        return run_out(row)
 
     def _last_run(self) -> SystemUpdateModel | None:
-        run = latest_update(self.db)
-        if (
-            run is not None
-            and run.state == UpdateState.RUNNING
-            and not is_running(run, self.clock())
-        ):
-            logger.warning("Atualização %s sem resultado há mais de %s", run.id, RUNNING_TIMEOUT)
-            run.state = UpdateState.FAILED
-            run.message = STALE_MESSAGE
-            run.finished_at = self.clock()
-            self.db.commit()
-        return run
+        return last_run(self.db, UpdateComponent.APP, self.clock())
 
 
 def record_update_result(
@@ -150,20 +135,8 @@ def record_update_result(
     *,
     clock: Callable[[], datetime] = utcnow,
 ) -> bool:
-    """Grava o resultado na última atualização pedida, se ela ainda estiver `running` (usado
-    pelo CLI, no fim da tarefa). False se não houver (tarefa rodada à mão): nada muda."""
-    if state == UpdateState.RUNNING:
-        raise ValueError("o resultado precisa ser succeeded ou failed")
-    run = latest_update(db)
-    if run is None or run.state != UpdateState.RUNNING:
-        logger.warning("Resultado de atualização sem pedido em andamento: %s", state)
-        return False
-    run.state = state
-    run.message = message or None
-    run.finished_at = clock()
-    db.commit()
-    logger.info("Atualização %s → %s: %s", run.from_version, run.target_version, state)
-    return True
+    """Resultado da atualização do Stemma (CLI `update-result`, no fim da tarefa)."""
+    return record_result(db, UpdateComponent.APP, state, message, clock())
 
 
 def _latest_installable(releases: list[Release]) -> Release | None:
@@ -171,7 +144,7 @@ def _latest_installable(releases: list[Release]) -> Release | None:
     return max(candidates, key=lambda r: r.version) if candidates else None
 
 
-def _run_out(row: SystemUpdateModel) -> UpdateRunOut:
+def run_out(row: SystemUpdateModel) -> UpdateRunOut:
     return UpdateRunOut(
         id=row.id,
         from_version=row.from_version,

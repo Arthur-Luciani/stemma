@@ -6,6 +6,8 @@ import { Button, ButtonLink } from '../../ui/Button';
 import { cx } from '../../ui/cx';
 import { Icon } from '../../ui/Icon';
 import { useReprocessSession } from '../session/hooks';
+import { suggestsYtDlpUpdate } from '../ytdlp/status';
+import { YtDlpHint } from '../ytdlp/YtDlpHint';
 import { useCancelJob, useDiscardJob } from './hooks';
 import styles from './JobCard.module.css';
 import { JobStages } from './JobStages';
@@ -88,6 +90,7 @@ function FailedCard({ job, compact }: JobCardProps) {
         <span className={styles.code}>{job.session.code}</span>
       </div>
       <div className={styles.error}>{message}</div>
+      {suggestsYtDlpUpdate(job.error_code ?? job.session.error_code) && <YtDlpHint />}
       <div className={styles.actions}>
         <Button
           variant="secondary"

@@ -23,13 +23,15 @@
     AppUpdate         tarefa agendada \Stemma\Atualizar (ADR 0015): baixa o instalador da última
                       release, roda em modo silencioso e grava o resultado no banco
                       (-InstallerPath usa um .exe local, para ensaio)
-    PruneCache        deixa no cache do uv só o que as versões instaladas usam (administrador)
+    YtDlpUpdate       tarefa agendada \Stemma\AtualizarYtDlp (ADR 0016), diária e sob demanda:
+                      atualiza só o yt-dlp do venv no ar e grava o resultado no banco
+    PruneCache       deixa no cache do uv só o que as versões instaladas usam (administrador)
     Start / Stop      "Iniciar o Stemma" / "Parar o Stemma" do ícone da bandeja (Stemma.exe): pedem
                       administrador (UAC) sozinhos e mostram um aviso no fim
 #>
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('Check', 'CheckPort', 'TailscaleInstall', 'TailscaleLogin', 'Install', 'Update', 'Uninstall', 'AppUpdate', 'PruneCache', 'Start', 'Stop')]
+    [ValidateSet('Check', 'CheckPort', 'TailscaleInstall', 'TailscaleLogin', 'Install', 'Update', 'Uninstall', 'AppUpdate', 'YtDlpUpdate', 'PruneCache', 'Start', 'Stop')]
     [string]$Mode,
     [string]$Root = 'C:\stemma',
     [string]$ServiceId = 'stemma',
@@ -135,6 +137,16 @@ if ($Mode -in 'Install', 'Update', 'Uninstall', 'AppUpdate') {
     Start-Transcript -LiteralPath $transcript | Out-Null
     Write-Result 'log' $transcript
 }
+elseif ($Mode -eq 'YtDlpUpdate') {
+    # Roda todo dia: um log só, que recomeça (guardando o anterior) ao passar de 1 MB.
+    $logDir = Join-Path $Root 'logs'
+    New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+    $transcript = Join-Path $logDir 'ytdlp-update.log'
+    if ((Test-Path -LiteralPath $transcript) -and (Get-Item -LiteralPath $transcript).Length -gt 1MB) {
+        Move-Item -LiteralPath $transcript -Destination "$transcript.old" -Force
+    }
+    Start-Transcript -LiteralPath $transcript -Append | Out-Null
+}
 
 try {
     switch ($Mode) {
@@ -224,6 +236,11 @@ try {
             $outcome = Invoke-StemmaAppUpdate -Root $Root -ServiceId $ServiceId -InstallerPath $InstallerPath `
                 -SimulateFailure:$SimulateFailure
             if ($outcome.State -ne 'succeeded') { throw $outcome.Message }
+        }
+        'YtDlpUpdate' {
+            Assert-Admin
+            $outcome = Invoke-StemmaYtDlpUpdate -Root $Root -ServiceId $ServiceId
+            if ($outcome.State -eq 'failed') { throw $outcome.Message }
         }
         'PruneCache' {
             Assert-Admin

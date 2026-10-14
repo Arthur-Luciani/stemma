@@ -15,6 +15,8 @@ import { Icon } from '../../ui/Icon';
 import { SkeletonList } from '../../ui/Skeleton';
 import { useIsDesktop } from '../../ui/useMediaQuery';
 import styles from './DiscoverPage.module.css';
+import { suggestsYtDlpUpdate } from '../ytdlp/status';
+import { YtDlpHint } from '../ytdlp/YtDlpHint';
 import { useRecentSessions, useSearch } from './hooks';
 import { IdentityForm } from './IdentityForm';
 import { SearchBox } from './SearchBox';
@@ -151,19 +153,24 @@ export function DiscoverPage() {
     body = <SkeletonList rows={3} label={strings.app.loading} />;
   } else if (search.isError) {
     const linkError = isApiError(search.error) && search.error.status === 422;
+    // yt-dlp velho: a mensagem do servidor diz isso, e a sugestão de atualizar vem junto.
+    const outdated = isApiError(search.error) && suggestsYtDlpUpdate(search.error.code);
     body = (
       <ErrorState
         title={linkError ? strings.discover.linkErrorTitle : strings.discover.unavailableTitle}
-        body={linkError ? search.error.message : strings.discover.unavailableBody}
+        body={linkError || outdated ? search.error.message : strings.discover.unavailableBody}
         action={
           linkError ? undefined : (
-            <Button
-              variant="secondary"
-              onClick={() => void search.refetch()}
-              disabled={search.isFetching}
-            >
-              {strings.common.retry}
-            </Button>
+            <div className={styles.errorActions}>
+              {outdated && <YtDlpHint />}
+              <Button
+                variant="secondary"
+                onClick={() => void search.refetch()}
+                disabled={search.isFetching}
+              >
+                {strings.common.retry}
+              </Button>
+            </div>
           )
         }
       />

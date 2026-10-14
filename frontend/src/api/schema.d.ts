@@ -281,6 +281,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/ytdlp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ytdlp */
+        get: operations["get_ytdlp_api_system_ytdlp_get"];
+        put?: never;
+        /** Start Ytdlp Update */
+        post: operations["start_ytdlp_update_api_system_ytdlp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -762,7 +780,7 @@ export interface components {
         };
         /**
          * UpdateRunOut
-         * @description Uma atualização pedida pelo app.
+         * @description Uma atualização (do Stemma ou do yt-dlp) pedida pelo app ou pela tarefa diária.
          */
         UpdateRunOut: {
             /**
@@ -784,10 +802,38 @@ export interface components {
         };
         /**
          * UpdateState
-         * @description Atualização do Stemma disparada pelo app (ADR 0015).
+         * @description Atualização disparada pelo app ou pela tarefa agendada (ADR 0015 e 0016).
          * @enum {string}
          */
         UpdateState: "running" | "succeeded" | "failed";
+        /**
+         * YtDlpStatusOut
+         * @description yt-dlp instalado e o último publicado no PyPI (ADR 0016).
+         */
+        YtDlpStatusOut: {
+            /** Active Jobs */
+            active_jobs: number;
+            /** Available */
+            available: boolean;
+            /** Can Update */
+            can_update: boolean;
+            /**
+             * Check
+             * @enum {string}
+             */
+            check: "ok" | "unavailable";
+            /** Checked At */
+            checked_at: string | null;
+            /** Installed Version */
+            installed_version: string;
+            last_run: components["schemas"]["UpdateRunOut"] | null;
+            /** Latest Published At */
+            latest_published_at: string | null;
+            /** Latest Version */
+            latest_version: string | null;
+            /** Stale */
+            stale: boolean;
+        };
     };
     responses: never;
     parameters: never;
@@ -1790,6 +1836,100 @@ export interface operations {
         };
     };
     start_update_api_system_update_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateRunOut"];
+                };
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    get_ytdlp_api_system_ytdlp_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YtDlpStatusOut"];
+                };
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    start_ytdlp_update_api_system_ytdlp_post: {
         parameters: {
             query?: never;
             header?: never;

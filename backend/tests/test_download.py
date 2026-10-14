@@ -123,6 +123,15 @@ def test_youtube_fora_do_ar_e_erro_e_nao_lista_vazia() -> None:
     assert exc.value.status == 502
 
 
+def test_busca_com_extrator_quebrado_sugere_atualizar_o_ytdlp() -> None:
+    client, _ = make_client(error=DownloadError("ERROR: [youtube:search] Unable to extract data"))
+
+    with pytest.raises(AppError) as exc:
+        client.search("queen")
+
+    assert exc.value.code == "ytdlp_outdated"
+
+
 def test_cookie_file_vai_para_as_opcoes(tmp_path: Path) -> None:
     cookies = tmp_path / "cookies.txt"
     client, made = make_client(result={"entries": []}, cookie_file=cookies)
@@ -332,6 +341,12 @@ def test_erro_do_subprocess_usa_so_as_linhas_de_erro() -> None:
             "youtube_unavailable",
         ),
         ("Requested format is not available. Use --list-formats", "youtube_format_unavailable"),
+        (
+            "[youtube] abc: Unable to extract uploader id; please report this issue on "
+            "https://github.com/yt-dlp/yt-dlp/issues . Confirm you are on the latest version",
+            "ytdlp_outdated",
+        ),
+        ("[youtube] abc: nsig extraction failed: Some formats may be missing", "ytdlp_outdated"),
         ("Service is unavailable", "download_failed"),
         ("algo estranho", "download_failed"),
     ],

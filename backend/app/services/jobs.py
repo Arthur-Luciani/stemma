@@ -53,14 +53,7 @@ class JobService:
 
     def count_active(self) -> int:
         """Jobs na fila ou rodando (processamento e export)."""
-        return (
-            self.db.scalar(
-                select(func.count())
-                .select_from(JobModel)
-                .where(JobModel.state.in_(ACTIVE_JOB_STATES))
-            )
-            or 0
-        )
+        return count_active_jobs(self.db)
 
     def list(self) -> list[JobOut]:
         """Em execução, depois a fila por chegada, depois os encerrados mais recentes."""
@@ -228,3 +221,14 @@ class JobService:
 
 def _session_busy() -> ConflictError:
     return ConflictError("session_busy", "Esta sessão já está na fila ou sendo processada.")
+
+
+def count_active_jobs(db: Session) -> int:
+    """Jobs na fila ou rodando. Fora do `JobService` para o CLI, que não tem a fila (a tarefa
+    diária do yt-dlp não atualiza com job ativo)."""
+    return (
+        db.scalar(
+            select(func.count()).select_from(JobModel).where(JobModel.state.in_(ACTIVE_JOB_STATES))
+        )
+        or 0
+    )

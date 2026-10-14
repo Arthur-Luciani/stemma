@@ -116,7 +116,8 @@ C:\stemma\
   setup\                Stemma.exe (ícone da bandeja), desinstalador, motor (engine\setup.ps1 + StemmaDeploy.psm1), pacote, QR
   winsw\                stemma.exe (WinSW 2.12) + stemma.xml
   logs\                 serviço (stemma.out.log / stemma.err.log, rotação), setup-*.log do instalador,
-                        update-vX.Y.Z.log (instalador rodado pelo app) e app-update-result.txt
+                        update-vX.Y.Z.log (instalador rodado pelo app), app-update-result.txt e
+                        ytdlp-update.log (tarefa diária do yt-dlp)
   downloads\            instalador baixado pela atualização pelo app
 D:\stemma-data\         STORAGE_ROOT: banco, stems, exports, cache do torch
   backups\              backups do banco feitos antes de cada atualização
@@ -124,6 +125,7 @@ D:\stemma-data\         STORAGE_ROOT: banco, stems, exports, cache do torch
 
 - O serviço `stemma` roda como **LocalSystem** (não pede senha) e executa `current\deploy\start.ps1`: põe `tools\` no `PATH`, carrega o `.env`, aplica as migrations e sobe o uvicorn (1 worker) em `127.0.0.1:<porta>`, servindo também o `frontend\dist` da versão.
 - Tarefas agendadas `\Stemma\Atualizar` (SYSTEM, sob demanda) e `\Stemma\Bandeja` (grupo Usuários): atualização pelo app. O `.env` aponta para a primeira em `UPDATE_TASK`.
+- Tarefa agendada `\Stemma\AtualizarYtDlp` (SYSTEM, diária às 5h e sob demanda): atualização do yt-dlp. O `.env` aponta para ela em `YTDLP_UPDATE_TASK`.
 - Acesso de fora só pelo `tailscale serve`: `https://<pc>.<tailnet>.ts.net` → `http://127.0.0.1:<porta>`.
 
 ## Voltar versão (rollback manual)
@@ -136,13 +138,17 @@ Volta para a versão instalada imediatamente anterior. Faz backup do banco, desf
 
 ## Só o yt-dlp
 
-Quando o YouTube quebra o download e já saiu um yt-dlp novo:
+O yt-dlp é a peça que mais quebra (o YouTube muda). Ele se atualiza sozinho ([ADR 0016](decisions/0016-atualizar-yt-dlp.md)):
+
+- **Todo dia às 5h** a tarefa `\Stemma\AtualizarYtDlp` confere o PyPI. Se o PC estava desligado, ela roda assim que ele ligar. Com versão nova e nenhum job na fila ou rodando, ela para o serviço, instala a versão nova no venv da versão no ar, sobe de novo e confere o `/health` (uns 30 s fora do ar). Se ele não voltar, ela reinstala a versão anterior. Com job ativo, fica para o dia seguinte.
+- **Pelo app**: quando um download ou uma busca falha com erro típico de yt-dlp velho e já existe versão nova, o card do job (ou o erro da busca) mostra **Atualizar yt-dlp**. Depois é só tocar em **Tentar de novo**. Se a tarefa diária não instalar uma versão que saiu há mais de 2 dias, aparece o aviso "yt-dlp desatualizado" no topo do app.
+- **No PC** (administrador), o mesmo que a tarefa faz, na hora:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File C:\stemma\current\deploy\update.ps1 -YtDlpOnly
 ```
 
-Atualiza o yt-dlp no venv da versão atual e reinicia o serviço. O `/health` mostra a versão (`ytdlp`). A próxima atualização volta para a versão do `uv.lock`.
+O `/health` mostra a versão (`ytdlp`). Atualizar o Stemma **não** volta o yt-dlp: se a versão anterior tinha um mais novo que o do `uv.lock` da nova, o update instala esse. Log da tarefa: `C:\stemma\logs\ytdlp-update.log`. O resultado de cada atualização fica no banco (`system_updates`, componente `ytdlp`).
 
 ## Cookies do YouTube
 
@@ -158,7 +164,8 @@ Se o download falhar com "YouTube pediu login. Atualize os cookies.":
 Get-Content C:\stemma\logs\stemma.err.log -Tail 50 -Wait   # o log do app vai para o stderr
 Get-ChildItem C:\stemma\logs\setup-*.log                   # cada execução do instalador
 Get-Content C:\stemma\logs\app-update-result.txt          # resultado da última atualização pelo app
-Get-ScheduledTask -TaskPath '\Stemma\'                    # tarefas da atualização pelo app
+Get-ScheduledTask -TaskPath '\Stemma\'                    # tarefas da atualização pelo app e do yt-dlp
+Get-Content C:\stemma\logs\ytdlp-update.log -Tail 30      # o que a tarefa do yt-dlp fez
 Get-Service stemma
 Invoke-RestMethod http://127.0.0.1:8000/health
 tailscale serve status

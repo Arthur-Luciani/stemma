@@ -1,6 +1,7 @@
 import { NavLink, useMatch } from 'react-router';
 
 import { UpdateChip } from '../features/update/UpdateNotice';
+import { YtDlpChip } from '../features/ytdlp/YtDlpNotice';
 import { mixPath } from '../lib/session';
 import { strings } from '../strings';
 import { cx } from '../ui/cx';
@@ -73,6 +74,7 @@ export function Topbar() {
       </nav>
       <div className={styles.topActions}>
         <UpdateChip />
+        <YtDlpChip />
         <OpenOnPhone />
       </div>
     </header>

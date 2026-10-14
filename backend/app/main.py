@@ -30,7 +30,7 @@ from app.pipeline.handlers import ExportHandler, ProcessHandler
 from app.pipeline.probe import GpuProbe
 from app.pipeline.queue import JobHandler, JobRunner
 from app.pipeline.separate import DemucsSeparator, DemucsSettings
-from app.pipeline.updater import GitHubReleases, UpdateTask
+from app.pipeline.updater import GitHubReleases, UpdateTask, YtDlpReleases
 from app.services.events import EventBus
 from app.spa import install_spa
 from app.storage import Storage
@@ -114,6 +114,10 @@ def create_app(
         url=settings.update_releases_url,
     )
     app.state.update_task = UpdateTask(settings.schtasks_bin, settings.update_task)
+    app.state.ytdlp_releases = YtDlpReleases(
+        ttl_s=settings.ytdlp_check_ttl_s, url=settings.ytdlp_releases_url
+    )
+    app.state.ytdlp_update_task = UpdateTask(settings.schtasks_bin, settings.ytdlp_update_task)
 
     if settings.cors_origins:
         app.add_middleware(

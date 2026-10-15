@@ -190,23 +190,37 @@ describe('PresetSelector', () => {
     render(<PresetSelector presets={list} value={named('Original')} onChange={onChange} />);
     expect(screen.queryByRole('radio', { name: 'Sem voz' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Mais presets' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Sem voz' }));
+    expect(screen.getByRole('button', { name: 'Mais presets' })).toHaveTextContent('Mais · 2');
+    await userEvent.click(screen.getByRole('button', { name: 'Sem voz' }));
     expect(onChange).toHaveBeenLastCalledWith(hiddenVoice);
   });
 
-  it('o preset ativo aparece mesmo escondido, e sem escondidos não há "Mais"', () => {
+  it('o preset ativo escondido ocupa o 1º lugar, e o Mais sempre existe para gerenciar', async () => {
     const hiddenVoice = { ...named('Sem voz'), visible: false };
-    const { rerender } = render(
+    const onManage = vi.fn();
+    render(
       <PresetSelector
         presets={[named('Original'), hiddenVoice]}
         value={hiddenVoice}
         onChange={vi.fn()}
+        onManage={onManage}
       />,
     );
-    expect(screen.getByRole('radio', { name: 'Sem voz' })).toHaveAttribute('aria-checked', 'true');
+    const radios = screen.getAllByRole('radio');
+    expect(radios.map((r) => r.textContent)).toEqual(['visibility_offSem voz', 'Original']);
+    expect(radios[0]).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Mais presets' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Gerenciar' }));
+    expect(onManage).toHaveBeenCalledOnce();
+  });
+
+  it('sem nenhum preset mostra "Personalizado" e a ação de salvar, sem Mais', async () => {
+    const onSave = vi.fn();
+    render(<PresetSelector presets={[]} value={null} onChange={vi.fn()} onSave={onSave} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Personalizado');
     expect(screen.queryByRole('button', { name: 'Mais presets' })).not.toBeInTheDocument();
-    rerender(<PresetSelector presets={presets} value={null} onChange={vi.fn()} />);
-    expect(screen.queryByRole('button', { name: 'Mais presets' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar como preset' }));
+    expect(onSave).toHaveBeenCalledOnce();
   });
 });
 

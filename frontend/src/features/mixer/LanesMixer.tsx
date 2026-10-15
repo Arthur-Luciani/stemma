@@ -30,6 +30,8 @@ export function LanesMixer({
   duration,
   onOpenExport,
   onEdit,
+  onSavePreset,
+  onManagePresets,
   onBack,
 }: MixerViewProps & { onBack: () => void }) {
   const root = useRef<HTMLDivElement>(null);
@@ -72,6 +74,8 @@ export function LanesMixer({
       </header>
 
       <PresetSelector
+        onSave={onSavePreset}
+        onManage={onManagePresets}
         variant="pills"
         className={styles.pills}
         presets={presets}

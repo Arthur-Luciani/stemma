@@ -21,6 +21,8 @@ export function PracticeMixer({
   mixer,
   duration,
   onAdjust,
+  onSavePreset,
+  onManagePresets,
 }: MixerViewProps & { onAdjust: () => void }) {
   const root = useRef<HTMLDivElement>(null);
   const time = useRef<HTMLSpanElement>(null);
@@ -47,6 +49,8 @@ export function PracticeMixer({
       </header>
 
       <PresetSelector
+        onSave={onSavePreset}
+        onManage={onManagePresets}
         variant="grid"
         className={styles.practicePresets}
         presets={presets}

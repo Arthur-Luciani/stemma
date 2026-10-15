@@ -28,7 +28,8 @@ function matches(stems: StemsMix, preset: MixPreset): boolean {
   return STEMS.every((stem) => {
     const a = stems[stem];
     const b = { ...DEFAULT_STEM, ...preset.stems[stem] };
-    return !a.solo && a.volume === b.volume && a.pan === b.pan && a.mute === b.mute;
+    // Volume com tolerância de ±1; pan e mute exatos; o solo não conta (ADR 0018).
+    return Math.abs(a.volume - b.volume) <= 1 && a.pan === b.pan && a.mute === b.mute;
   });
 }
 

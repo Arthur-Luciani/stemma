@@ -31,6 +31,8 @@ export function DesktopMixer({
   onOpenExport,
   onCloseExport,
   onEdit,
+  onSavePreset,
+  onManagePresets,
 }: MixerViewProps) {
   const root = useRef<HTMLDivElement>(null);
   const time = useRef<HTMLSpanElement>(null);
@@ -74,6 +76,8 @@ export function DesktopMixer({
           </div>
         </div>
         <PresetSelector
+          onSave={onSavePreset}
+          onManage={onManagePresets}
           presets={presets}
           value={preset}
           onChange={(p) => {

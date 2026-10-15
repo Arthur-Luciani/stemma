@@ -48,6 +48,16 @@ describe('presets', () => {
     for (const preset of presets) expect(matchPreset(applyPreset(preset), presets)).toBe(preset);
   });
 
+  it('o solo não conta e o volume tem tolerância de ±1', () => {
+    const base = original();
+    const solo = mixerReducer(base, { type: 'solo', stem: 'drums' });
+    expect(matchName(solo)).toBe('Original');
+    expect(matchName(mixerReducer(base, { type: 'volume', stem: 'bass', value: 99 }))).toBe(
+      'Original',
+    );
+    expect(matchName(mixerReducer(base, { type: 'volume', stem: 'bass', value: 98 }))).toBeNull();
+  });
+
   it('o pan entra no match', () => {
     const stems = { ...original().stems, bass: { ...DEFAULT_STEM, pan: 0.3 } };
     expect(matchPreset(stems, presets)).toBeNull();
@@ -66,7 +76,6 @@ describe('presets', () => {
     for (const action of [
       { type: 'volume', stem: 'bass', value: 80 },
       { type: 'pan', stem: 'other', value: -0.3 },
-      { type: 'solo', stem: 'drums' },
       { type: 'mute', stem: 'bass' },
     ] as const) {
       expect(matchName(mixerReducer(state, action))).toBeNull();

@@ -16,6 +16,9 @@ export interface MixerViewProps {
   onOpenExport: () => void;
   onCloseExport: () => void;
   onEdit: () => void;
+  /** Abrem "Salvar como preset" e o gerenciador de presets. */
+  onSavePreset: () => void;
+  onManagePresets: () => void;
 }
 
 /** Nome do stem em PT-BR. */

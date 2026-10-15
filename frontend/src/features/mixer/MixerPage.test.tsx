@@ -113,7 +113,7 @@ describe('Mixer', () => {
     expect(screen.getByText('ST-042 · 3:41 · hoje', { exact: false })).toBeInTheDocument();
 
     const vocals = screen.getByRole('region', { name: 'Voz' });
-    await userEvent.click(within(vocals).getByRole('button', { name: 'Solo de Voz' }));
+    await userEvent.click(within(vocals).getByRole('button', { name: 'Silenciar Voz' }));
     expect(screen.getByText('Personalizado')).toBeInTheDocument();
     expect(
       screen.getAllByRole('radio').every((r) => r.getAttribute('aria-checked') === 'false'),
@@ -121,7 +121,7 @@ describe('Mixer', () => {
     await waitFor(() => {
       expect(puts).toHaveLength(1);
     });
-    expect(puts[0]?.stems.vocals?.solo).toBe(true);
+    expect(puts[0]?.stems.vocals?.mute).toBe(true);
 
     await userEvent.click(screen.getByRole('radio', { name: 'Original' }));
     expect(within(drums).getByRole('button', { name: 'Silenciar Bateria' })).toHaveAttribute(

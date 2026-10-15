@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useParams } from 'react-router';
 
 import type { Session } from '../../api/types';
@@ -18,6 +18,9 @@ import { useAudioEngine, usePeaks } from './hooks';
 import { LanesMixer } from './LanesMixer';
 import styles from './MixerPage.module.css';
 import { PracticeMixer } from './PracticeMixer';
+import { PresetManager } from './PresetManager';
+import { presetStemsFromMix } from './presets';
+import { SavePresetDialog } from './SavePresetDialog';
 import { skip, useMixerShortcuts, type ShortcutAction } from './shortcuts';
 import { useMixer } from './useMixer';
 import type { MixerViewProps } from './views';
@@ -67,6 +70,8 @@ function MixerScreen({ session }: { session: Session }) {
   const [view, setView, clearView] = useUrlParam('view');
   const [exportParam, openExport, closeExport] = useUrlParam('export');
   const [edit, openEdit, closeEdit] = useUrlParam('edit');
+  const [panel, openPanel, closePanel] = useUrlParam('painel');
+  const [saving, setSaving] = useState(false);
 
   const { engine, error } = useAudioEngine(session.id);
   const peaks = usePeaks(session.id);
@@ -131,6 +136,12 @@ function MixerScreen({ session }: { session: Session }) {
     onEdit: () => {
       openEdit('1');
     },
+    onSavePreset: () => {
+      setSaving(true);
+    },
+    onManagePresets: () => {
+      openPanel('presets');
+    },
   };
 
   return (
@@ -158,6 +169,23 @@ function MixerScreen({ session }: { session: Session }) {
         />
       )}
       {edit !== null && <EditSessionDialog session={session} onClose={closeEdit} />}
+      {panel === 'presets' && (
+        <PresetManager
+          mixer={props.mixer}
+          onClose={closePanel}
+          onSaveCurrent={props.onSavePreset}
+        />
+      )}
+      {saving && (
+        <SavePresetDialog
+          mode="create"
+          presets={props.mixer.presets}
+          stems={presetStemsFromMix(props.mixer.state.stems)}
+          onClose={() => {
+            setSaving(false);
+          }}
+        />
+      )}
     </>
   );
 }

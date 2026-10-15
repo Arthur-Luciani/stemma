@@ -27,7 +27,7 @@ const isActive = (e: Export) => e.state === 'queued' || e.state === 'running';
 class MixNotSaved extends Error {}
 
 function exportTitle(e: Export): string {
-  const preset = e.preset ? strings.mixer.preset[e.preset] : strings.mixer.preset.custom;
+  const preset = e.preset ?? strings.mixer.preset.custom;
   return `${preset} · ${FORMAT_LABEL[e.format]}`;
 }
 
@@ -50,7 +50,7 @@ export function ExportPanel({ session, mixer, variant }: ExportPanelProps) {
       // Sem `stems`, o backend exporta o mix salvo: o que está na tela precisa estar salvo.
       // Se o save falhou (o toast já saiu), não exporta um mix diferente do da tela.
       if (!(await mixer.flush())) throw new MixNotSaved();
-      return createExport(session.id, f);
+      return createExport(session.id, f, mixer.preset?.name);
     },
     onSuccess: (created) => {
       // O `/ws` pode ter trazido um estado mais novo (running, done) antes da resposta.
@@ -79,7 +79,9 @@ export function ExportPanel({ session, mixer, variant }: ExportPanelProps) {
       {sheet && (
         <div className={styles.summary}>
           <div className={styles.summaryHead}>
-            <span className={styles.summaryPreset}>{strings.mixer.preset[mixer.preset]}</span>
+            <span className={styles.summaryPreset}>
+              {mixer.preset?.name ?? strings.mixer.preset.custom}
+            </span>
             {session.metrics?.lufs != null && (
               <span className={styles.mono} title={strings.mixer.metricsHint}>
                 {formatDb(session.metrics.lufs)} {strings.mixer.lufs}

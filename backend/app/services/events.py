@@ -125,7 +125,7 @@ def build_job_out(job: JobModel, session: SessionModel, estimate: JobEstimate | 
 
 def export_file_name(export: ExportModel, session: SessionModel) -> str:
     """ "Artista - Título (Sem voz).mp3", válido como nome de arquivo no Windows."""
-    preset = f" ({export.preset.label})" if export.preset else ""
+    preset = f" ({export.preset})" if export.preset else ""
     return f"{safe_filename(f'{session.artist} - {session.title}{preset}')}.{export.format.value}"
 
 

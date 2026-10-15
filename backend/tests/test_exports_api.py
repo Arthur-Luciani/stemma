@@ -40,7 +40,7 @@ def test_exporta_mp3_com_o_mix_do_corpo_e_baixa(pipeline_client: TestClient) -> 
 
     response = pipeline_client.post(
         f"/api/sessions/{session['id']}/exports",
-        json={"format": "mp3", "preset": "no_vocals", "stems": MIX_SEM_VOZ},
+        json={"format": "mp3", "preset": "Sem voz", "stems": MIX_SEM_VOZ},
     )
 
     assert response.status_code == 201, response.text
@@ -66,18 +66,16 @@ def test_exporta_mp3_com_o_mix_do_corpo_e_baixa(pipeline_client: TestClient) -> 
 
 def test_exporta_wav_com_o_mix_salvo(pipeline_client: TestClient) -> None:
     session = ready_session(pipeline_client)
-    pipeline_client.put(
-        f"/api/sessions/{session['id']}/mix", json={"stems": MIX_SEM_VOZ, "preset": "custom"}
-    )
+    pipeline_client.put(f"/api/sessions/{session['id']}/mix", json={"stems": MIX_SEM_VOZ})
 
     created = pipeline_client.post(
         f"/api/sessions/{session['id']}/exports", json={"format": "wav"}
     ).json()
     export = export_done(pipeline_client, session["id"], created["id"])
 
-    assert export["preset"] == "custom"
+    assert export["preset"] is None
     assert export["stems"] == MIX_SEM_VOZ
-    assert export["file_name"] == "Queen - Bohemian Rhapsody (Personalizado).wav"
+    assert export["file_name"] == "Queen - Bohemian Rhapsody.wav"
     download = pipeline_client.get(f"/api/exports/{created['id']}/file")
     assert download.headers["content-type"] == "audio/wav"
     assert download.content[:4] == b"RIFF"

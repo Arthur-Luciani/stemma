@@ -20,7 +20,7 @@ function fakeBackend(sessionOverrides = {}) {
     metrics: { lufs: -10.6, true_peak_db: 0.9 },
     ...sessionOverrides,
   });
-  let mix: MixState = makeMix({ preset: 'no_drums', stems: { ...makeMix().stems } });
+  let mix: MixState = makeMix({ stems: { ...makeMix().stems } });
   mix.stems.drums = { volume: 100, pan: 0, mute: true, solo: false };
   const puts: MixStateIn[] = [];
   const calls: string[] = [];
@@ -28,7 +28,7 @@ function fakeBackend(sessionOverrides = {}) {
     makeExport({
       session_id: session.id,
       format: 'wav',
-      preset: 'original',
+      preset: 'Original',
       file_name: 'Nelly Furtado - Do It (Original).wav',
       created_at: '2026-09-09T10:00:00Z',
     }),
@@ -53,7 +53,7 @@ function fakeBackend(sessionOverrides = {}) {
       const created = makeExport({
         session_id: session.id,
         format: body.format,
-        preset: mix.preset,
+        preset: null,
         state: 'queued',
         progress: 0,
         size_bytes: null,
@@ -121,7 +121,6 @@ describe('Mixer', () => {
     await waitFor(() => {
       expect(puts).toHaveLength(1);
     });
-    expect(puts[0]?.preset).toBe('custom');
     expect(puts[0]?.stems.vocals?.solo).toBe(true);
 
     await userEvent.click(screen.getByRole('radio', { name: 'Original' }));
@@ -130,7 +129,7 @@ describe('Mixer', () => {
       'false',
     );
     await waitFor(() => {
-      expect(puts.at(-1)?.preset).toBe('original');
+      expect(puts.at(-1)?.stems.drums?.mute).toBe(false);
     });
   });
 

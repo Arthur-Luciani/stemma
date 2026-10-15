@@ -35,7 +35,7 @@ export function LanesMixer({
   const root = useRef<HTMLDivElement>(null);
   const time = useRef<HTMLSpanElement>(null);
   usePlayhead(engine, root, time, formatShortClock);
-  const { state, preset, dispatch } = mixer;
+  const { state, presets, preset, dispatch } = mixer;
   const [panParam, openPan, closePan] = useUrlParam('pan');
   const panStem = isStem(panParam) ? panParam : null;
 
@@ -74,6 +74,7 @@ export function LanesMixer({
       <PresetSelector
         variant="pills"
         className={styles.pills}
+        presets={presets}
         value={preset}
         onChange={(p) => {
           dispatch({ type: 'preset', preset: p });

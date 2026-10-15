@@ -89,6 +89,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Presets */
+        get: operations["list_presets_api_presets_get"];
+        put?: never;
+        /** Create Preset */
+        post: operations["create_preset_api_presets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/presets/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder Presets */
+        put: operations["reorder_presets_api_presets_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/presets/{preset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Preset */
+        delete: operations["delete_preset_api_presets__preset_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Preset */
+        patch: operations["update_preset_api_presets__preset_id__patch"];
+        trace?: never;
+    };
     "/api/search": {
         parameters: {
             query?: never;
@@ -398,7 +451,8 @@ export interface components {
          */
         ExportCreate: {
             format: components["schemas"]["ExportFormat"];
-            preset?: components["schemas"]["MixPreset"] | null;
+            /** Preset */
+            preset?: string | null;
             /** Stems */
             stems?: {
                 [key: string]: components["schemas"]["StemMix"];
@@ -437,7 +491,8 @@ export interface components {
             id: string;
             /** Lufs */
             lufs: number | null;
-            preset: components["schemas"]["MixPreset"] | null;
+            /** Preset */
+            preset: string | null;
             /** Progress */
             progress: number;
             /**
@@ -574,18 +629,12 @@ export interface components {
             type: "job.updated";
         };
         LiveEvent: components["schemas"]["SessionUpdatedEvent"] | components["schemas"]["SessionDeletedEvent"] | components["schemas"]["JobUpdatedEvent"] | components["schemas"]["ExportUpdatedEvent"];
-        /**
-         * MixPreset
-         * @enum {string}
-         */
-        MixPreset: "original" | "no_vocals" | "no_drums" | "no_bass" | "vocals_only" | "custom";
         /** MixStateIn */
         MixStateIn: {
             /** Loop A S */
             loop_a_s?: number | null;
             /** Loop B S */
             loop_b_s?: number | null;
-            preset: components["schemas"]["MixPreset"];
             /** Stems */
             stems: {
                 [key: string]: components["schemas"]["StemMix"];
@@ -597,13 +646,92 @@ export interface components {
             loop_a_s?: number | null;
             /** Loop B S */
             loop_b_s?: number | null;
-            preset: components["schemas"]["MixPreset"];
             /** Stems */
             stems: {
                 [key: string]: components["schemas"]["StemMix"];
             };
             /** Updated At */
             updated_at: string | null;
+        };
+        /** PresetCreate */
+        PresetCreate: {
+            /** Name */
+            name: string;
+            /** Stems */
+            stems: {
+                [key: string]: components["schemas"]["PresetStem"];
+            };
+            /**
+             * Visible
+             * @default true
+             */
+            visible: boolean;
+        };
+        /** PresetListOut */
+        PresetListOut: {
+            /** Items */
+            items: components["schemas"]["PresetOut"][];
+        };
+        /**
+         * PresetOrder
+         * @description Todos os ids, na nova ordem.
+         */
+        PresetOrder: {
+            /** Ids */
+            ids: string[];
+        };
+        /** PresetOut */
+        PresetOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Position */
+            position: number;
+            /** Stems */
+            stems: {
+                [key: string]: components["schemas"]["PresetStem"];
+            };
+            /** Visible */
+            visible: boolean;
+        };
+        /**
+         * PresetStem
+         * @description Nível de um stem no preset. Solo não entra: aplicar um preset limpa o solo.
+         */
+        PresetStem: {
+            /**
+             * Mute
+             * @default false
+             */
+            mute: boolean;
+            /**
+             * Pan
+             * @default 0
+             */
+            pan: number;
+            /**
+             * Volume
+             * @default 100
+             */
+            volume: number;
+        };
+        /**
+         * PresetUpdate
+         * @description Só os campos enviados mudam (renomear, atualizar o mix, mostrar/esconder).
+         */
+        PresetUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Stems */
+            stems?: {
+                [key: string]: components["schemas"]["PresetStem"];
+            } | null;
+            /** Visible */
+            visible?: boolean | null;
         };
         /** ReleaseNotes */
         ReleaseNotes: {
@@ -1108,6 +1236,255 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    list_presets_api_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresetListOut"];
+                };
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    create_preset_api_presets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresetCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresetOut"];
+                };
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    reorder_presets_api_presets_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresetOrder"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresetListOut"];
+                };
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    delete_preset_api_presets__preset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Conflito com o estado atual */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Entrada inválida */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    update_preset_api_presets__preset_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresetUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresetOut"];
+                };
             };
             /** @description Não encontrado */
             404: {

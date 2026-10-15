@@ -2,11 +2,14 @@ import type {
   DiskUsage,
   Export,
   Job,
+  MixPreset,
   MixState,
+  PresetStem,
   SearchResult,
   Session,
   SessionList,
   SessionState,
+  Stem,
   SystemUpdate,
   UpdateRun,
   YtDlpStatus,
@@ -108,7 +111,6 @@ export function makeMix(overrides: Partial<MixState> = {}): MixState {
       bass: { ...STEM_DEFAULT },
       other: { ...STEM_DEFAULT },
     },
-    preset: 'original',
     loop_a_s: null,
     loop_b_s: null,
     updated_at: null,
@@ -116,12 +118,45 @@ export function makeMix(overrides: Partial<MixState> = {}): MixState {
   };
 }
 
+export function makePreset(
+  name: string,
+  position: number,
+  levels: Partial<Record<Stem, Partial<PresetStem>>> = {},
+  visible = true,
+): MixPreset {
+  const stem = (s: Stem) => ({ volume: 100, pan: 0, mute: false, ...levels[s] });
+  return {
+    id: uuid(),
+    name,
+    position,
+    visible,
+    stems: {
+      vocals: stem('vocals'),
+      drums: stem('drums'),
+      bass: stem('bass'),
+      other: stem('other'),
+    },
+  };
+}
+
+/** Os cinco presets que a migration cria. */
+export function makeDefaultPresets(): MixPreset[] {
+  const mute = { mute: true };
+  return [
+    makePreset('Original', 0),
+    makePreset('Sem voz', 1, { vocals: mute }),
+    makePreset('Sem bateria', 2, { drums: mute }),
+    makePreset('Sem baixo', 3, { bass: mute }),
+    makePreset('Só voz', 4, { drums: mute, bass: mute, other: mute }),
+  ];
+}
+
 export function makeExport(overrides: Partial<Export> = {}): Export {
   return {
     id: uuid(),
     session_id: uuid(),
     format: 'mp3',
-    preset: 'original',
+    preset: 'Original',
     stems: makeMix().stems,
     state: 'done',
     progress: 100,

@@ -6,7 +6,8 @@ import { formatDb } from '../../lib/format';
 import { Fader } from './Fader';
 import { LoopABControl } from './LoopABControl';
 import { MetricsBadge } from './MetricsBadge';
-import type { PresetId } from './mixState';
+import type { MixPreset } from '../../api/types';
+import { makeDefaultPresets } from '../../test/fixtures';
 import { MuteSoloButton } from './MuteSoloButton';
 import { PanControl } from './PanControl';
 import { PresetSelector } from './PresetSelector';
@@ -138,23 +139,30 @@ describe('MuteSoloButton', () => {
 });
 
 describe('PresetSelector', () => {
+  const presets = makeDefaultPresets();
+  const named = (name: string): MixPreset => {
+    const found = presets.find((p) => p.name === name);
+    if (!found) throw new Error(name);
+    return found;
+  };
+
   it('marca o preset ativo e troca com clique e setas', async () => {
-    const onChange = vi.fn<(preset: PresetId) => void>();
-    render(<PresetSelector value="no_drums" onChange={onChange} />);
+    const onChange = vi.fn<(preset: MixPreset) => void>();
+    render(<PresetSelector presets={presets} value={named('Sem bateria')} onChange={onChange} />);
     expect(screen.getByRole('radio', { name: 'Sem bateria' })).toHaveAttribute(
       'aria-checked',
       'true',
     );
     expect(screen.queryByText('Personalizado')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: 'Só voz' }));
-    expect(onChange).toHaveBeenLastCalledWith('vocals_only');
+    expect(onChange).toHaveBeenLastCalledWith(named('Só voz'));
     screen.getByRole('radio', { name: 'Sem bateria' }).focus();
     await userEvent.keyboard('{ArrowRight}');
-    expect(onChange).toHaveBeenLastCalledWith('no_bass');
+    expect(onChange).toHaveBeenLastCalledWith(named('Sem baixo'));
   });
 
   it('com mix fora dos presets mostra "Personalizado" e o primeiro recebe o Tab', async () => {
-    render(<PresetSelector value="custom" onChange={vi.fn()} />);
+    render(<PresetSelector presets={presets} value={null} onChange={vi.fn()} />);
     expect(screen.getByText('Personalizado')).toBeInTheDocument();
     expect(
       screen.getAllByRole('radio').every((r) => r.getAttribute('aria-checked') === 'false'),
@@ -164,8 +172,41 @@ describe('PresetSelector', () => {
   });
 
   it('a grade do Modo prática sempre mostra "Personalizado"', () => {
-    render(<PresetSelector value="original" onChange={vi.fn()} variant="grid" />);
+    render(
+      <PresetSelector
+        presets={presets}
+        value={named('Original')}
+        onChange={vi.fn()}
+        variant="grid"
+      />,
+    );
     expect(screen.getByText('Personalizado')).toBeInTheDocument();
+  });
+
+  it('presets escondidos ficam atrás do "Mais"', async () => {
+    const onChange = vi.fn<(preset: MixPreset) => void>();
+    const hiddenVoice = { ...named('Sem voz'), visible: false };
+    const list = [named('Original'), hiddenVoice, { ...named('Sem baixo'), visible: false }];
+    render(<PresetSelector presets={list} value={named('Original')} onChange={onChange} />);
+    expect(screen.queryByRole('radio', { name: 'Sem voz' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Mais presets' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Sem voz' }));
+    expect(onChange).toHaveBeenLastCalledWith(hiddenVoice);
+  });
+
+  it('o preset ativo aparece mesmo escondido, e sem escondidos não há "Mais"', () => {
+    const hiddenVoice = { ...named('Sem voz'), visible: false };
+    const { rerender } = render(
+      <PresetSelector
+        presets={[named('Original'), hiddenVoice]}
+        value={hiddenVoice}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('radio', { name: 'Sem voz' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('button', { name: 'Mais presets' })).not.toBeInTheDocument();
+    rerender(<PresetSelector presets={presets} value={null} onChange={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Mais presets' })).not.toBeInTheDocument();
   });
 });
 

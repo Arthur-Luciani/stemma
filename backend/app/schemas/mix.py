@@ -3,7 +3,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.domain.enums import MixPreset, Stem
+from app.domain.enums import Stem
 
 
 class StemMix(BaseModel):
@@ -19,7 +19,6 @@ class MixStateIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     stems: dict[Stem, StemMix]
-    preset: MixPreset
     loop_a_s: Annotated[float, Field(ge=0)] | None = None
     loop_b_s: Annotated[float, Field(ge=0)] | None = None
 

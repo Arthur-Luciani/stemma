@@ -14,6 +14,7 @@ from app.api import (
     jobs,
     media,
     mix,
+    presets,
     search,
     sessions,
     system,
@@ -131,6 +132,7 @@ def create_app(
     app.include_router(health.router)
     app.include_router(sessions.router)
     app.include_router(mix.router)
+    app.include_router(presets.router)
     app.include_router(artists.router)
     app.include_router(jobs.router)
     app.include_router(search.router)

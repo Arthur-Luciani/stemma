@@ -344,7 +344,6 @@ def _any_mix() -> dict[str, object]:
     stem = {"volume": 50, "pan": 0, "mute": False, "solo": False}
     return {
         "stems": {s: stem for s in ("vocals", "drums", "bass", "other")},
-        "preset": "custom",
     }
 
 

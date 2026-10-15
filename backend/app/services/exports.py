@@ -7,7 +7,7 @@ from pathlib import Path
 from sqlalchemy import select
 
 from app.db.models import ExportModel, JobModel, SessionModel
-from app.domain.enums import STEMS, ExportState, JobKind, JobState, MixPreset, SessionState
+from app.domain.enums import STEMS, ExportState, JobKind, JobState, SessionState
 from app.domain.errors import ConflictError, NotFoundError
 from app.pipeline.audio import active_stems, no_active_stems
 from app.pipeline.queue import JobRunner
@@ -47,12 +47,8 @@ class ExportService:
             raise ConflictError(
                 "session_not_ready", "A sessão ainda não está pronta para exportar."
             )
-        preset: MixPreset | None = data.preset
-        if data.stems is None:
-            saved = self.mix.get(session_id)
-            levels, preset = saved.stems, preset or saved.preset
-        else:
-            levels = data.stems
+        preset = data.preset
+        levels = self.mix.get(session_id).stems if data.stems is None else data.stems
         available = {stem for stem in STEMS if stem.value in session.stems}
         if not active_stems(levels, available=available):
             raise no_active_stems()

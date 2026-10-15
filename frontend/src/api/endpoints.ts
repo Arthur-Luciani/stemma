@@ -4,8 +4,11 @@ import type {
   Export,
   ExportFormat,
   Job,
+  MixPreset,
   MixState,
   MixStateIn,
+  PresetCreate,
+  PresetUpdate,
   SearchResult,
   Session,
   SessionCreate,
@@ -116,6 +119,32 @@ export function saveMix(
   );
 }
 
+export async function listPresets(signal?: AbortSignal): Promise<MixPreset[]> {
+  const data = await call(() => apiClient.GET('/api/presets', { signal }));
+  return data.items;
+}
+
+export function createPreset(body: PresetCreate): Promise<MixPreset> {
+  return call(() => apiClient.POST('/api/presets', { body }));
+}
+
+export function updatePreset(id: string, body: PresetUpdate): Promise<MixPreset> {
+  return call(() =>
+    apiClient.PATCH('/api/presets/{preset_id}', { params: { path: { preset_id: id } }, body }),
+  );
+}
+
+export async function deletePreset(id: string): Promise<void> {
+  await call(() =>
+    apiClient.DELETE('/api/presets/{preset_id}', { params: { path: { preset_id: id } } }),
+  );
+}
+
+export async function reorderPresets(ids: string[]): Promise<MixPreset[]> {
+  const data = await call(() => apiClient.PUT('/api/presets/order', { body: { ids } }));
+  return data.items;
+}
+
 export async function listExports(id: string, signal?: AbortSignal): Promise<Export[]> {
   const data = await call(() =>
     apiClient.GET('/api/sessions/{session_id}/exports', { ...path(id), signal }),
@@ -123,10 +152,16 @@ export async function listExports(id: string, signal?: AbortSignal): Promise<Exp
   return data.items;
 }
 
-/** Sem `stems`, o backend usa o mix salvo: salve antes de pedir. */
-export function createExport(id: string, format: ExportFormat): Promise<Export> {
+/**
+ * Sem `stems`, o backend usa o mix salvo: salve antes de pedir. `preset` é o nome do preset
+ * que o mix bate (snapshot para o histórico); sem ele, o export não mostra preset.
+ */
+export function createExport(id: string, format: ExportFormat, preset?: string): Promise<Export> {
   return call(() =>
-    apiClient.POST('/api/sessions/{session_id}/exports', { ...path(id), body: { format } }),
+    apiClient.POST('/api/sessions/{session_id}/exports', {
+      ...path(id),
+      body: { format, preset },
+    }),
   );
 }
 

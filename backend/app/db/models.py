@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, Enum, ForeignKey, Index, MetaData, String, Text, Uuid
+from sqlalchemy import JSON, Boolean, Enum, ForeignKey, Index, MetaData, String, Text, Uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.db.types import UTCDateTime, utcnow
@@ -14,11 +14,11 @@ from app.domain.enums import (
     ExportState,
     JobKind,
     JobState,
-    MixPreset,
     SessionState,
     UpdateComponent,
     UpdateState,
 )
+from app.domain.presets import MAX_PRESET_NAME
 
 NAMING_CONVENTION = {
     "ix": "ix_%(table_name)s_%(column_0_N_name)s",
@@ -91,7 +91,8 @@ class ExportModel(Base):
         ForeignKey("sessions.id", ondelete="CASCADE"), index=True
     )
     format: Mapped[ExportFormat] = mapped_column(_enum(ExportFormat))
-    preset: Mapped[MixPreset | None] = mapped_column(_enum(MixPreset))
+    # Snapshot do nome do preset no pedido (o preset pode ser renomeado ou excluído depois).
+    preset: Mapped[str | None] = mapped_column(String(MAX_PRESET_NAME))
     # Snapshot dos níveis usados: {stem: {volume, pan, mute, solo}}
     levels: Mapped[dict[str, Any]] = mapped_column(JSON)
     state: Mapped[ExportState] = mapped_column(_enum(ExportState), default=ExportState.QUEUED)
@@ -160,10 +161,23 @@ class MixStateModel(Base):
     )
     # {stem: {volume: 0–100, pan: -1..1, mute: bool, solo: bool}}
     stems: Mapped[dict[str, Any]] = mapped_column(JSON)
-    preset: Mapped[MixPreset] = mapped_column(_enum(MixPreset), default=MixPreset.ORIGINAL)
     loop_a_s: Mapped[float | None]
     loop_b_s: Mapped[float | None]
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class MixPresetModel(Base):
+    """Perfil de som do usuário (global, vale para qualquer música). ADR 0018."""
+
+    __tablename__ = "mix_presets"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(MAX_PRESET_NAME), unique=True)
+    position: Mapped[int]
+    # Aparece no seletor do mixer; os demais ficam atrás do botão "Mais".
+    visible: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+    # {stem: {volume: 0–100, pan: -1..1, mute: bool}}; solo não entra.
+    stems: Mapped[dict[str, Any]] = mapped_column(JSON)
 
 
 class SystemUpdateModel(Base):

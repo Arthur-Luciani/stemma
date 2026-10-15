@@ -28,7 +28,7 @@ export function ConsoleMixer({
   const root = useRef<HTMLDivElement>(null);
   const time = useRef<HTMLSpanElement>(null);
   usePlayhead(engine, root, time, formatShortClock);
-  const { state, preset, dispatch } = mixer;
+  const { state, presets, preset, dispatch } = mixer;
 
   return (
     <div ref={root} className={styles.console}>
@@ -122,6 +122,7 @@ export function ConsoleMixer({
           <PresetSelector
             variant="pills"
             className={styles.consolePresets}
+            presets={presets}
             value={preset}
             onChange={(p) => {
               dispatch({ type: 'preset', preset: p });

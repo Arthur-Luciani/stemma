@@ -1,9 +1,11 @@
 import uuid
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.domain.enums import ExportFormat, ExportState, MixPreset, Stem
+from app.domain.enums import ExportFormat, ExportState, Stem
+from app.domain.presets import MAX_PRESET_NAME
 from app.schemas.mix import StemMix
 
 
@@ -13,7 +15,8 @@ class ExportCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     format: ExportFormat
-    preset: MixPreset | None = None
+    # Nome do preset aplicado (snapshot para o histórico); sem ele, o export não mostra preset.
+    preset: Annotated[str, Field(min_length=1, max_length=MAX_PRESET_NAME)] | None = None
     stems: dict[Stem, StemMix] | None = None
 
     @field_validator("stems")
@@ -30,7 +33,7 @@ class ExportOut(BaseModel):
     id: uuid.UUID
     session_id: uuid.UUID
     format: ExportFormat
-    preset: MixPreset | None
+    preset: str | None
     # Níveis usados no export (snapshot do mix no momento do pedido).
     stems: dict[Stem, StemMix]
     state: ExportState

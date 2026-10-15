@@ -132,3 +132,12 @@
     background: var(--bg-soft);
   }
 }
+
+/* "Mais": o menu dos presets que não aparecem no seletor. */
+.more {
+  flex: none;
+}
+
+.pills .more {
+  align-self: center;
+}

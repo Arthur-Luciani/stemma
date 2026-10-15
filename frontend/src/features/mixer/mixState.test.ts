@@ -1,4 +1,8 @@
+import { makeDefaultPresets, makePreset } from '../../test/fixtures';
+import type { MixPreset } from '../../api/types';
 import {
+  applyPreset,
+  DEFAULT_STEM,
   effectiveVolume,
   formatPan,
   loopFromDrag,
@@ -7,25 +11,31 @@ import {
   fromServer,
   matchPreset,
   mixerReducer,
-  presetStems,
-  PRESETS,
   toMixStateIn,
   type MixerState,
 } from './mixState';
 
-const original = (): MixerState => ({ stems: presetStems('original'), loop: null });
+const presets = makeDefaultPresets();
+const byName = (name: string): MixPreset => {
+  const found = presets.find((p) => p.name === name);
+  if (!found) throw new Error(name);
+  return found;
+};
+const original = (): MixerState => ({ stems: applyPreset(byName('Original')), loop: null });
+const matchName = (state: MixerState) => matchPreset(state.stems, presets)?.name ?? null;
 
 describe('presets', () => {
-  it('"Sem X" muta só o X e deixa o resto em 100%, centro e sem solo', () => {
-    const stems = presetStems('no_drums');
-    expect(stems.drums).toEqual({ volume: 100, pan: 0, mute: true, solo: false });
+  it('aplicar usa volume, pan e mute do preset e limpa o solo', () => {
+    const custom = makePreset('Bateria baixa', 5, { drums: { volume: 25, pan: -0.5 } });
+    const stems = applyPreset(custom);
+    expect(stems.drums).toEqual({ volume: 25, pan: -0.5, mute: false, solo: false });
     expect(stems.vocals).toEqual({ volume: 100, pan: 0, mute: false, solo: false });
-    expect(stems.bass.mute).toBe(false);
-    expect(stems.other.mute).toBe(false);
   });
 
-  it('"Só voz" muta os outros três', () => {
-    const stems = presetStems('vocals_only');
+  it('"Sem X" muta só o X e "Só voz" muta os outros três', () => {
+    expect(applyPreset(byName('Sem bateria')).drums.mute).toBe(true);
+    expect(applyPreset(byName('Sem bateria')).bass.mute).toBe(false);
+    const stems = applyPreset(byName('Só voz'));
     expect([stems.vocals.mute, stems.drums.mute, stems.bass.mute, stems.other.mute]).toEqual([
       false,
       true,
@@ -35,12 +45,23 @@ describe('presets', () => {
   });
 
   it('cada preset se reconhece', () => {
-    for (const preset of PRESETS) expect(matchPreset(presetStems(preset))).toBe(preset);
+    for (const preset of presets) expect(matchPreset(applyPreset(preset), presets)).toBe(preset);
+  });
+
+  it('o pan entra no match', () => {
+    const stems = { ...original().stems, bass: { ...DEFAULT_STEM, pan: 0.3 } };
+    expect(matchPreset(stems, presets)).toBeNull();
+  });
+
+  it('com níveis iguais vale o primeiro da ordem; sem nenhum, é null', () => {
+    const copy = makePreset('Cópia', 5);
+    expect(matchPreset(original().stems, [copy, ...presets])?.name).toBe('Cópia');
+    expect(matchPreset(original().stems, [])).toBeNull();
   });
 
   it('mudar qualquer controle vira Personalizado; voltar ao valor de antes volta ao preset', () => {
-    let state = mixerReducer(original(), { type: 'preset', preset: 'no_vocals' });
-    expect(matchPreset(state.stems)).toBe('no_vocals');
+    let state = mixerReducer(original(), { type: 'preset', preset: byName('Sem voz') });
+    expect(matchName(state)).toBe('Sem voz');
 
     for (const action of [
       { type: 'volume', stem: 'bass', value: 80 },
@@ -48,24 +69,21 @@ describe('presets', () => {
       { type: 'solo', stem: 'drums' },
       { type: 'mute', stem: 'bass' },
     ] as const) {
-      const changed = mixerReducer(state, action);
-      expect(matchPreset(changed.stems)).toBe('custom');
+      expect(matchName(mixerReducer(state, action))).toBeNull();
     }
 
     state = mixerReducer(state, { type: 'volume', stem: 'bass', value: 80 });
     state = mixerReducer(state, { type: 'volume', stem: 'bass', value: 100 });
-    expect(matchPreset(state.stems)).toBe('no_vocals');
+    expect(matchName(state)).toBe('Sem voz');
     // Desmutar a voz no "Sem voz" é o Original.
-    expect(matchPreset(mixerReducer(state, { type: 'mute', stem: 'vocals' }).stems)).toBe(
-      'original',
-    );
+    expect(matchName(mixerReducer(state, { type: 'mute', stem: 'vocals' }))).toBe('Original');
   });
 
   it('aplicar um preset limpa solo e pan, mas mantém o loop', () => {
     let state = mixerReducer(original(), { type: 'loop', loop: { a: 10, b: 20 } });
     state = mixerReducer(state, { type: 'solo', stem: 'bass' });
     state = mixerReducer(state, { type: 'pan', stem: 'bass', value: 0.5 });
-    state = mixerReducer(state, { type: 'preset', preset: 'original' });
+    state = mixerReducer(state, { type: 'preset', preset: byName('Original') });
     expect(state.stems.bass).toEqual({ volume: 100, pan: 0, mute: false, solo: false });
     expect(state.loop).toEqual({ a: 10, b: 20 });
   });
@@ -98,7 +116,6 @@ describe('ida e volta com a API', () => {
   it('fromServer completa stems faltando e ignora loop inválido', () => {
     const state = fromServer({
       stems: { vocals: { volume: 50, pan: 0, mute: false, solo: false } },
-      preset: 'custom',
       loop_a_s: 30,
       loop_b_s: 10,
       updated_at: null,
@@ -108,14 +125,14 @@ describe('ida e volta com a API', () => {
     expect(state.loop).toBeNull();
   });
 
-  it('toMixStateIn manda o preset derivado e o loop', () => {
+  it('toMixStateIn manda os stems e o loop, sem preset', () => {
+    const noBass = applyPreset(byName('Sem baixo'));
     const state = mixerReducer(
-      { stems: presetStems('no_bass'), loop: null },
+      { stems: noBass, loop: null },
       { type: 'loop', loop: { a: 58, b: 86 } },
     );
     expect(toMixStateIn(state)).toEqual({
-      stems: presetStems('no_bass'),
-      preset: 'no_bass',
+      stems: noBass,
       loop_a_s: 58,
       loop_b_s: 86,
     });
@@ -165,7 +182,7 @@ describe('marcar loop A–B', () => {
 
 describe('effectiveVolume', () => {
   it('é o volume, ou 0 se mudo ou fora do solo', () => {
-    let stems = presetStems('no_drums');
+    let stems = applyPreset(byName('Sem bateria'));
     expect(effectiveVolume(stems, 'drums')).toBe(0);
     expect(effectiveVolume(stems, 'vocals')).toBe(100);
     stems = mixerReducer({ stems, loop: null }, { type: 'solo', stem: 'bass' }).stems;

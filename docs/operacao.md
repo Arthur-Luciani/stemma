@@ -116,9 +116,9 @@ C:\stemma\
   install.json          serviço e se o instalador ligou o tailscale serve (usado no update e no desinstalador)
   current\              junction → releases\vX.Y.Z (a versão no ar)
   releases\vX.Y.Z\      uma pasta por versão, cada uma com o próprio venv (backend\.venv)
-  tools\                uv, ffmpeg\bin, deno e python\ (versões e SHA256 fixados no StemmaDeploy.psm1)
+  tools\                uv, ffmpeg\bin, deno e python\ (versões e SHA256 fixados no StemmaDeploy.Tools.ps1)
   cache\uv\             cache do uv (no mesmo volume dos venvs, para o hardlink)
-  setup\                Stemma.exe (ícone da bandeja), desinstalador, motor (engine\setup.ps1 + StemmaDeploy.psm1), pacote, QR
+  setup\                Stemma.exe (ícone da bandeja), desinstalador, motor (engine\setup.ps1 + StemmaDeploy.psm1 e StemmaDeploy.*.ps1), pacote, QR
   winsw\                stemma.exe (WinSW 2.12) + stemma.xml
   logs\                 serviço (stemma.out.log / stemma.err.log, rotação), setup-*.log do instalador,
                         update-vX.Y.Z.log (instalador rodado pelo app), app-update-result.txt e

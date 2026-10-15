@@ -55,7 +55,7 @@ Na F5, instalar era rodar `install.ps1` num PowerShell de administrador, com uv,
 
 ## Consequências
 - O Stemma roda com privilégios de sistema. Isso é aceitável num PC pessoal, com o uvicorn escutando só em `127.0.0.1` e o acesso de fora só pelo Tailscale.
-- Trocar a versão de uma ferramenta = trocar versão + SHA256 no `StemmaDeploy.psm1` (o `Install-StemmaTool` reinstala quando a marca `.stemma-tool` não bate).
+- Trocar a versão de uma ferramenta = trocar versão + SHA256 no `StemmaDeploy.Tools.ps1` (o `Install-StemmaTool` reinstala quando a marca `.stemma-tool` não bate).
 - O `.exe` precisa de Inno Setup ≥ 6.3 (`ExecAndLogOutput`/`ExecAndCaptureOutput`).
 - Ensaio sem tocar na instalação real: `/ROOT=… /SERVICEID=… /PORT=… /DATAROOT=… /SKIPTAILSCALE` (outro `AppId`, outra pasta no Menu Iniciar).
 - **Nunca rode o seeder (`Copy-UvCacheSeed` ou `[Stemma.UvCacheSeeder]::Seed`) contra o cache do usuário fora do instalador**. Os arquivos ligados são os mesmos da instalação: com outro destino, ou sem elevação, a ACL deles muda também em `C:\stemma\cache\uv`. Os testes usam caches falsos no `TestDrive`.

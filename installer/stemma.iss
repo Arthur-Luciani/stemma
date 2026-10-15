@@ -1,7 +1,7 @@
 ﻿; Instalador do Stemma (F5b, ADR 0014). Inno Setup 6.3+ (usa ExecAndLogOutput).
 ; Compilar: powershell -File installer\build.ps1 -ZipPath <stemma-vX.Y.Z.zip>
 ; Este arquivo só monta as telas e repassa parâmetros: toda a lógica fica em deploy\setup.ps1
-; e deploy\StemmaDeploy.psm1.
+; e deploy\StemmaDeploy.psm1 (com as partes StemmaDeploy.*.ps1).
 ;
 ; Linha de comando (além das do Inno):
 ;   /SIMULATEFAILURE   na atualização, faz o /health da versão nova falhar (teste do rollback)
@@ -54,10 +54,13 @@ brazilianportuguese.ReadyLabel2b=Confira o que vai ser feito e clique em Instala
 
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\payload"
+; Partes do motor de uma versão anterior (o StemmaDeploy.psm1 só carrega as da lista dele).
+Type: files; Name: "{app}\engine\StemmaDeploy.*.ps1"
 
 [Files]
 Source: "..\deploy\setup.ps1"; DestDir: "{app}\engine"; Flags: ignoreversion
 Source: "..\deploy\StemmaDeploy.psm1"; DestDir: "{app}\engine"; Flags: ignoreversion
+Source: "..\deploy\StemmaDeploy.*.ps1"; DestDir: "{app}\engine"; Flags: ignoreversion
 Source: "qr.py"; DestDir: "{app}\engine"; Flags: ignoreversion
 Source: "{#PayloadDir}\segno-*.whl"; DestDir: "{app}\engine"; Flags: ignoreversion
 Source: "{#PayloadDir}\{#ZipName}"; DestDir: "{app}\payload"; Flags: ignoreversion
@@ -68,6 +71,7 @@ Source: "{#PayloadDir}\Stemma.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; Cópias para a checagem antes de instalar (extraídas em {tmp}).
 Source: "..\deploy\setup.ps1"; Flags: dontcopy
 Source: "..\deploy\StemmaDeploy.psm1"; Flags: dontcopy
+Source: "..\deploy\StemmaDeploy.*.ps1"; Flags: dontcopy
 ; uv.lock da release (build.ps1): estimativa de download e espaço na tela "Pronto para instalar".
 Source: "{#PayloadDir}\uv.lock"; Flags: dontcopy
 
@@ -238,6 +242,7 @@ function TempEngine: String;
 begin
   ExtractTemporaryFile('setup.ps1');
   ExtractTemporaryFile('StemmaDeploy.psm1');
+  ExtractTemporaryFiles('{tmp}\StemmaDeploy.*.ps1');
   Result := ExpandConstant('{tmp}\setup.ps1');
 end;
 

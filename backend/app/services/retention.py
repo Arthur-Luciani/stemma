@@ -19,7 +19,7 @@ from app.storage import BACKUPS_DIR, Storage
 
 logger = logging.getLogger(__name__)
 
-# Nome dos backups do banco (`deploy/StemmaDeploy.psm1`, `New-BackupPath`).
+# Nome dos backups do banco (`deploy/StemmaDeploy.Flows.ps1`, `New-BackupPath`).
 BACKUP_PATTERN = "stemma-*.db"
 
 

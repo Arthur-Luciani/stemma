@@ -37,7 +37,7 @@ frontend/  React + TypeScript + Vite
   src/features/   discover, library, session, mixer (hooks + componentes da feature)
   src/ui/         componentes base do design system
   src/audio/      AudioEngine (fora do React)
-deploy/    WinSW XML, start.ps1, setup.ps1 (motor do instalador), install.ps1, update.ps1 (funções em StemmaDeploy.psm1)
+deploy/    WinSW XML, start.ps1, setup.ps1 (motor do instalador), install.ps1, update.ps1 (funções no StemmaDeploy.psm1, divididas por assunto em StemmaDeploy.<Assunto>.ps1)
 installer/ Inno Setup (stemma.iss) + build.ps1 + qr.py — casca sem lógica sobre o deploy/
 ```
 

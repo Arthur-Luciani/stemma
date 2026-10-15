@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/Arthur-Luciani/stemma/compare/v1.8.0...v1.9.0) (2026-10-15)
+
+
+### Features
+
+* presets de mix editáveis, globais e com pan no match ([#59](https://github.com/Arthur-Luciani/stemma/issues/59)) ([9714730](https://github.com/Arthur-Luciani/stemma/commit/9714730bde81551813111835e41de119f6551302))
+
 ## [1.8.0](https://github.com/Arthur-Luciani/stemma/compare/v1.7.0...v1.8.0) (2026-10-15)
 
 

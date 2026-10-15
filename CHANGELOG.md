@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.0](https://github.com/Arthur-Luciani/stemma/compare/v1.7.0...v1.8.0) (2026-10-15)
+
+
+### Features
+
+* continuar tocando fora do mixer, com barrinha de reprodução ([#58](https://github.com/Arthur-Luciani/stemma/issues/58)) ([a9ad51e](https://github.com/Arthur-Luciani/stemma/commit/a9ad51ea46eb8d92b859c1ca1f706eb73a0b4a71))
+* limitar backups e exports antigos e mostrar o uso de disco ([#56](https://github.com/Arthur-Luciani/stemma/issues/56)) ([4cf8688](https://github.com/Arthur-Luciani/stemma/commit/4cf86889d23781a93e808dfed4a03b8023712436))
+
 ## [1.7.0](https://github.com/Arthur-Luciani/stemma/compare/v1.6.0...v1.7.0) (2026-10-14)
 
 

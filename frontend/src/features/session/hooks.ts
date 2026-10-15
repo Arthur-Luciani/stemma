@@ -14,10 +14,11 @@ import { clearLastSession, setLastSession } from '../../app/lastSession';
 import { queryKeys } from '../../app/queryKeys';
 import { useErrorToast } from '../../app/useErrorToast';
 
-export function useSession(id: string) {
+export function useSession(id: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.session(id),
     queryFn: ({ signal }) => getSession(id, signal),
+    enabled,
   });
 }
 

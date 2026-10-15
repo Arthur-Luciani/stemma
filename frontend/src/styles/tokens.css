@@ -100,7 +100,8 @@
   --topbar-height: 60px;
   --bottomnav-height: 64px;
   --content-max: 1200px;
-  --z-dock: 20;
+  --z-player: 20;
+  --z-dock: 21;
   --z-nav: 30;
   --z-sheet: 40;
   --z-toast: 50;

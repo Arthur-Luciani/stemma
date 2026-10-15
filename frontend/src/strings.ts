@@ -300,6 +300,15 @@ export const strings = {
     started: 'Export na fila.',
     close: 'Fechar',
   },
+  player: {
+    region: 'Player',
+    play: 'Tocar',
+    pause: 'Pausar',
+    close: 'Fechar player',
+    progress: 'Progresso da música',
+    openMixer: (title: string, artist: string) =>
+      artist ? `Abrir mixer: ${title}, ${artist}` : `Abrir mixer: ${title}`,
+  },
   devEngine: {
     title: 'Teste do AudioEngine',
     hint: 'Página técnica (só em desenvolvimento): toca os 4 stems e mede a sincronia.',

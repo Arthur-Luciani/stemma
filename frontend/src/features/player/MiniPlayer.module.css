@@ -1,0 +1,211 @@
+.bar {
+  position: fixed;
+  z-index: var(--z-player);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 64px;
+  padding: 0 10px;
+  border-radius: 14px;
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+  animation: enter 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Celular: colada acima da bottom nav. */
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: calc(var(--bottomnav-height) + env(safe-area-inset-bottom) + var(--space-2));
+}
+
+.open {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: inherit;
+  text-decoration: none;
+  border-radius: 10px;
+}
+
+.open:focus-visible,
+.play:focus-visible,
+.close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cover {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+  display: block;
+}
+
+.fallback {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  padding-bottom: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+}
+
+.fallback span {
+  width: 3px;
+  border-radius: 2px;
+}
+
+.fallback span:nth-child(1) {
+  height: 8px;
+  background: var(--stem-vocals);
+}
+.fallback span:nth-child(2) {
+  height: 15px;
+  background: var(--stem-drums);
+}
+.fallback span:nth-child(3) {
+  height: 11px;
+  background: var(--stem-bass);
+}
+.fallback span:nth-child(4) {
+  height: 5px;
+  background: var(--stem-other);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.title,
+.artist {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.artist {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.play,
+.close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+
+.play {
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.play:disabled {
+  cursor: default;
+}
+
+/* O spinner é warn por padrão; sobre o âmbar do play ele usa a tinta do botão. */
+.play > span {
+  border-color: transparent;
+  border-top-color: var(--accent-ink);
+  border-right-color: var(--accent-ink);
+}
+
+.close {
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-body);
+}
+
+.progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--line);
+}
+
+.fill {
+  height: 100%;
+  width: calc(var(--progress, 0) * 100%);
+  background: var(--text-strong);
+}
+
+.loading .fill {
+  background: var(--text-muted);
+}
+
+@keyframes enter {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+/* Desktop (mesma query do `DESKTOP_QUERY`): canto inferior esquerdo, sem cobrir o dock. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .bar {
+    left: var(--space-5);
+    right: auto;
+    bottom: var(--space-5);
+    width: 360px;
+  }
+}
+
+/* Celular deitado: compacta, à direita, sem sombra. */
+@media (orientation: landscape) and (max-height: 599px) {
+  .bar {
+    left: auto;
+    right: var(--space-2);
+    width: min(420px, calc(100% - 2 * var(--space-2)));
+    height: 52px;
+    padding: 0 var(--space-2) 0 var(--space-2);
+    gap: 4px;
+    border-radius: 10px;
+    box-shadow: none;
+  }
+
+  .cover {
+    width: 36px;
+    height: 36px;
+  }
+
+  .fallback {
+    padding-bottom: 9px;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    animation: fade 120ms linear;
+  }
+}

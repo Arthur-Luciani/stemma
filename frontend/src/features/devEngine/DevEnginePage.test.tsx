@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
+import { player } from '../../audio/player';
 import { FakeAudioContext, FakeMedia } from '../../test/audio';
 import { makeSession, sessionList } from '../../test/fixtures';
 import { renderApp } from '../../test/render';
@@ -41,7 +42,7 @@ describe('/dev/engine', () => {
     vi.restoreAllMocks();
   });
 
-  it('carrega a sessão escolhida, toca, mede e fecha o contexto ao sair', async () => {
+  it('carrega a sessão escolhida, toca, mede e fecha o contexto ao fechar o player', async () => {
     const session = makeSession({ code: 'ST-007', title: 'Let It Be', artist: 'The Beatles' });
     server.use(
       http.get('*/api/sessions', () => HttpResponse.json(sessionList([session]))),
@@ -78,9 +79,10 @@ describe('/dev/engine', () => {
     expect(screen.getByRole('button', { name: 'Copiar relatório' })).toBeInTheDocument();
     expect(screen.getByText(/"thresholdMs": 30/)).toBeInTheDocument();
 
+    // Sair da página não solta o áudio: o engine é do player do app.
     await router.navigate('/sessions');
-    await waitFor(() => {
-      expect(contexts[0]?.state).toBe('closed');
-    });
+    expect(contexts[0]?.state).toBe('running');
+    player.close();
+    expect(contexts[0]?.state).toBe('closed');
   });
 });

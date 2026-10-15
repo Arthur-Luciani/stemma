@@ -24,3 +24,28 @@
 .main {
   width: 100%;
 }
+
+/*
+ * Com a barrinha de reprodução (64 + 8 de respiro), o conteúdo ganha espaço no fim e a pílula
+ * de processamento sobe (`--player-offset`, lido em ProcessingPill.module.css).
+ * No celular deitado a barrinha é compacta (52).
+ */
+.withBar {
+  --player-offset: 72px;
+}
+
+.mobile.withBar {
+  padding-bottom: calc(
+    var(--bottomnav-height) + 76px + var(--player-offset) + env(safe-area-inset-bottom)
+  );
+}
+
+.desktop.withBar {
+  padding-bottom: 112px;
+}
+
+@media (orientation: landscape) and (max-height: 599px) {
+  .withBar {
+    --player-offset: 60px;
+  }
+}

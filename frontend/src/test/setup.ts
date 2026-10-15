@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 
+import { player } from '../audio/player';
 import { resetViewport, installMatchMedia } from './media';
 import { pwaFake } from './pwaRegister';
 import { server } from './server';
@@ -42,6 +43,8 @@ beforeAll(() => {
 
 afterEach(() => {
   cleanup();
+  // O player é do app (sobrevive ao unmount do mixer): cada teste começa com ele fechado.
+  player.close();
   server.resetHandlers();
   resetViewport();
   FakeWebSocket.instances.length = 0;

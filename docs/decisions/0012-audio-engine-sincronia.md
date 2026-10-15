@@ -28,7 +28,7 @@ A ADR 0006 escolheu 4 `<audio>` em streaming com re-sync periódico, mas deixou 
 - O laço de controle (loop A–B, fim, `timeupdate`, re-sync) roda num `setInterval` de 25 ms e também no `timeupdate` do primeiro `<audio>`. Esse evento continua com a aba em segundo plano, onde os timers são estrangulados.
 - Ao voltar para a aba (`visibilitychange`), o engine retoma o contexto se foi suspenso e mede/corrige na hora.
 - `navigator.audioSession.type = "playback"` quando existir (iOS).
-- `dispose()` solta os `src`, desconecta os nós e fecha o `AudioContext`.
+- `dispose()` solta os `src`, desconecta os nós e fecha o `AudioContext`. Quem chama é o `Player` do app, ao fechar a barrinha ou trocar de música, e não mais o unmount do mixer ([ADR 0017](0017-player-global.md)).
 
 ### Waveform
 - **Canvas próprio**, sem wavesurfer. Os peaks do backend (1600 pontos) são reamostrados pelo máximo de cada trecho para barras de 2 px com 1 px de espaço.

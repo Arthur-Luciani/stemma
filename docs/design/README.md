@@ -110,6 +110,32 @@ Stem mutado = cor a 30% de opacidade + waveform tracejada. A cor **sempre** acom
   - **1f Modo prática**: tempo 44px, play 104px, presets 72px, loop A–B arrastando na timeline; botão "Ajustar" abre o mixer fino.
   - **1g Paisagem**: console horizontal.
 
+## Mini player (barrinha de reprodução global)
+
+Fonte: `docs/design/mini-player.md` e `MiniPlayer.dc.html` no projeto do Claude Design. Aparece em todas as telas **fora do mixer**; tocar na barra (fora dos botões) abre `/sessions/:id/mix`. Decisão de arquitetura: [ADR 0017](../decisions/0017-player-global.md).
+
+| Item | Valor |
+|---|---|
+| Altura | 64 (celular retrato, desktop) · 52 compacta (paisagem) |
+| Fundo / raio | `bg-raised` · r14 (compacta r10) · sombra `--shadow-float` (compacta sem sombra) |
+| Padding / gap | 10 nas pontas (compacta 8) · miniatura↔texto 12 · entre botões 4 |
+| Miniatura | 44×44 r10 (compacta 36) · fallback `bg-surface` + `line` + 4 barras dos stems |
+| Título / artista | Sora 15/600 `text-strong` · 13/400 `text-muted` · 1 linha, ellipsis |
+| Tocar / Pausar | 44, círculo `accent`, ícone 28 preenchido `accent-ink` · único accent da barra |
+| Fechar player | 44 ghost r10, ícone `close` 22 `text-body` |
+| Progresso | 2px na borda inferior · trilho `line` · preenchimento `text-strong` (`text-muted` carregando) via `--progress` |
+| Posição celular | fixed · inset 8 · acima da bottom nav + safe area + 8 |
+| Posição paisagem | à direita, max-width 420 |
+| Posição desktop | fixed · left 24 · bottom 24 · width 360 (o dock de processamento fica à direita) |
+| z-index | barrinha 20 (`--z-player`) · pílula/dock 21 (`--z-dock`) · bottom nav 30 |
+| Empilhamento no celular | safe area → bottom nav 64 → 8 → barrinha 64 → 8 → pílula 52 (a pílula sobe pelo `--player-offset`) |
+| Estados | tocando `pause` · pausada `play_arrow` · carregando spinner + `aria-busy` |
+| A11y | `<section aria-label="Player">` · link "Abrir mixer: {título}, {artista}" · "Tocar"/"Pausar", "Fechar player" · `role="progressbar"` sem aria-live |
+| Foco | `:focus-visible` outline 2px `accent`, offset 2 · ordem: barra → play → fechar |
+| Entrada | translateY(100%→0) + opacity, 240ms `cubic-bezier(.2,.8,.2,1)` · reduced motion: só opacity, 120ms |
+
+Reservado para a fila (#45): um botão "próxima" de 44 entre Tocar/Pausar e Fechar; a altura não muda.
+
 ## Decisões pendentes
 
 - [x] **Mixer no celular** (decidido na F4a, 2026-10-05): **1f (Modo prática) é a tela inicial do mixer**; "Ajustar" abre **1e (Lanes compactas)**; ao girar para paisagem, **1g**.
@@ -185,3 +211,9 @@ Feitos na F5c (atualizar pelo app), de propósito:
   - com job ativo: botão desabilitado e aviso em `warn-text`.
 - Não confundir com o toast "Nova versão disponível · Recarregar" do PWA, que aparece depois que o servidor já atualizou.
 
+Feitos na #44 (barrinha de reprodução), de propósito:
+
+- **Paisagem**: a bottom nav do app não tem variante deitada, então a barrinha compacta fica **acima da nav, à direita** (e não "dentro da linha da nav").
+- **Sem animação de saída**: a barrinha entra com a animação do design, mas some na hora ao fechar (a saída de 180 ms exigiria atrasar o unmount).
+- **Fim da música**: a barrinha fica com o play e o progresso cheio, como o mixer; o design pedia `--progress: 0`. Tocar de novo recomeça do início.
+- **Desktop < 820px** não existe: o desktop do app começa em 900×600, então a regra de empilhar sob o dock não foi implementada.

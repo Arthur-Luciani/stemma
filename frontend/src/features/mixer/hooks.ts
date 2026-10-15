@@ -1,12 +1,12 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { useEffect, useState, useSyncExternalStore, type RefObject } from 'react';
+import { useEffect, useSyncExternalStore, type RefObject } from 'react';
 
-import { getPeaks, listExports, stemUrl } from '../../api/endpoints';
+import { getPeaks, listExports } from '../../api/endpoints';
 import type { Stem, StemPeaks } from '../../api/types';
 import { queryKeys } from '../../app/queryKeys';
 import { AudioEngine, type EngineStats, type PlaybackState } from '../../audio/AudioEngine';
 import { STEMS } from '../../audio/stems';
-import { keepScreenOnWhilePlaying } from '../../audio/wakeLock';
+import { player } from '../../audio/player';
 import { formatClock } from '../../lib/format';
 
 interface EngineHandle {
@@ -15,42 +15,20 @@ interface EngineHandle {
 }
 
 /**
- * Cria o AudioEngine da sessão e o descarta (fechando o `AudioContext`) ao sair ou trocar
- * de sessão. Devolve o engine só depois de os 4 stems terem metadados. Enquanto ele toca, a
- * tela fica acesa.
+ * Conecta o mixer ao player do app ([ADR 0017](../../../../docs/decisions/0017-player-global.md)).
+ * O engine é do player: sair do mixer não o solta, e voltar à mesma sessão pega o que já está
+ * tocando. Devolve o engine só depois de os 4 stems terem metadados.
  */
 export function useAudioEngine(sessionId: string | null): EngineHandle {
-  const [handle, setHandle] = useState<EngineHandle>({ engine: null, error: null });
+  const snapshot = useSyncExternalStore(player.subscribe, player.getSnapshot);
 
   useEffect(() => {
-    if (!sessionId) return;
-    const engine = new AudioEngine();
-    const stopWakeLock = keepScreenOnWhilePlaying(engine);
-    let alive = true;
-    const urls = Object.fromEntries(
-      STEMS.map((stem) => [stem, stemUrl(sessionId, stem)]),
-    ) as Record<Stem, string>;
-    engine.load(urls).then(
-      () => {
-        if (alive) setHandle({ engine, error: null });
-      },
-      (error: unknown) => {
-        if (alive)
-          setHandle({
-            engine: null,
-            error: error instanceof Error ? error.message : String(error),
-          });
-      },
-    );
-    return () => {
-      alive = false;
-      stopWakeLock();
-      engine.dispose();
-      setHandle({ engine: null, error: null });
-    };
+    if (sessionId) player.open(sessionId);
   }, [sessionId]);
 
-  return handle;
+  // Na troca de sessão, o snapshot ainda é o da anterior até o efeito rodar.
+  if (!sessionId || snapshot.sessionId !== sessionId) return { engine: null, error: null };
+  return { engine: snapshot.engine, error: snapshot.error };
 }
 
 const noop = () => undefined;

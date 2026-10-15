@@ -60,7 +60,7 @@ Um processo uvicorn (1 worker) serve `/api`, `/ws` e o `frontend/dist` na mesma 
 - `fetch`/`WebSocket` só em `src/api/`. Server state via TanStack Query; nada de duplicar sessão em contexts.
 - Toda tela tem URL (React Router). O back do Android tem que funcionar.
 - Estilo só com tokens (`var(--…)`) e CSS Modules. Sem hex solto, sem `style={{}}` exceto valores dinâmicos (ex.: posição do playhead).
-- Áudio só pelo `AudioEngine`; React não roda nada a 60 fps. `AudioContext` sempre fechado no unmount.
+- Áudio só pelo `AudioEngine`; React não roda nada a 60 fps. O engine é do `player` do app ([ADR 0017](docs/decisions/0017-player-global.md)): o mixer só se conecta a ele, e o `AudioContext` é fechado ao fechar a barrinha ou trocar de música (nunca no unmount do mixer).
 - Mobile-first; alvos de toque ≥ 44px; nada depende de hover.
 - UI em português do Brasil com acentuação correta; sem CAIXA ALTA em botões.
 

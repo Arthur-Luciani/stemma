@@ -2,7 +2,10 @@
   position: fixed;
   left: var(--space-4);
   right: var(--space-4);
-  bottom: calc(var(--bottomnav-height) + env(safe-area-inset-bottom) + var(--space-3));
+  bottom: calc(
+    var(--bottomnav-height) + env(safe-area-inset-bottom) + var(--space-3) +
+      var(--player-offset, 0px)
+  );
   z-index: var(--z-dock);
   display: flex;
   align-items: center;

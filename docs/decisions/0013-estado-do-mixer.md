@@ -31,7 +31,7 @@ Os presets da v1 (vocal, bateria, karaokê) não correspondem aos da v2 (Origina
 - Os saves entram numa fila (um de cada vez, na ordem), para o último sempre ganhar no servidor.
 - Corpo igual ao último salvo/carregado não é reenviado.
 - **Flush** imediato:
-  - ao sair da tela (unmount);
+  - ao sair da tela (unmount). O áudio pode continuar tocando fora do mixer ([ADR 0017](0017-player-global.md)); o mix só muda dentro dele;
   - no `pagehide` e no `visibilitychange` para `hidden`, com `fetch` `keepalive`, para o save sobreviver ao recarregar ou ao app ir para o fundo no celular;
   - antes de pedir um export, porque o backend exporta o mix salvo.
 - Falha no save vira toast. O próximo save tenta de novo.

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
 import type { Export, MixState, MixStateIn } from '../../api/types';
+import { player } from '../../audio/player';
 import { stubAudioGlobals } from '../../test/audio';
 import { makeExport, makeMix, makeSession } from '../../test/fixtures';
 import { renderApp } from '../../test/render';
@@ -177,14 +178,68 @@ describe('Mixer', () => {
     fireEvent.keyDown(document.body, { code: 'KeyB', key: 'b' });
     // Sair da tela salva o pendente na hora.
     first.unmount();
-    await waitFor(() => {
-      expect(audio.contexts.every((c) => c.state === 'closed')).toBe(true);
-    });
+    // O áudio é do player do app: segue vivo depois do unmount e só some ao recarregar a página.
+    expect(audio.contexts.some((c) => c.state !== 'closed')).toBe(true);
+    player.close();
+    expect(audio.contexts.every((c) => c.state === 'closed')).toBe(true);
 
     audio.media.length = 0;
     await openDesktop(`/sessions/${session.id}/mix`);
     await waitFor(() => {
       expect(screen.getByRole('radio', { name: 'Só voz' })).toHaveAttribute('aria-checked', 'true');
+    });
+  });
+
+  describe('continua tocando fora do mixer', () => {
+    async function leaveWhilePlaying() {
+      const { session } = fakeBackend();
+      const { router } = await openDesktop(`/sessions/${session.id}/mix`);
+      expect(screen.queryByRole('region', { name: 'Player' })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Tocar' }));
+      await router.navigate('/sessions');
+      return { session, router };
+    }
+
+    it('sair do mixer mantém o som e mostra a barrinha com título e artista', async () => {
+      await leaveWhilePlaying();
+      const bar = await screen.findByRole('region', { name: 'Player' });
+      expect(within(bar).getByText('Do It')).toBeInTheDocument();
+      expect(within(bar).getByText('Nelly Furtado')).toBeInTheDocument();
+      expect(within(bar).getByRole('button', { name: 'Pausar' })).toBeInTheDocument();
+      expect(audio.contexts).toHaveLength(1);
+      expect(audio.contexts[0]?.state).not.toBe('closed');
+      expect(audio.media.every((el) => !el.paused)).toBe(true);
+    });
+
+    it('a barrinha pausa e retoma', async () => {
+      await leaveWhilePlaying();
+      const bar = await screen.findByRole('region', { name: 'Player' });
+      await userEvent.click(within(bar).getByRole('button', { name: 'Pausar' }));
+      expect(audio.media.every((el) => el.paused)).toBe(true);
+      await userEvent.click(within(bar).getByRole('button', { name: 'Tocar' }));
+      expect(audio.media.every((el) => !el.paused)).toBe(true);
+    });
+
+    it('tocar na barrinha volta ao mixer da sessão, sem recarregar o áudio', async () => {
+      const { session, router } = await leaveWhilePlaying();
+      const bar = await screen.findByRole('region', { name: 'Player' });
+      await userEvent.click(
+        within(bar).getByRole('link', { name: 'Abrir mixer: Do It, Nelly Furtado' }),
+      );
+      expect(router.state.location.pathname).toBe(`/sessions/${session.id}/mix`);
+      await screen.findByRole('radiogroup', { name: 'Presets' });
+      expect(screen.queryByRole('region', { name: 'Player' })).not.toBeInTheDocument();
+      expect(audio.contexts).toHaveLength(1);
+      expect(audio.media).toHaveLength(4);
+      expect(audio.media.every((el) => !el.paused)).toBe(true);
+    });
+
+    it('fechar a barrinha para o som e solta o AudioContext', async () => {
+      await leaveWhilePlaying();
+      const bar = await screen.findByRole('region', { name: 'Player' });
+      await userEvent.click(within(bar).getByRole('button', { name: 'Fechar player' }));
+      expect(screen.queryByRole('region', { name: 'Player' })).not.toBeInTheDocument();
+      expect(audio.contexts.every((c) => c.state === 'closed')).toBe(true);
     });
   });
 

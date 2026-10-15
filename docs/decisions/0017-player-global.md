@@ -36,3 +36,15 @@ O `AudioEngine` nascia e morria com o mixer: sair para a Biblioteca ou o Descobr
 - A regra "`AudioContext` sempre fechado no unmount" do CLAUDE.md vira "fechado quando o player é fechado ou troca de música".
 - Testes que montam o app precisam fechar o player entre si (`test/setup.ts` faz `player.close()` no `afterEach`).
 - A fila de reprodução (#45) entra como evolução do `Player`: ele passa a ter mais de uma sessão, mas continua dono do único engine.
+
+## Handoff (issue #44)
+**Feito:** `Player`, `useAudioEngine` como cliente, `MiniPlayer` no `AppLayout`, Media Session, testes (`player.test.ts`, 4 casos no `MixerPage.test.tsx`), docs de design.
+
+**Pegadinhas**
+- `player` é singleton de módulo: teste que monta o app precisa começar com ele fechado (`test/setup.ts` já faz `player.close()`); teste de "recarregar a página" chama `player.close()` à mão.
+- `useAudioEngine` devolve `engine: null` enquanto o snapshot é de outra sessão (o efeito de `open` ainda não rodou), então a view nunca ganha o engine da música anterior.
+- A pílula de processamento sobe pelo `--player-offset`, definido em `.withBar` do `AppLayout`; ao mudar a altura da barrinha, mude lá e em `AppLayout.module.css` (padding do conteúdo).
+- `--z-dock` passou de 20 para 21 e `--z-player` é 20 (pílula/dock ficam acima da barrinha, como no design).
+- Não rode `prettier --write` em `frontend/src/api/` (arquivos gerados): reformata e o CI acusa drift do `gen:api`.
+
+**Pendente / para a fila (#45):** conferência no celular (retrato/paisagem, safe area, tela de bloqueio) e a animação de saída da barrinha; o botão "próxima" tem lugar reservado no design.

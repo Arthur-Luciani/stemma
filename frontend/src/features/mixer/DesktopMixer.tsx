@@ -31,12 +31,14 @@ export function DesktopMixer({
   onOpenExport,
   onCloseExport,
   onEdit,
+  onSavePreset,
+  onManagePresets,
 }: MixerViewProps) {
   const root = useRef<HTMLDivElement>(null);
   const time = useRef<HTMLSpanElement>(null);
   usePlayhead(engine, root, time);
 
-  const { state, preset, dispatch } = mixer;
+  const { state, presets, preset, dispatch } = mixer;
   const { handlers, preview } = useTimelineGesture({
     duration,
     onSeek: (seconds) => engine?.seek(seconds),
@@ -74,6 +76,9 @@ export function DesktopMixer({
           </div>
         </div>
         <PresetSelector
+          onSave={onSavePreset}
+          onManage={onManagePresets}
+          presets={presets}
           value={preset}
           onChange={(p) => {
             dispatch({ type: 'preset', preset: p });

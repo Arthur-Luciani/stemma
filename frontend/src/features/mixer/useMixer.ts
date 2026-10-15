@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getMix, saveMix } from '../../api/endpoints';
+import { usePresets } from './presets';
 import type { MixPreset } from '../../api/types';
 import { queryKeys } from '../../app/queryKeys';
 import { useErrorToast } from '../../app/useErrorToast';
@@ -22,8 +23,10 @@ export const SAVE_DEBOUNCE_MS = 600;
 export interface Mixer {
   /** `null` até o mix salvo chegar. */
   state: MixerState | null;
-  /** Derivado do mix: o preset que ele bate, ou `custom`. */
-  preset: MixPreset;
+  /** Todos os presets do usuário, na ordem dele. */
+  presets: MixPreset[];
+  /** Derivado do mix: o primeiro preset que ele bate, ou `null` (Personalizado). */
+  preset: MixPreset | null;
   loadError: unknown;
   dispatch: (action: MixerAction) => void;
   /**
@@ -56,6 +59,7 @@ export function useMixer(
     staleTime: Infinity,
   });
 
+  const presets = usePresets();
   const [state, setState] = useState<MixerState | null>(null);
   const [pendingA, setPendingA] = useState<number | null>(null);
   const pendingARef = useRef<number | null>(null);
@@ -173,7 +177,8 @@ export function useMixer(
 
   return {
     state,
-    preset: stems ? matchPreset(stems) : 'original',
+    presets,
+    preset: stems ? matchPreset(stems, presets) : null,
     loadError: query.error,
     dispatch,
     flush: save,

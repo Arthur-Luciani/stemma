@@ -1,6 +1,6 @@
 /**
  * Estado do mixer (puro, sem React): presets, "Personalizado" derivado e o reducer da tela.
- * O preset nunca é guardado à parte: é sempre o que o mix atual bate (ou "custom").
+ * O preset nunca é guardado à parte: é sempre o que o mix atual bate na lista do servidor (ou `null`).
  */
 
 import type { MixPreset, MixState, MixStateIn, Stem, StemMix } from '../../api/types';
@@ -15,46 +15,27 @@ export interface MixerState {
   loop: { a: number; b: number } | null;
 }
 
-export type PresetId = Exclude<MixPreset, 'custom'>;
-
-/** Ordem de exibição dos presets. */
-export const PRESETS: readonly PresetId[] = [
-  'original',
-  'no_vocals',
-  'no_drums',
-  'no_bass',
-  'vocals_only',
-];
-
-/** Stems mudos em cada preset; os outros ficam em 100%, pan no centro e sem solo. */
-const PRESET_MUTED: Record<PresetId, readonly Stem[]> = {
-  original: [],
-  no_vocals: ['vocals'],
-  no_drums: ['drums'],
-  no_bass: ['bass'],
-  vocals_only: ['drums', 'bass', 'other'],
-};
-
 export const DEFAULT_STEM: StemMix = { volume: 100, pan: 0, mute: false, solo: false };
 
-export function presetStems(preset: PresetId): StemsMix {
-  const muted = PRESET_MUTED[preset];
+/** Aplica o preset: volume, pan e mute dele; o solo sempre sai. */
+export function applyPreset(preset: MixPreset): StemsMix {
   return Object.fromEntries(
-    STEMS.map((stem) => [stem, { ...DEFAULT_STEM, mute: muted.includes(stem) }]),
+    STEMS.map((stem) => [stem, { ...DEFAULT_STEM, ...preset.stems[stem], solo: false }]),
   ) as StemsMix;
 }
 
-function sameStem(a: StemMix, b: StemMix): boolean {
-  return a.volume === b.volume && a.pan === b.pan && a.mute === b.mute && a.solo === b.solo;
+function matches(stems: StemsMix, preset: MixPreset): boolean {
+  return STEMS.every((stem) => {
+    const a = stems[stem];
+    const b = { ...DEFAULT_STEM, ...preset.stems[stem] };
+    // Volume com tolerância de ±1; pan e mute exatos; o solo não conta (ADR 0018).
+    return Math.abs(a.volume - b.volume) <= 1 && a.pan === b.pan && a.mute === b.mute;
+  });
 }
 
-/** O preset que o mix bate exatamente, ou `custom`. */
-export function matchPreset(stems: StemsMix): MixPreset {
-  for (const preset of PRESETS) {
-    const target = presetStems(preset);
-    if (STEMS.every((stem) => sameStem(stems[stem], target[stem]))) return preset;
-  }
-  return 'custom';
+/** O primeiro preset da lista (na ordem do usuário) que o mix bate, ou `null` (Personalizado). */
+export function matchPreset(stems: StemsMix, presets: readonly MixPreset[]): MixPreset | null {
+  return presets.find((preset) => matches(stems, preset)) ?? null;
 }
 
 /** Estado da tela a partir do que veio da API (stems faltando viram o padrão). */
@@ -67,11 +48,10 @@ export function fromServer(mix: MixState): MixerState {
   return { stems, loop: a !== null && b !== null && a < b ? { a, b } : null };
 }
 
-/** Corpo do `PUT /mix`. O preset salvo é o derivado. */
+/** Corpo do `PUT /mix`. O preset não vai: é derivado na tela. */
 export function toMixStateIn(state: MixerState): MixStateIn {
   return {
     stems: state.stems,
-    preset: matchPreset(state.stems),
     loop_a_s: state.loop?.a ?? null,
     loop_b_s: state.loop?.b ?? null,
   };
@@ -85,7 +65,7 @@ export type MixerAction =
   | { type: 'pan'; stem: Stem; value: number }
   | { type: 'mute'; stem: Stem; value?: boolean }
   | { type: 'solo'; stem: Stem; value?: boolean }
-  | { type: 'preset'; preset: PresetId }
+  | { type: 'preset'; preset: MixPreset }
   | { type: 'loop'; loop: { a: number; b: number } | null };
 
 function patchStem(state: MixerState, stem: Stem, patch: Partial<StemMix>): MixerState {
@@ -112,7 +92,7 @@ export function mixerReducer(state: MixerState, action: MixerAction): MixerState
         solo: action.value ?? !state.stems[action.stem].solo,
       });
     case 'preset':
-      return { ...state, stems: presetStems(action.preset) };
+      return { ...state, stems: applyPreset(action.preset) };
     case 'loop':
       return { ...state, loop: action.loop };
   }

@@ -6,7 +6,7 @@ from sqlalchemy.dialects.sqlite import insert
 
 from app.db.models import MixStateModel
 from app.db.types import utcnow
-from app.domain.enums import STEMS, MixPreset
+from app.domain.enums import STEMS
 from app.domain.errors import InvalidInputError
 from app.schemas.mix import MixStateIn, MixStateOut, StemMix
 from app.services.sessions import SessionService
@@ -15,7 +15,6 @@ from app.services.sessions import SessionService
 def default_mix() -> MixStateOut:
     return MixStateOut(
         stems={stem: StemMix() for stem in STEMS},
-        preset=MixPreset.ORIGINAL,
         updated_at=None,
     )
 
@@ -33,7 +32,6 @@ class MixService:
         return MixStateOut.model_validate(
             {
                 "stems": row.stems,
-                "preset": row.preset,
                 "loop_a_s": row.loop_a_s,
                 "loop_b_s": row.loop_b_s,
                 "updated_at": row.updated_at,
@@ -51,7 +49,6 @@ class MixService:
 
         values = {
             "stems": {stem.value: data.stems[stem].model_dump() for stem in STEMS},
-            "preset": data.preset,
             "loop_a_s": data.loop_a_s,
             "loop_b_s": data.loop_b_s,
             "updated_at": utcnow(),

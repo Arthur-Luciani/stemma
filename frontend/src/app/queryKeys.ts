@@ -11,6 +11,7 @@ export const queryKeys = {
   peaks: (id: string, stem: Stem) => ['sessions', 'peaks', id, stem] as const,
   mix: (id: string) => ['sessions', 'mix', id] as const,
   exports: (id: string) => ['sessions', 'exports', id] as const,
+  presets: ['presets'] as const,
   jobs: ['jobs'] as const,
   systemUpdate: ['system', 'update'] as const,
   ytdlp: ['system', 'ytdlp'] as const,

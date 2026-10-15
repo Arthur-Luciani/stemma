@@ -78,29 +78,6 @@ class ExportFormat(StrEnum):
     MP3 = "mp3"
 
 
-class MixPreset(StrEnum):
-    ORIGINAL = "original"
-    NO_VOCALS = "no_vocals"
-    NO_DRUMS = "no_drums"
-    NO_BASS = "no_bass"
-    VOCALS_ONLY = "vocals_only"
-    CUSTOM = "custom"
-
-    @property
-    def label(self) -> str:
-        return _PRESET_LABELS[self]
-
-
-_PRESET_LABELS = {
-    MixPreset.ORIGINAL: "Original",
-    MixPreset.NO_VOCALS: "Sem voz",
-    MixPreset.NO_DRUMS: "Sem bateria",
-    MixPreset.NO_BASS: "Sem baixo",
-    MixPreset.VOCALS_ONLY: "Só voz",
-    MixPreset.CUSTOM: "Personalizado",
-}
-
-
 class SessionSort(StrEnum):
     NEWEST = "newest"
     OLDEST = "oldest"

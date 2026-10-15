@@ -81,3 +81,72 @@ def test_batch_com_fks_desligadas_preserva_filhos(migrated: Settings) -> None:
 def test_batch_com_fks_ligadas_apagaria_filhos(migrated: Settings) -> None:
     # Controle: prova que o teste acima detecta o problema.
     assert _rebuild_sessions_table(migrated.database_url, foreign_keys=True) == 0
+
+
+def test_0005_converte_presets_dos_exports_e_semeia_a_tabela(settings: Settings) -> None:
+    from alembic import command
+
+    from tests.conftest import alembic_config
+
+    config = alembic_config(settings.database_url)
+    command.upgrade(config, "0004")
+    engine = make_engine(settings.database_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO sessions (id, code, source_url, artist, title, artist_key,"
+                    " search_key, state, progress, created_at, updated_at) VALUES"
+                    " ('a1', 'ST-001', 'u', 'a', 't', 'a', 'a', 'ready', 0, '2026-01-01',"
+                    " '2026-01-01')"
+                )
+            )
+            stems = '{"vocals": {"volume": 100, "pan": 0, "mute": false, "solo": false}}'
+            for i, preset in enumerate(("no_vocals", "custom", None)):
+                conn.execute(
+                    text(
+                        "INSERT INTO exports (id, session_id, format, preset, levels, state,"
+                        " progress, created_at, updated_at) VALUES (:id, 'a1', 'wav', :preset,"
+                        " :levels, 'done', 100, '2026-01-01', '2026-01-01')"
+                    ),
+                    {"id": f"e{i}", "preset": preset, "levels": stems},
+                )
+            conn.execute(
+                text(
+                    "INSERT INTO mix_states (session_id, stems, preset, updated_at)"
+                    " VALUES ('a1', :levels, 'no_vocals', '2026-01-01')"
+                ),
+                {"levels": stems},
+            )
+    finally:
+        engine.dispose()
+
+    command.upgrade(config, "0005")
+
+    engine = make_engine(settings.database_url)
+    try:
+        with engine.connect() as conn:
+            exports = conn.execute(text("SELECT id, preset FROM exports ORDER BY id")).all()
+            presets = (
+                conn.execute(text("SELECT name FROM mix_presets ORDER BY position")).scalars().all()
+            )
+            mix_columns = [r[1] for r in conn.execute(text("PRAGMA table_info(mix_states)"))]
+            mixes = conn.execute(text("SELECT count(*) FROM mix_states")).scalar_one()
+    finally:
+        engine.dispose()
+
+    assert [tuple(r) for r in exports] == [("e0", "Sem voz"), ("e1", "Personalizado"), ("e2", None)]
+    assert list(presets) == ["Original", "Sem voz", "Sem bateria", "Sem baixo", "Só voz"]
+    assert "preset" not in mix_columns
+    assert mixes == 1
+
+
+def test_0005_downgrade_volta_o_enum(settings: Settings) -> None:
+    from alembic import command
+
+    from tests.conftest import alembic_config
+
+    config = alembic_config(settings.database_url)
+    command.upgrade(config, "head")
+    command.downgrade(config, "0004")
+    command.upgrade(config, "head")

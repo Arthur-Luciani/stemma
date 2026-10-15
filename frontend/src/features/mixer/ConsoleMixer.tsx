@@ -24,11 +24,13 @@ export function ConsoleMixer({
   mixer,
   duration,
   onOpenExport,
+  onSavePreset,
+  onManagePresets,
 }: MixerViewProps) {
   const root = useRef<HTMLDivElement>(null);
   const time = useRef<HTMLSpanElement>(null);
   usePlayhead(engine, root, time, formatShortClock);
-  const { state, preset, dispatch } = mixer;
+  const { state, presets, preset, dispatch } = mixer;
 
   return (
     <div ref={root} className={styles.console}>
@@ -120,8 +122,11 @@ export function ConsoleMixer({
         {/* Só o meio rola quando falta altura: cabeçalho e transport ficam à vista. */}
         <div className={styles.consoleMiddle}>
           <PresetSelector
+            onSave={onSavePreset}
+            onManage={onManagePresets}
             variant="pills"
             className={styles.consolePresets}
+            presets={presets}
             value={preset}
             onChange={(p) => {
               dispatch({ type: 'preset', preset: p });

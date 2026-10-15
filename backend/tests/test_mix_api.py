@@ -17,7 +17,6 @@ def _mix(**overrides: object) -> dict[str, object]:
             "bass": {"volume": 100, "pan": 0.25, "mute": False, "solo": True},
             "other": {"volume": 64.5, "pan": 1, "mute": False, "solo": False},
         },
-        "preset": "custom",
         "loop_a_s": 12.5,
         "loop_b_s": 30,
     }
@@ -33,7 +32,6 @@ def test_mix_padrao_quando_nao_salvo(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "stems": {s: {"volume": 100, "pan": 0, "mute": False, "solo": False} for s in STEMS},
-        "preset": "original",
         "loop_a_s": None,
         "loop_b_s": None,
         "updated_at": None,
@@ -61,10 +59,9 @@ def test_salvar_de_novo_substitui(client: TestClient) -> None:
     url = f"/api/sessions/{session['id']}/mix"
     client.put(url, json=_mix())
 
-    client.put(url, json=_mix(preset="no_vocals", loop_a_s=None, loop_b_s=None))
+    client.put(url, json=_mix(loop_a_s=None, loop_b_s=None))
 
     body = client.get(url).json()
-    assert body["preset"] == "no_vocals"
     assert body["loop_a_s"] is None
 
 
@@ -74,7 +71,7 @@ def test_salvar_de_novo_substitui(client: TestClient) -> None:
         ({"loop_a_s": 10, "loop_b_s": None}, "loop precisa dos dois pontos"),
         ({"loop_a_s": 30, "loop_b_s": 10}, "ponto A do loop precisa vir antes"),
         ({"loop_a_s": -1, "loop_b_s": 10}, "loop_a_s"),
-        ({"preset": "rock"}, "preset"),
+        ({"preset": "original"}, "preset"),
         ({"stems": {"vocals": {"volume": 50}}}, "faltam os stems: drums, bass, other"),
     ],
 )

@@ -26,7 +26,6 @@ from app.domain.enums import (
     ExportState,
     JobKind,
     JobState,
-    MixPreset,
     SessionState,
 )
 from app.domain.errors import AppError
@@ -77,7 +76,7 @@ class ExportInfo:
 
     id: uuid.UUID
     format: ExportFormat
-    preset: MixPreset | None
+    preset: str | None
     # Snapshot dos níveis: {stem: {volume, pan, mute, solo}}
     levels: dict[str, Any]
 

@@ -21,11 +21,13 @@ export function PracticeMixer({
   mixer,
   duration,
   onAdjust,
+  onSavePreset,
+  onManagePresets,
 }: MixerViewProps & { onAdjust: () => void }) {
   const root = useRef<HTMLDivElement>(null);
   const time = useRef<HTMLSpanElement>(null);
   usePlayhead(engine, root, time, formatShortClock);
-  const { state, preset, dispatch } = mixer;
+  const { state, presets, preset, dispatch } = mixer;
 
   return (
     <div ref={root} className={styles.screen}>
@@ -47,8 +49,11 @@ export function PracticeMixer({
       </header>
 
       <PresetSelector
+        onSave={onSavePreset}
+        onManage={onManagePresets}
         variant="grid"
         className={styles.practicePresets}
+        presets={presets}
         value={preset}
         onChange={(p) => {
           dispatch({ type: 'preset', preset: p });

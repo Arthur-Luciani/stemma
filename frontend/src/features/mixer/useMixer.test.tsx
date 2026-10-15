@@ -17,7 +17,7 @@ function setup({ debounceMs = 40, engine = null as AudioEngine | null } = {}) {
   const puts: MixStateIn[] = [];
   server.use(
     http.get('*/api/sessions/:id/mix', () =>
-      HttpResponse.json(makeMix({ preset: 'no_vocals', loop_a_s: 5, loop_b_s: 9 })),
+      HttpResponse.json(makeMix({ loop_a_s: 5, loop_b_s: 9 })),
     ),
     http.put('*/api/sessions/:id/mix', async ({ request }) => {
       const body = (await request.json()) as MixStateIn;
@@ -42,8 +42,10 @@ describe('useMixer', () => {
       expect(result.current.state).not.toBeNull();
     });
     expect(result.current.state?.loop).toEqual({ a: 5, b: 9 });
-    // O mix salvo é tudo em 100 sem mute: bate com Original, não com o rótulo que veio.
-    expect(result.current.preset).toBe('original');
+    // O mix salvo é tudo em 100 sem mute: bate com o Original da lista.
+    await waitFor(() => {
+      expect(result.current.preset?.name).toBe('Original');
+    });
   });
 
   it('salva uma vez só, com o último estado, depois do debounce', async () => {
@@ -56,14 +58,14 @@ describe('useMixer', () => {
       result.current.dispatch({ type: 'volume', stem: 'bass', value: 20 });
       result.current.dispatch({ type: 'mute', stem: 'vocals' });
     });
-    expect(result.current.preset).toBe('custom');
+    expect(result.current.preset).toBeNull();
     expect(puts).toHaveLength(0);
     await waitFor(() => {
       expect(puts).toHaveLength(1);
     });
     expect(puts[0]?.stems.bass?.volume).toBe(20);
     expect(puts[0]?.stems.vocals?.mute).toBe(true);
-    expect(puts[0]?.preset).toBe('custom');
+    expect(puts[0]).not.toHaveProperty('preset');
     expect(puts[0]?.loop_a_s).toBe(5);
   });
 
@@ -86,10 +88,11 @@ describe('useMixer', () => {
       expect(result.current.state).not.toBeNull();
     });
     act(() => {
-      result.current.dispatch({ type: 'preset', preset: 'no_drums' });
+      const preset = result.current.presets.find((p) => p.name === 'Sem bateria');
+      if (preset) result.current.dispatch({ type: 'preset', preset });
     });
     await act(() => result.current.flush());
-    expect(puts.map((p) => p.preset)).toEqual(['no_drums']);
+    expect(puts.map((p) => p.stems.drums?.mute)).toEqual([true]);
 
     act(() => {
       result.current.dispatch({ type: 'loop', loop: null });

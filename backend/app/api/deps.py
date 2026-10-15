@@ -17,6 +17,7 @@ from app.services.identity import IdentityService
 from app.services.jobs import JobService
 from app.services.media import MediaService
 from app.services.mix import MixService
+from app.services.presets import PresetService
 from app.services.search import SearchService
 from app.services.sessions import SessionService
 from app.services.system_update import SystemUpdateService
@@ -68,6 +69,10 @@ def get_mix_service(
     sessions: Annotated[SessionService, Depends(get_session_service)],
 ) -> MixService:
     return MixService(sessions)
+
+
+def get_preset_service(db: DbSession) -> PresetService:
+    return PresetService(db)
 
 
 def get_job_service(
@@ -141,6 +146,7 @@ def get_ytdlp_update_service(request: Request, db: DbSession) -> YtDlpUpdateServ
 SessionServiceDep = Annotated[SessionService, Depends(get_session_service)]
 IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]
 MixServiceDep = Annotated[MixService, Depends(get_mix_service)]
+PresetServiceDep = Annotated[PresetService, Depends(get_preset_service)]
 JobServiceDep = Annotated[JobService, Depends(get_job_service)]
 HealthServiceDep = Annotated[HealthService, Depends(get_health_service)]
 ExportServiceDep = Annotated[ExportService, Depends(get_export_service)]

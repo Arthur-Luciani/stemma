@@ -103,12 +103,15 @@
           "preset": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/MixPreset"
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Preset"
           },
           "stems": {
             "anyOf": [
@@ -225,12 +228,13 @@
           "preset": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/MixPreset"
+                "type": "string"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Preset"
           },
           "progress": {
             "title": "Progress",
@@ -639,18 +643,6 @@
           }
         ]
       },
-      "MixPreset": {
-        "enum": [
-          "original",
-          "no_vocals",
-          "no_drums",
-          "no_bass",
-          "vocals_only",
-          "custom"
-        ],
-        "title": "MixPreset",
-        "type": "string"
-      },
       "MixStateIn": {
         "additionalProperties": false,
         "properties": {
@@ -678,9 +670,6 @@
             ],
             "title": "Loop B S"
           },
-          "preset": {
-            "$ref": "#/components/schemas/MixPreset"
-          },
           "stems": {
             "additionalProperties": {
               "$ref": "#/components/schemas/StemMix"
@@ -693,8 +682,7 @@
           }
         },
         "required": [
-          "stems",
-          "preset"
+          "stems"
         ],
         "title": "MixStateIn",
         "type": "object"
@@ -726,9 +714,6 @@
             ],
             "title": "Loop B S"
           },
-          "preset": {
-            "$ref": "#/components/schemas/MixPreset"
-          },
           "stems": {
             "additionalProperties": {
               "$ref": "#/components/schemas/StemMix"
@@ -754,10 +739,192 @@
         },
         "required": [
           "stems",
-          "preset",
           "updated_at"
         ],
         "title": "MixStateOut",
+        "type": "object"
+      },
+      "PresetCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "stems": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PresetStem"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Stem"
+            },
+            "title": "Stems",
+            "type": "object"
+          },
+          "visible": {
+            "default": true,
+            "title": "Visible",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "stems"
+        ],
+        "title": "PresetCreate",
+        "type": "object"
+      },
+      "PresetListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PresetOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PresetListOut",
+        "type": "object"
+      },
+      "PresetOrder": {
+        "additionalProperties": false,
+        "description": "Todos os ids, na nova ordem.",
+        "properties": {
+          "ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PresetOrder",
+        "type": "object"
+      },
+      "PresetOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "stems": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PresetStem"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Stem"
+            },
+            "title": "Stems",
+            "type": "object"
+          },
+          "visible": {
+            "title": "Visible",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "position",
+          "visible",
+          "stems"
+        ],
+        "title": "PresetOut",
+        "type": "object"
+      },
+      "PresetStem": {
+        "additionalProperties": false,
+        "description": "Nível de um stem no preset. Solo não entra: aplicar um preset limpa o solo.",
+        "properties": {
+          "mute": {
+            "default": false,
+            "title": "Mute",
+            "type": "boolean"
+          },
+          "pan": {
+            "default": 0,
+            "maximum": 1.0,
+            "minimum": -1.0,
+            "title": "Pan",
+            "type": "number"
+          },
+          "volume": {
+            "default": 100,
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Volume",
+            "type": "number"
+          }
+        },
+        "title": "PresetStem",
+        "type": "object"
+      },
+      "PresetUpdate": {
+        "additionalProperties": false,
+        "description": "Só os campos enviados mudam (renomear, atualizar o mix, mostrar/esconder).",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "stems": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/PresetStem"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/Stem"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stems"
+          },
+          "visible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visible"
+          }
+        },
+        "title": "PresetUpdate",
         "type": "object"
       },
       "ReleaseNotes": {
@@ -1902,6 +2069,304 @@
         "summary": "Discard Job",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/api/presets": {
+      "get": {
+        "operationId": "list_presets_api_presets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresetListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "List Presets",
+        "tags": [
+          "presets"
+        ]
+      },
+      "post": {
+        "operationId": "create_preset_api_presets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresetCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Create Preset",
+        "tags": [
+          "presets"
+        ]
+      }
+    },
+    "/api/presets/order": {
+      "put": {
+        "operationId": "reorder_presets_api_presets_order_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresetOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresetListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Reorder Presets",
+        "tags": [
+          "presets"
+        ]
+      }
+    },
+    "/api/presets/{preset_id}": {
+      "delete": {
+        "operationId": "delete_preset_api_presets__preset_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "preset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Preset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Delete Preset",
+        "tags": [
+          "presets"
+        ]
+      },
+      "patch": {
+        "operationId": "update_preset_api_presets__preset_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "preset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Preset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresetUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Não encontrado"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflito com o estado atual"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Update Preset",
+        "tags": [
+          "presets"
         ]
       }
     },

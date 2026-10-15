@@ -1,6 +1,7 @@
 # 0013 — Estado do mixer: preset derivado, tela como verdade e save com debounce
 
 - **Status:** aceita (2026-10-05)
+- A seção "Presets" foi mudada pela [0018](0018-presets-editaveis.md): presets editáveis, com pan no match e sem `preset` no `PUT /mix`.
 - Complementa a [0011](0011-frontend-dados-ao-vivo-e-url.md) (dados ao vivo e URL) e a [0012](0012-audio-engine-sincronia.md) (AudioEngine).
 
 ## Contexto

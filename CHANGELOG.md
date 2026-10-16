@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/Arthur-Luciani/stemma/compare/v1.9.0...v1.10.0) (2026-10-16)
+
+
+### Features
+
+* presets com ícone, cor e barrinhas de mistura, e seletor que cabe no celular ([#63](https://github.com/Arthur-Luciani/stemma/issues/63)) ([c56f27f](https://github.com/Arthur-Luciani/stemma/commit/c56f27fe26508b7b275f4c1ab6b0c8bf21628561))
+
 ## [1.9.0](https://github.com/Arthur-Luciani/stemma/compare/v1.8.0...v1.9.0) (2026-10-15)
 
 

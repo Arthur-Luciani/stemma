@@ -1,10 +1,12 @@
-import { Fragment, useRef, type KeyboardEvent } from 'react';
+import { Fragment, useEffect, useRef, type KeyboardEvent } from 'react';
 
 import type { MixPreset } from '../../api/types';
 import { strings } from '../../strings';
 import { cx } from '../../ui/cx';
 import { Icon } from '../../ui/Icon';
 import { Button } from '../../ui/Button';
+import { hiddenEdges, scrollToShow } from './pillsScroll';
+import { PresetMark } from './PresetMark';
 import { PresetMore } from './PresetMore';
 import styles from './PresetSelector.module.css';
 
@@ -28,6 +30,8 @@ interface PresetSelectorProps {
  * Presets como grupo de rádio (setas do teclado). Só os marcados como visíveis aparecem; os
  * outros ficam no "Mais · N". O preset ativo escondido ocupa o 1º lugar, com o ícone de
  * escondido. "Personalizado" não se escolhe: aparece quando o mix não bate com nenhum preset.
+ * Cada preset aparece com a marca (ícone ou barrinhas, na cor dele) e o nome, cortado se faltar
+ * espaço (ADR 0019).
  */
 export function PresetSelector({
   presets,
@@ -39,10 +43,42 @@ export function PresetSelector({
   className,
 }: PresetSelectorProps) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const groupRef = useRef<HTMLDivElement>(null);
   const custom = value === null;
   const hidden = presets.filter((p) => !p.visible);
   const activeHidden = value && !value.visible ? value : null;
   const shown = [...(activeHidden ? [activeHidden] : []), ...presets.filter((p) => p.visible)];
+
+  const pills = variant === 'pills';
+  const activeIndex = shown.findIndex((p) => p.id === value?.id);
+
+  // Pílulas: degradê só na borda que esconde conteúdo. Atributos direto no DOM, sem render.
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!pills || !group) return;
+    const update = () => {
+      const edges = hiddenEdges(group);
+      group.toggleAttribute('data-fade-start', edges.start);
+      group.toggleAttribute('data-fade-end', edges.end);
+    };
+    update();
+    group.addEventListener('scroll', update, { passive: true });
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    observer?.observe(group);
+    return () => {
+      group.removeEventListener('scroll', update);
+      observer?.disconnect();
+    };
+  }, [pills, shown.length]);
+
+  // Pílulas: o preset ativo rola para a vista (rolando só a fileira, não a página).
+  useEffect(() => {
+    const group = groupRef.current;
+    const item = refs.current[activeIndex];
+    if (!pills || !group || !item) return;
+    const left = scrollToShow(group, item);
+    if (left !== null) group.scrollLeft = left;
+  }, [pills, activeIndex]);
 
   const onKeyDown = (event: KeyboardEvent, index: number) => {
     const delta = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
@@ -60,6 +96,7 @@ export function PresetSelector({
   return (
     <div className={cx(styles.wrap, styles[`${variant}Wrap`], className)}>
       <div
+        ref={groupRef}
         role="radiogroup"
         aria-label={strings.mixer.presets}
         className={cx(styles.group, styles[variant])}
@@ -92,8 +129,8 @@ export function PresetSelector({
                     aria-label={strings.mixer.preset.hiddenActive}
                   />
                 )}
+                <PresetMark preset={preset} />
                 <span className={styles.label}>{preset.name}</span>
-                {checked && variant === 'grid' && <Icon name="check" size={24} />}
               </button>
               {preset === activeHidden && <span className={styles.divider} aria-hidden="true" />}
             </Fragment>

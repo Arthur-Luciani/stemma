@@ -14,6 +14,8 @@ from app.domain.enums import (
     ExportState,
     JobKind,
     JobState,
+    PresetColor,
+    PresetIcon,
     SessionState,
     UpdateComponent,
     UpdateState,
@@ -33,13 +35,13 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
-def _enum[E: StrEnum](enum: type[E]) -> Enum:
+def _enum[E: StrEnum](enum: type[E], length: int = 16) -> Enum:
     # Guarda o valor (`"ready"`), não o nome (`"READY"`); sem CHECK para facilitar migrations.
     return Enum(
         enum,
         native_enum=False,
         create_constraint=False,
-        length=16,
+        length=length,
         values_callable=lambda members: [m.value for m in members],
     )
 
@@ -178,6 +180,9 @@ class MixPresetModel(Base):
     visible: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     # {stem: {volume: 0–100, pan: -1..1, mute: bool}}; solo não entra.
     stems: Mapped[dict[str, Any]] = mapped_column(JSON)
+    # Marca do preset no seletor (ADR 0019); só exibição, não entra no match com o mix.
+    icon: Mapped[PresetIcon | None] = mapped_column(_enum(PresetIcon, length=32))
+    color: Mapped[PresetColor | None] = mapped_column(_enum(PresetColor))
 
 
 class SystemUpdateModel(Base):

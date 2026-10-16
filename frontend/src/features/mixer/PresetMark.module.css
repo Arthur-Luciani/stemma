@@ -1,0 +1,37 @@
+/* Quadrado opaco: a cor do preset não some sobre o --accent do preset ativo. */
+.mark {
+  --mark: var(--text-body);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--bg-soft);
+  color: var(--mark);
+}
+
+.tinted {
+  background: color-mix(in srgb, var(--mark) 22%, var(--bg-surface));
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 55%;
+}
+
+.bar {
+  width: 3px;
+  min-height: 2px;
+  border-radius: 1px;
+  background: var(--stem);
+}
+
+/* Mudo: só um traço no pé da barra. */
+.muted {
+  height: 2px;
+  opacity: 0.6;
+}

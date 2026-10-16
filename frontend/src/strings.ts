@@ -1,5 +1,7 @@
 /** Textos da interface em PT-BR. Único lugar com texto de UI. */
 
+import type { PresetColor, PresetIcon } from './api/types';
+
 const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
 export const ordinal = (n: number) => `${String(n)}º`;
 
@@ -269,12 +271,12 @@ export const strings = {
       actionsFor: (name: string) => `Mais ações: ${name}`,
       allDefault: 'Tudo em 100%, centro',
       updateWithMix: 'Atualizar com o mix atual',
-      rename: 'Renomear',
+      edit: 'Editar',
       moveUp: 'Subir',
       moveDown: 'Descer',
       remove: 'Excluir',
       saveTitle: 'Salvar mix como preset',
-      renameTitle: 'Renomear preset',
+      editTitle: 'Editar preset',
       name: 'Nome do preset',
       namePlaceholder: 'Ex.: Bateria baixa',
       showToggle: 'Mostrar no seletor',
@@ -283,7 +285,38 @@ export const strings = {
       nameTooLong: (max: number) => `O nome passa de ${String(max)} caracteres.`,
       updateInstead: (name: string) => `Atualizar ${name} com este mix`,
       saved: (name: string) => `Preset “${name}” salvo.`,
-      renamed: 'Preset renomeado.',
+      edited: 'Preset salvo.',
+      iconLabel: 'Ícone',
+      colorLabel: 'Cor',
+      noIcon: 'Sem ícone (mostra a mistura)',
+      noColor: 'Sem cor',
+      iconNames: {
+        graphic_eq: 'Equalizador',
+        music_note: 'Nota musical',
+        mic: 'Microfone',
+        mic_off: 'Microfone desligado',
+        record_voice_over: 'Cantando',
+        volume_off: 'Mudo',
+        volume_down: 'Volume baixo',
+        hearing: 'Ouvido',
+        headphones: 'Fones',
+        piano: 'Piano',
+        lyrics: 'Letra',
+        school: 'Estudo',
+        speed: 'Velocidade',
+        repeat: 'Repetir',
+        star: 'Estrela',
+        bolt: 'Energia',
+      } satisfies Record<PresetIcon, string>,
+      colorNames: {
+        vocals: 'Azul (voz)',
+        drums: 'Laranja (bateria)',
+        bass: 'Verde (baixo)',
+        other: 'Roxo (outros)',
+        red: 'Vermelho',
+        yellow: 'Amarelo',
+        gray: 'Cinza',
+      } satisfies Record<PresetColor, string>,
       updated: (name: string) => `Preset “${name}” atualizado.`,
       removed: (name: string) => `Preset “${name}” excluído.`,
       managerTitle: 'Presets',

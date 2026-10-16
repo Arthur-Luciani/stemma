@@ -38,6 +38,8 @@ class PresetService:
             position=0 if last is None else last + 1,
             visible=data.visible,
             stems=_stems_json(data.stems),
+            icon=data.icon,
+            color=data.color,
         )
         self.db.add(row)
         self.db.commit()
@@ -54,6 +56,11 @@ class PresetService:
             row.stems = _stems_json(data.stems)
         if data.visible is not None:
             row.visible = data.visible
+        # `null` enviado remove; campo omitido não mexe.
+        if "icon" in data.model_fields_set:
+            row.icon = data.icon
+        if "color" in data.model_fields_set:
+            row.color = data.color
         self.db.commit()
         return PresetOut.model_validate(_out(row))
 
@@ -100,4 +107,6 @@ def _out(row: MixPresetModel) -> dict[str, object]:
         "position": row.position,
         "visible": row.visible,
         "stems": row.stems,
+        "icon": row.icon,
+        "color": row.color,
     }

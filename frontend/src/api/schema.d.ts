@@ -653,8 +653,16 @@ export interface components {
             /** Updated At */
             updated_at: string | null;
         };
+        /**
+         * PresetColor
+         * @description Cores que um preset pode ter: as dos stems e três extras (tokens `--preset-*`, ADR 0019).
+         * @enum {string}
+         */
+        PresetColor: "vocals" | "drums" | "bass" | "other" | "red" | "yellow" | "gray";
         /** PresetCreate */
         PresetCreate: {
+            color?: components["schemas"]["PresetColor"] | null;
+            icon?: components["schemas"]["PresetIcon"] | null;
             /** Name */
             name: string;
             /** Stems */
@@ -667,6 +675,12 @@ export interface components {
              */
             visible: boolean;
         };
+        /**
+         * PresetIcon
+         * @description Ícones que um preset pode ter: nomes do Material Symbols, numa lista curta (ADR 0019).
+         * @enum {string}
+         */
+        PresetIcon: "graphic_eq" | "music_note" | "mic" | "mic_off" | "record_voice_over" | "volume_off" | "volume_down" | "hearing" | "headphones" | "piano" | "lyrics" | "school" | "speed" | "repeat" | "star" | "bolt";
         /** PresetListOut */
         PresetListOut: {
             /** Items */
@@ -682,6 +696,8 @@ export interface components {
         };
         /** PresetOut */
         PresetOut: {
+            color: components["schemas"]["PresetColor"] | null;
+            icon: components["schemas"]["PresetIcon"] | null;
             /**
              * Id
              * Format: uuid
@@ -721,9 +737,13 @@ export interface components {
         };
         /**
          * PresetUpdate
-         * @description Só os campos enviados mudam (renomear, atualizar o mix, mostrar/esconder).
+         * @description Só os campos enviados mudam (editar, atualizar o mix, mostrar/esconder).
+         *
+         *     `icon` e `color` enviados como `null` removem a marca; omitidos, ficam como estão.
          */
         PresetUpdate: {
+            color?: components["schemas"]["PresetColor"] | null;
+            icon?: components["schemas"]["PresetIcon"] | null;
             /** Name */
             name?: string | null;
             /** Stems */

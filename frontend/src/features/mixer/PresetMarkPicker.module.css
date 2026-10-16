@@ -1,0 +1,71 @@
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  color: var(--text-strong);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+}
+
+/* 44px de alvo; 6 por linha cabem em 320px. */
+.icons,
+.colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, var(--touch-min));
+  gap: 4px;
+}
+
+.option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  border: 2px solid transparent;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.option:has(.input:checked) {
+  border-color: var(--accent-text);
+}
+
+.option:has(.input:focus-visible) {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+/* Rádio nativo invisível: o teclado e o leitor de tela continuam funcionando. */
+.input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.swatch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--swatch);
+}
+
+.none {
+  border: 1px dashed var(--line-strong);
+  background: transparent;
+  color: var(--text-muted);
+}

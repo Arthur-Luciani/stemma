@@ -103,17 +103,68 @@ describe('SavePresetDialog', () => {
     expect(screen.getByLabelText('Nome do preset')).toHaveValue('Novo');
   });
 
-  it('renomear permite o próprio nome e não mostra o interruptor', () => {
+  it('editar permite o próprio nome, não mostra o interruptor e já marca ícone e cor', () => {
     wrap(
       <SavePresetDialog
-        mode="rename"
-        preset={presets[0] as MixPreset}
+        mode="edit"
+        preset={presets[1] as MixPreset}
         presets={presets}
         onClose={vi.fn()}
       />,
     );
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Salvar' })).toBeEnabled();
+    expect(screen.getByRole('radio', { name: 'Microfone desligado' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Azul (voz)' })).toBeChecked();
+  });
+
+  it('salva com o ícone e a cor escolhidos', async () => {
+    const posts: PresetCreate[] = [];
+    server.use(
+      http.post('*/api/presets', async ({ request }) => {
+        const body = (await request.json()) as PresetCreate;
+        posts.push(body);
+        return HttpResponse.json(makePreset(body.name, 5), { status: 201 });
+      }),
+    );
+    const onClose = vi.fn();
+    wrap(<SavePresetDialog mode="create" presets={presets} stems={STEMS} onClose={onClose} />);
+    expect(screen.getByRole('radio', { name: 'Sem ícone (mostra a mistura)' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Sem cor' })).toBeChecked();
+    await userEvent.type(screen.getByLabelText('Nome do preset'), 'Treino');
+    await userEvent.click(screen.getByRole('radio', { name: 'Estudo' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Vermelho' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+    expect(posts[0]).toMatchObject({ name: 'Treino', icon: 'school', color: 'red' });
+  });
+
+  it('editar tira o ícone e a cor mandando null', async () => {
+    const patches: PresetUpdate[] = [];
+    server.use(
+      http.patch('*/api/presets/:id', async ({ request }) => {
+        patches.push((await request.json()) as PresetUpdate);
+        return HttpResponse.json(presets[1]);
+      }),
+    );
+    const onClose = vi.fn();
+    wrap(
+      <SavePresetDialog
+        mode="edit"
+        preset={presets[1] as MixPreset}
+        presets={presets}
+        onClose={onClose}
+      />,
+    );
+    await userEvent.click(screen.getByRole('radio', { name: 'Sem ícone (mostra a mistura)' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Sem cor' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+    expect(patches[0]).toEqual({ name: 'Sem voz', icon: null, color: null });
   });
 });
 

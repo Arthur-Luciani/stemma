@@ -82,12 +82,18 @@
   font-weight: 600;
 }
 
+/* Na lista o nome aparece inteiro: quebra em até 2 linhas. */
 .name {
+  display: -webkit-box;
   flex: 1;
   min-width: 0;
+  padding: 6px 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .footer {

@@ -52,7 +52,7 @@
   align-items: center;
   gap: 4px;
   min-height: 64px;
-  padding: 0 4px 0 var(--space-4);
+  padding: var(--space-2) 4px var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--bg-soft);
 }
 
@@ -73,12 +73,20 @@
 }
 
 .name {
+  display: -webkit-box;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   color: var(--text-strong);
   font-size: 15px;
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.mark {
+  margin-right: var(--space-2);
 }
 
 .badge {

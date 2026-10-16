@@ -150,3 +150,33 @@ def test_0005_downgrade_volta_o_enum(settings: Settings) -> None:
     command.upgrade(config, "head")
     command.downgrade(config, "0004")
     command.upgrade(config, "head")
+
+
+def test_0006_marca_so_os_de_fabrica_com_o_nome_original(settings: Settings) -> None:
+    from alembic import command
+
+    from tests.conftest import alembic_config
+
+    config = alembic_config(settings.database_url)
+    command.upgrade(config, "0005")
+    engine = make_engine(settings.database_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE mix_presets SET name = 'Karaokê' WHERE name = 'Sem voz'"))
+        command.upgrade(config, "head")
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text("SELECT name, icon, color FROM mix_presets ORDER BY position")
+            ).all()
+    finally:
+        engine.dispose()
+
+    assert [tuple(r) for r in rows] == [
+        ("Original", "graphic_eq", None),
+        ("Karaokê", None, None),
+        ("Sem bateria", "volume_off", "drums"),
+        ("Sem baixo", "volume_off", "bass"),
+        ("Só voz", "mic", "vocals"),
+    ]
+    command.downgrade(config, "0005")
+    command.upgrade(config, "head")

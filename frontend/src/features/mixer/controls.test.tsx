@@ -7,7 +7,7 @@ import { Fader } from './Fader';
 import { LoopABControl } from './LoopABControl';
 import { MetricsBadge } from './MetricsBadge';
 import type { MixPreset } from '../../api/types';
-import { makeDefaultPresets } from '../../test/fixtures';
+import { makeDefaultPresets, makePreset } from '../../test/fixtures';
 import { MuteSoloButton } from './MuteSoloButton';
 import { PanControl } from './PanControl';
 import { PresetSelector } from './PresetSelector';
@@ -207,11 +207,30 @@ describe('PresetSelector', () => {
       />,
     );
     const radios = screen.getAllByRole('radio');
-    expect(radios.map((r) => r.textContent)).toEqual(['visibility_offSem voz', 'Original']);
+    expect(radios.map((r) => r.textContent)).toEqual([
+      'visibility_offmic_offSem voz',
+      'graphic_eqOriginal',
+    ]);
     expect(radios[0]).toHaveAttribute('aria-checked', 'true');
     await userEvent.click(screen.getByRole('button', { name: 'Mais presets' }));
     await userEvent.click(screen.getByRole('button', { name: 'Gerenciar' }));
     expect(onManage).toHaveBeenCalledOnce();
+  });
+
+  it('cada preset tem a marca (ícone ou barrinhas) e o nome continua sendo o rótulo', () => {
+    const plain = makePreset('Aprendendo bateria com metrônomo', 5, { drums: { volume: 30 } });
+    render(
+      <PresetSelector
+        presets={[named('Sem voz'), plain]}
+        value={null}
+        onChange={vi.fn()}
+        variant="grid"
+      />,
+    );
+    const withIcon = screen.getByRole('radio', { name: 'Sem voz' });
+    expect(withIcon).toHaveTextContent('mic_off');
+    const bars = screen.getByRole('radio', { name: 'Aprendendo bateria com metrônomo' });
+    expect(bars.querySelectorAll('[aria-hidden="true"] > span > span')).toHaveLength(4);
   });
 
   it('sem nenhum preset mostra "Personalizado" e a ação de salvar, sem Mais', async () => {

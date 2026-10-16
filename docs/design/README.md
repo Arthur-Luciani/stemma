@@ -56,6 +56,16 @@ Este arquivo resume o que a implementação precisa. Em caso de dúvida visual, 
 
 Stem mutado = cor a 30% de opacidade + waveform tracejada. A cor **sempre** acompanha o nome do stem.
 
+### Marca dos presets ([ADR 0019](../decisions/0019-marca-dos-presets.md))
+
+A cor do preset é uma das 4 dos stems ou uma destas extras (sem o dourado do `--accent`, que é o preset ativo):
+
+| Cor | Token | Escuro |
+|---|---|---|
+| Vermelho | `--preset-red` | `#e5676f` |
+| Amarelo | `--preset-yellow` | `#d6cf5c` |
+| Cinza | `--preset-gray` | `#9aa3ad` |
+
 ### Tema claro (opcional, fase posterior)
 `#f4f2ee` base · `#ffffff` surface · `#e8e5df` soft · `#1c1f23` text · `#5d636b` muted · `#a26d22` accent · stems na coluna "Claro".
 
@@ -217,3 +227,10 @@ Feitos na #44 (barrinha de reprodução), de propósito:
 - **Sem animação de saída**: a barrinha entra com a animação do design, mas some na hora ao fechar (a saída de 180 ms exigiria atrasar o unmount).
 - **Fim da música**: a barrinha fica com o play e o progresso cheio, como o mixer; o design pedia `--progress: 0`. Tocar de novo recomeça do início.
 - **Desktop < 820px** não existe: o desktop do app começa em 900×600, então a regra de empilhar sob o dock não foi implementada.
+
+Feitos na #62 (marca dos presets), de propósito, sem tela no design ainda:
+
+- **Marca** = quadrado de 26px (raio 7) antes do nome do preset em todos os seletores, no "Mais" e no gerenciador. Com ícone: o ícone (Material Symbols, preenchido) na cor do preset. Sem ícone: 4 barrinhas com o volume de cada stem nas cores dos stems (mudo = traço no pé). Com cor: fundo = 22% da cor sobre `surface` (opaco, para não sumir no preset ativo âmbar); sem cor: fundo `soft`.
+- **Nome**: nas pílulas, até 128px com reticências; na grade do 1f, até 2 linhas; no "Mais" e no gerenciador, até 2 linhas.
+- **1f sem o ✓ no preset ativo**: com a marca, o nome não cabia na coluna; o preenchimento âmbar já marca o ativo.
+- **Editar** (antes "Renomear") no menu ⋯ do gerenciador abre o mesmo diálogo de salvar com nome, grade de ícones (44px, "Sem ícone" primeiro, mostrando as barrinhas) e cores (bolinhas de 26px em alvos de 44px, "Sem cor" tracejado primeiro).

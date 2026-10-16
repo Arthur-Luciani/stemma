@@ -45,6 +45,11 @@
   --stem-bass: #3fb896;
   --stem-other: #c98bd0;
 
+  /* Cores extras da marca dos presets (as outras são as dos stems; ADR 0019) */
+  --preset-red: #e5676f;
+  --preset-yellow: #d6cf5c;
+  --preset-gray: #9aa3ad;
+
   /* Tipografia */
   --font-ui: 'Sora', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;

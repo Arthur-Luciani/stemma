@@ -7,6 +7,7 @@ import { Button } from '../../ui/Button';
 import { cx } from '../../ui/cx';
 import { Icon } from '../../ui/Icon';
 import { useIsDesktop } from '../../ui/useMediaQuery';
+import { PresetMark } from './PresetMark';
 import styles from './PresetMore.module.css';
 
 interface PresetMoreProps {
@@ -66,6 +67,7 @@ export function PresetMore({ hidden, active, onChange, onSave, onManage, large }
                     onChange(preset);
                   }}
                 >
+                  <PresetMark preset={preset} />
                   <span className={styles.name}>{preset.name}</span>
                   {checked && <Icon name="check" size={18} />}
                 </button>

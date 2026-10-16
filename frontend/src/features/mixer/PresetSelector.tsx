@@ -6,6 +6,7 @@ import { cx } from '../../ui/cx';
 import { Icon } from '../../ui/Icon';
 import { Button } from '../../ui/Button';
 import { hiddenEdges, scrollToShow } from './pillsScroll';
+import { PresetMark } from './PresetMark';
 import { PresetMore } from './PresetMore';
 import styles from './PresetSelector.module.css';
 
@@ -29,6 +30,8 @@ interface PresetSelectorProps {
  * Presets como grupo de rádio (setas do teclado). Só os marcados como visíveis aparecem; os
  * outros ficam no "Mais · N". O preset ativo escondido ocupa o 1º lugar, com o ícone de
  * escondido. "Personalizado" não se escolhe: aparece quando o mix não bate com nenhum preset.
+ * Cada preset aparece com a marca (ícone ou barrinhas, na cor dele) e o nome, cortado se faltar
+ * espaço (ADR 0019).
  */
 export function PresetSelector({
   presets,
@@ -126,8 +129,8 @@ export function PresetSelector({
                     aria-label={strings.mixer.preset.hiddenActive}
                   />
                 )}
+                <PresetMark preset={preset} />
                 <span className={styles.label}>{preset.name}</span>
-                {checked && variant === 'grid' && <Icon name="check" size={24} />}
               </button>
               {preset === activeHidden && <span className={styles.divider} aria-hidden="true" />}
             </Fragment>

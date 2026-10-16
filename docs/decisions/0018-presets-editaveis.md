@@ -2,6 +2,7 @@
 
 - **Status:** aceita (2026-10-15)
 - Muda a seção "Presets" da [0013](0013-estado-do-mixer.md); o resto da 0013 (estado na tela, save com debounce, loop A–B) continua valendo.
+- Complementada pela [0019](0019-marca-dos-presets.md): ícone e cor do preset.
 - Issue [#43](https://github.com/Arthur-Luciani/stemma/issues/43).
 
 ## Contexto

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 
-import type { MixPreset, PresetStem, Stem } from '../../api/types';
+import type { MixPreset, PresetColor, PresetIcon, PresetStem, Stem } from '../../api/types';
 import { errorMessage } from '../../app/useErrorToast';
 import { strings } from '../../strings';
 import { Button } from '../../ui/Button';
@@ -8,6 +8,7 @@ import { Dialog } from '../../ui/Dialog';
 import { Switch } from '../../ui/Switch';
 import { TextField } from '../../ui/TextField';
 import { useToast } from '../../ui/toastContext';
+import { PresetMarkPicker } from './PresetMarkPicker';
 import { MAX_PRESET_NAME, presetNameTaken, useCreatePreset, useUpdatePreset } from './presets';
 import styles from './SavePresetDialog.module.css';
 
@@ -16,13 +17,15 @@ const FORM_ID = 'save-preset-form';
 type SavePresetDialogProps = {
   presets: readonly MixPreset[];
   onClose: () => void;
-} & ({ mode: 'create'; stems: Record<Stem, PresetStem> } | { mode: 'rename'; preset: MixPreset });
+} & ({ mode: 'create'; stems: Record<Stem, PresetStem> } | { mode: 'edit'; preset: MixPreset });
 
-/** Salva o mix atual como preset novo, ou renomeia um existente. */
+/** Salva o mix atual como preset novo, ou edita nome, ícone e cor de um existente. */
 export function SavePresetDialog(props: SavePresetDialogProps) {
   const { presets, onClose } = props;
-  const rename = props.mode === 'rename';
-  const [name, setName] = useState(rename ? props.preset.name : '');
+  const edit = props.mode === 'edit';
+  const [name, setName] = useState(edit ? props.preset.name : '');
+  const [icon, setIcon] = useState<PresetIcon | null>(edit ? props.preset.icon : null);
+  const [color, setColor] = useState<PresetColor | null>(edit ? props.preset.color : null);
   const [visible, setVisible] = useState(true);
   const create = useCreatePreset();
   const update = useUpdatePreset();
@@ -32,7 +35,7 @@ export function SavePresetDialog(props: SavePresetDialogProps) {
 
   const trimmed = name.trim();
   const taken = trimmed
-    ? presetNameTaken(presets, trimmed, rename ? props.preset.id : undefined)
+    ? presetNameTaken(presets, trimmed, edit ? props.preset.id : undefined)
     : undefined;
   const tooLong = name.length > MAX_PRESET_NAME;
   const error = tooLong
@@ -44,19 +47,19 @@ export function SavePresetDialog(props: SavePresetDialogProps) {
 
   const submit = () => {
     if (!valid || pending) return;
-    if (props.mode === 'rename') {
+    if (props.mode === 'edit') {
       update.mutate(
-        { id: props.preset.id, patch: { name: trimmed } },
+        { id: props.preset.id, patch: { name: trimmed, icon, color } },
         {
           onSuccess: () => {
-            toast.show({ tone: 'good', message: strings.mixer.preset.renamed });
+            toast.show({ tone: 'good', message: strings.mixer.preset.edited });
             onClose();
           },
         },
       );
     } else {
       create.mutate(
-        { name: trimmed, stems: props.stems, visible },
+        { name: trimmed, stems: props.stems, visible, icon, color },
         {
           onSuccess: (saved) => {
             toast.show({ tone: 'good', message: strings.mixer.preset.saved(saved.name) });
@@ -89,7 +92,7 @@ export function SavePresetDialog(props: SavePresetDialogProps) {
     <Dialog
       open
       onClose={onClose}
-      title={rename ? strings.mixer.preset.renameTitle : strings.mixer.preset.saveTitle}
+      title={edit ? strings.mixer.preset.editTitle : strings.mixer.preset.saveTitle}
       actions={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -121,12 +124,19 @@ export function SavePresetDialog(props: SavePresetDialogProps) {
         <p id="preset-name-hint" role={error ? 'alert' : undefined} className={styles.error}>
           {error}
         </p>
-        {!rename && taken && (
+        {!edit && taken && (
           <Button variant="secondary" size="sm" onClick={updateInstead} disabled={pending}>
             {strings.mixer.preset.updateInstead(taken.name)}
           </Button>
         )}
-        {!rename && (
+        <PresetMarkPicker
+          icon={icon}
+          color={color}
+          stems={edit ? props.preset.stems : props.stems}
+          onIcon={setIcon}
+          onColor={setColor}
+        />
+        {!edit && (
           <div className={styles.toggle}>
             <span>{strings.mixer.preset.showToggle}</span>
             <Switch

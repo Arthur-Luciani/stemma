@@ -100,3 +100,36 @@ class UpdateComponent(StrEnum):
 
     APP = "app"  # o Stemma inteiro, pelo instalador (ADR 0015)
     YTDLP = "ytdlp"  # só o yt-dlp do venv no ar (ADR 0016)
+
+
+class PresetIcon(StrEnum):
+    """Ícones que um preset pode ter: nomes do Material Symbols, numa lista curta (ADR 0019)."""
+
+    GRAPHIC_EQ = "graphic_eq"
+    MUSIC_NOTE = "music_note"
+    MIC = "mic"
+    MIC_OFF = "mic_off"
+    RECORD_VOICE_OVER = "record_voice_over"
+    VOLUME_OFF = "volume_off"
+    VOLUME_DOWN = "volume_down"
+    HEARING = "hearing"
+    HEADPHONES = "headphones"
+    PIANO = "piano"
+    LYRICS = "lyrics"
+    SCHOOL = "school"
+    SPEED = "speed"
+    REPEAT = "repeat"
+    STAR = "star"
+    BOLT = "bolt"
+
+
+class PresetColor(StrEnum):
+    """Cores que um preset pode ter: as dos stems e três extras (tokens `--preset-*`, ADR 0019)."""
+
+    VOCALS = "vocals"
+    DRUMS = "drums"
+    BASS = "bass"
+    OTHER = "other"
+    RED = "red"
+    YELLOW = "yellow"
+    GRAY = "gray"

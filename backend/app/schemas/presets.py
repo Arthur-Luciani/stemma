@@ -3,7 +3,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.domain.enums import Stem
+from app.domain.enums import PresetColor, PresetIcon, Stem
 from app.domain.presets import MAX_PRESET_NAME
 
 PresetName = Annotated[str, Field(min_length=1, max_length=MAX_PRESET_NAME)]
@@ -32,18 +32,25 @@ class PresetCreate(BaseModel):
     name: PresetName
     stems: dict[Stem, PresetStem]
     visible: bool = True
+    icon: PresetIcon | None = None
+    color: PresetColor | None = None
 
     _stems = field_validator("stems")(_all_stems)
 
 
 class PresetUpdate(BaseModel):
-    """Só os campos enviados mudam (renomear, atualizar o mix, mostrar/esconder)."""
+    """Só os campos enviados mudam (editar, atualizar o mix, mostrar/esconder).
+
+    `icon` e `color` enviados como `null` removem a marca; omitidos, ficam como estão.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     name: PresetName | None = None
     stems: dict[Stem, PresetStem] | None = None
     visible: bool | None = None
+    icon: PresetIcon | None = None
+    color: PresetColor | None = None
 
     @field_validator("stems")
     @classmethod
@@ -65,6 +72,8 @@ class PresetOut(BaseModel):
     position: int
     visible: bool
     stems: dict[Stem, PresetStem]
+    icon: PresetIcon | None
+    color: PresetColor | None
 
 
 class PresetListOut(BaseModel):

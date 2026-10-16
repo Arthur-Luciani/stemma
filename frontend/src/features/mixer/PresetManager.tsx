@@ -12,6 +12,7 @@ import { Modal } from '../../ui/Modal';
 import { SkeletonList } from '../../ui/Skeleton';
 import { Switch } from '../../ui/Switch';
 import { useToast } from '../../ui/toastContext';
+import { PresetMark } from './PresetMark';
 import { presetDelta } from './presetText';
 import {
   presetStemsFromMix,
@@ -32,7 +33,7 @@ interface PresetManagerProps {
 }
 
 type Pending =
-  | { kind: 'rename'; preset: MixPreset }
+  | { kind: 'edit'; preset: MixPreset }
   | { kind: 'update'; preset: MixPreset }
   | { kind: 'remove'; preset: MixPreset };
 
@@ -110,6 +111,7 @@ export function PresetManager({ mixer, onClose, onSaveCurrent }: PresetManagerPr
           const isActive = preset.id === active?.id;
           return (
             <li key={preset.id} className={styles.row}>
+              <PresetMark preset={preset} className={styles.mark} />
               <div className={styles.info}>
                 <div className={styles.nameLine}>
                   <span className={styles.name}>{preset.name}</span>
@@ -153,10 +155,10 @@ export function PresetManager({ mixer, onClose, onSaveCurrent }: PresetManagerPr
                     },
                   },
                   {
-                    label: strings.mixer.preset.rename,
+                    label: strings.mixer.preset.edit,
                     icon: 'edit',
                     onSelect: () => {
-                      setPending({ kind: 'rename', preset });
+                      setPending({ kind: 'edit', preset });
                     },
                   },
                   ...(index > 0
@@ -223,9 +225,9 @@ export function PresetManager({ mixer, onClose, onSaveCurrent }: PresetManagerPr
         <div className={styles.body}>{body()}</div>
       </Modal>
 
-      {pending?.kind === 'rename' && (
+      {pending?.kind === 'edit' && (
         <SavePresetDialog
-          mode="rename"
+          mode="edit"
           preset={pending.preset}
           presets={presets}
           onClose={() => {

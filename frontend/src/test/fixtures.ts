@@ -123,6 +123,7 @@ export function makePreset(
   position: number,
   levels: Partial<Record<Stem, Partial<PresetStem>>> = {},
   visible = true,
+  mark: Pick<Partial<MixPreset>, 'icon' | 'color'> = {},
 ): MixPreset {
   const stem = (s: Stem) => ({ volume: 100, pan: 0, mute: false, ...levels[s] });
   return {
@@ -130,6 +131,8 @@ export function makePreset(
     name,
     position,
     visible,
+    icon: mark.icon ?? null,
+    color: mark.color ?? null,
     stems: {
       vocals: stem('vocals'),
       drums: stem('drums'),
@@ -139,15 +142,18 @@ export function makePreset(
   };
 }
 
-/** Os cinco presets que a migration cria. */
+/** Os cinco presets que a migration cria, com a marca da 0006. */
 export function makeDefaultPresets(): MixPreset[] {
   const mute = { mute: true };
   return [
-    makePreset('Original', 0),
-    makePreset('Sem voz', 1, { vocals: mute }),
-    makePreset('Sem bateria', 2, { drums: mute }),
-    makePreset('Sem baixo', 3, { bass: mute }),
-    makePreset('Só voz', 4, { drums: mute, bass: mute, other: mute }),
+    makePreset('Original', 0, {}, true, { icon: 'graphic_eq' }),
+    makePreset('Sem voz', 1, { vocals: mute }, true, { icon: 'mic_off', color: 'vocals' }),
+    makePreset('Sem bateria', 2, { drums: mute }, true, { icon: 'volume_off', color: 'drums' }),
+    makePreset('Sem baixo', 3, { bass: mute }, true, { icon: 'volume_off', color: 'bass' }),
+    makePreset('Só voz', 4, { drums: mute, bass: mute, other: mute }, true, {
+      icon: 'mic',
+      color: 'vocals',
+    }),
   ];
 }
 

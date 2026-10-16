@@ -71,9 +71,29 @@
 
 /* Pílulas (celular, 1e e paisagem): roláveis, 44px de alvo. */
 .pills {
+  /* offsetParent das pílulas, para rolar a ativa para a vista. */
+  position: relative;
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
+  --fade-start: 0px;
+  --fade-end: 0px;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black var(--fade-start),
+    black calc(100% - var(--fade-end)),
+    transparent
+  );
+}
+
+/* Degradê só na borda com conteúdo escondido (atributos postos pelo PresetSelector). */
+.pills[data-fade-start] {
+  --fade-start: 24px;
+}
+
+.pills[data-fade-end] {
+  --fade-end: 24px;
 }
 
 .pills::-webkit-scrollbar {
@@ -91,10 +111,10 @@
   background: var(--bg-soft);
 }
 
-/* Grade do Modo prática (1f): botões de 72px. */
+/* Grade do Modo prática (1f): botões de 72px. `minmax(0, …)`: nome longo não alarga a coluna. */
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -108,7 +128,30 @@
 
 .grid .item {
   justify-content: space-between;
+  min-width: 0;
   font-weight: 600;
+  text-align: start;
+  white-space: normal;
+}
+
+/* Nome longo quebra em até 2 linhas e termina em reticências. */
+.grid .label {
+  display: -webkit-box;
+  max-width: none;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.grid .item > :global(*) {
+  flex: none;
+}
+
+.grid .item > .label {
+  flex: 0 1 auto;
 }
 
 .grid .item:not(.active) {
@@ -122,6 +165,8 @@
 }
 
 .grid .custom {
+  min-width: 0;
+  overflow: hidden;
   font-size: 16px;
   font-weight: 500;
 }

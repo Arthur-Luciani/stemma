@@ -2,7 +2,7 @@ import type { MixPreset, PresetColor, PresetIcon } from '../../api/types';
 import { strings } from '../../strings';
 import { cx } from '../../ui/cx';
 import { Icon } from '../../ui/Icon';
-import { PRESET_COLORS, PRESET_ICONS, presetColorVar } from './presetMark';
+import { PRESET_COLORS, PRESET_ICONS, presetColorVar } from './presetMarkOptions';
 import { PresetMark } from './PresetMark';
 import styles from './PresetMarkPicker.module.css';
 

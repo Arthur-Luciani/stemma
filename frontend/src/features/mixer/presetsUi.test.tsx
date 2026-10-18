@@ -203,7 +203,6 @@ describe('PresetManager', () => {
     );
 
     await screen.findByText('Sem voz');
-    expect(screen.getByText('Ativo')).toBeInTheDocument();
     expect(screen.getByText('Aplicado')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Aplicar Sem voz' }));

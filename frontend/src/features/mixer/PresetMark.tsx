@@ -2,7 +2,7 @@ import type { MixPreset } from '../../api/types';
 import { STEMS, stemColorVar } from '../../audio/stems';
 import { cx } from '../../ui/cx';
 import { Icon } from '../../ui/Icon';
-import { presetColorVar } from './presetMark';
+import { presetColorVar } from './presetMarkOptions';
 import { presetLevel } from './presetText';
 import styles from './PresetMark.module.css';
 

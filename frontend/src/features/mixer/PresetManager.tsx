@@ -112,14 +112,9 @@ export function PresetManager({ mixer, onClose, onSaveCurrent }: PresetManagerPr
           return (
             <li key={preset.id} className={styles.row}>
               <PresetMark preset={preset} className={styles.mark} />
-              <div className={styles.info}>
-                <div className={styles.nameLine}>
-                  <span className={styles.name}>{preset.name}</span>
-                  {isActive && <span className={styles.badge}>{strings.mixer.preset.active}</span>}
-                </div>
-                <span className={styles.delta}>{presetDelta(preset)}</span>
-              </div>
-              <StemSummary stems={preset.stems} />
+              <span className={styles.name}>{preset.name}</span>
+              <StemSummary stems={preset.stems} className={styles.summary} />
+              <span className={styles.delta}>{presetDelta(preset)}</span>
               {isActive ? (
                 <span className={styles.applied}>
                   <Icon name="check" size={18} />
@@ -128,6 +123,7 @@ export function PresetManager({ mixer, onClose, onSaveCurrent }: PresetManagerPr
               ) : (
                 <Button
                   size="sm"
+                  className={styles.apply}
                   aria-label={strings.mixer.preset.applyNamed(preset.name)}
                   onClick={() => {
                     mixer.dispatch({ type: 'preset', preset });
@@ -138,6 +134,7 @@ export function PresetManager({ mixer, onClose, onSaveCurrent }: PresetManagerPr
               )}
               <Switch
                 label={strings.mixer.preset.showInSelector(preset.name)}
+                className={styles.visible}
                 checked={preset.visible}
                 onChange={(visible) => {
                   update.mutate({ id: preset.id, patch: { visible } }, { onError });
@@ -146,6 +143,7 @@ export function PresetManager({ mixer, onClose, onSaveCurrent }: PresetManagerPr
               <Menu
                 icon="more_vert"
                 label={strings.mixer.preset.actionsFor(preset.name)}
+                className={styles.more}
                 items={[
                   {
                     label: strings.mixer.preset.updateWithMix,

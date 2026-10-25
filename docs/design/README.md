@@ -234,3 +234,8 @@ Feitos na #62 (marca dos presets), de propósito, sem tela no design ainda:
 - **Nome**: nas pílulas, até 128px com reticências; na grade do 1f, até 2 linhas; no "Mais" e no gerenciador, até 2 linhas.
 - **1f sem o ✓ no preset ativo**: com a marca, o nome não cabia na coluna; o preenchimento âmbar já marca o ativo.
 - **Editar** (antes "Renomear") no menu ⋯ do gerenciador abre o mesmo diálogo de salvar com nome, grade de ícones (44px, "Sem ícone" primeiro, mostrando as barrinhas) e cores (bolinhas de 26px em alvos de 44px, "Sem cor" tracejado primeiro).
+
+Feitos depois, no gerenciador de presets (celular e gaveta do desktop):
+
+- **Linha em duas linhas**: em cima a marca, o nome (até 2 linhas, quebrando entre palavras), as barrinhas do mix e o ⋯; embaixo a descrição (até 2 linhas, em vez de cortar no primeiro stem), Aplicar e a chave "Mostrar no seletor". Numa linha só, no celular de 360px, sobravam uns 60px para o nome.
+- **Sem o selo "Ativo"**: o "✓ Aplicado" no lugar do botão já marca o preset ativo.

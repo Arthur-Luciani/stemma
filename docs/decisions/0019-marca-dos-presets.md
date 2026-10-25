@@ -15,7 +15,7 @@ No celular os nomes dos presets não cabem, e limitar caracteres não resolve: p
 - **O nome nunca some**: ele é o rótulo acessível do botão e aparece cortado com reticências onde falta espaço (pílulas, grade do Modo prática) e inteiro (até 2 linhas) na lista.
 - **API**: `icon` e `color` em `PresetOut`, opcionais em `PresetCreate`. No `PATCH`, `null` remove e campo omitido não mexe. Valor fora da lista dá 422 (`validation_error`).
 - **Presets padrão**: a migration 0006 dá ícone e cor aos cinco da 0005 que ainda têm o nome original e nenhuma marca: Original `graphic_eq` (sem cor), Sem voz `mic_off`/voz, Sem bateria `volume_off`/bateria, Sem baixo `volume_off`/baixo, Só voz `mic`/voz. O Material Symbols não tem ícone de bateria nem de baixo, então esses dois se diferenciam pela cor.
-- **Edição**: o "Renomear" do gerenciador vira **Editar** (nome, ícone e cor) e usa o mesmo diálogo de salvar. A lista de ícones e cores do frontend (`features/mixer/presetMark.ts`) é conferida contra os tipos gerados do OpenAPI na compilação.
+- **Edição**: o "Renomear" do gerenciador vira **Editar** (nome, ícone e cor) e usa o mesmo diálogo de salvar. A lista de ícones e cores do frontend (`features/mixer/presetMarkOptions.ts`) é conferida contra os tipos gerados do OpenAPI na compilação.
 
 ## Consequências
 - Ícone ou cor novos = mudar o enum no backend, rodar `npm run gen:api` e incluir o valor na lista do frontend e nos nomes em `strings.ts` (a compilação acusa o que faltar).

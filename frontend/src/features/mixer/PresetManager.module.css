@@ -47,33 +47,35 @@
   list-style: none;
 }
 
+/*
+ * Duas linhas, para o nome e a descrição terem a largura toda mesmo no celular:
+ *   [marca] nome (até 2 linhas)      barrinhas  [⋯]
+ *           Voz 30% · Baixo M        [Aplicar]  [chave]
+ */
 .row {
-  display: flex;
+  display: grid;
+  grid-template-areas:
+    'mark name  summary more'
+    'mark delta apply   visible';
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 4px;
-  min-height: 64px;
+  column-gap: var(--space-2);
   padding: var(--space-2) 4px var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--bg-soft);
 }
 
-.info {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  padding-right: var(--space-2);
+.mark {
+  grid-area: mark;
 }
 
-.nameLine {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
+/* Nome e descrição colados um no outro, no meio das duas linhas de controles. */
+.name {
+  align-self: end;
 }
 
 .name {
   display: -webkit-box;
+  grid-area: name;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -82,38 +84,50 @@
   font-size: 15px;
   font-weight: 600;
   line-height: 1.25;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
-.mark {
-  margin-right: var(--space-2);
+.summary {
+  grid-area: summary;
+  justify-self: center;
 }
 
-.badge {
-  flex: none;
-  padding: 3px 8px;
-  border-radius: var(--radius-chip);
-  background: var(--accent-soft);
-  color: var(--accent-text);
-  font-size: 12px;
-  font-weight: 600;
+.more {
+  grid-area: more;
+  justify-self: end;
 }
 
+/* A descrição também quebra em até 2 linhas em vez de cortar no primeiro stem. */
 .delta {
+  display: -webkit-box;
+  grid-area: delta;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+  align-self: start;
+}
+
+.apply,
+.applied {
+  grid-area: apply;
+  justify-self: center;
+}
+
+.visible {
+  grid-area: visible;
+  justify-self: end;
 }
 
 .applied {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  flex: none;
-  padding: 0 var(--space-2);
+  min-height: var(--touch-min);
   color: var(--accent-text);
   font-size: 14px;
   font-weight: 500;

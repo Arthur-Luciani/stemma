@@ -261,7 +261,6 @@ export const strings = {
       saveAs: 'Salvar como preset',
       manage: 'Gerenciar presets',
       manageShort: 'Gerenciar',
-      active: 'Ativo',
       applied: 'Aplicado',
       apply: 'Aplicar',
       applyNamed: (name: string) => `Aplicar ${name}`,

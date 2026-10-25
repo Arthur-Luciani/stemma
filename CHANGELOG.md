@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1](https://github.com/Arthur-Luciani/stemma/compare/v1.10.0...v1.10.1) (2026-10-25)
+
+
+### Bug Fixes
+
+* linha do gerenciador de presets em duas linhas no celular ([#65](https://github.com/Arthur-Luciani/stemma/issues/65)) ([24c5436](https://github.com/Arthur-Luciani/stemma/commit/24c5436a7589e7a5fa264cc6aa65f3add586f668))
+
 ## [1.10.0](https://github.com/Arthur-Luciani/stemma/compare/v1.9.0...v1.10.0) (2026-10-16)
 
 

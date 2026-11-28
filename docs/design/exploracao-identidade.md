@@ -162,8 +162,9 @@ Princípios: **corte seco** (curva de saída forte `cubic-bezier(.2,.8,.2,1)`; *
 
 | Momento | Decisão |
 |---|---|
-| **Abrir música (a porta)** | ~3 s. O **ícone de LED da linha cresce** até o painel grande (0–0,6 s) com o fundo colorido; título (0,55 s) e artista (0,7 s) entram deslizando; capa à vista ~1,6 s; o título sai e o painel **encolhe até o ícone do mixer** (2,35–2,95 s). Volta: o ícone do mixer viaja até a linha (0,75 s) |
-| **Porta no PC** | **2,4 s**, mesmas proporções: o ícone da linha clicada cresce até um painel de 540px à esquerda do centro; título (72px) e artista entram **ao lado** do painel; o painel pousa no ícone de 72px do cabeçalho do mixer. A volta animada fica para depois |
+| **Abrir música (a porta)** | ~3 s. O **ícone de LED da linha cresce** até o painel grande (0–0,6 s) com o fundo colorido; título (0,55 s) e artista (0,7 s) entram deslizando; capa à vista ~1,6 s; o título sai e o painel **encolhe até o ícone do mixer** (2,35–2,95 s). **Volta: o ícone do mixer viaja até a barrinha** (0,75 s), onde a música segue tocando |
+| **Porta no PC** | **2,4 s**, mesmas proporções: o ícone da linha clicada cresce até um painel de 540px à esquerda do centro; título (72px) e artista entram **ao lado** do painel; o painel pousa no ícone de 72px do cabeçalho do mixer. **Volta: o ícone viaja até a barrinha** no pé da barra lateral (0,6 s), com o mixer sumindo em 0,22 s |
+| Por que a volta vai para a barrinha | Ao sair do mixer a música continua tocando na barrinha; o destino existe sempre (qualquer página ou filtro, ou se a música foi aberta pela própria barrinha) e é o caminho inverso de Barrinha → mixer. Comparada com voltar para a linha da música e com só um fade |
 | Barrinha → mixer | A barrinha se expande até a tela (460 ms) e o ícone viaja até o cabeçalho; o ‹ encolhe de volta (360 ms) |
 | Adicionar | Sobe de baixo como uma folha (380 ms, desacelerando), Biblioteca escurece atrás; desce em 280 ms |
 | Gavetas | Sobem em 200 ms com corte seco + fundo escurecendo; descem em 160 ms |
@@ -190,7 +191,7 @@ Pendente na porta: tocar na capa para pular a animação (proposto, não prototi
 ### Em aberto
 
 - **Celular deitado** (console em paisagem, 1g): ficou **de fora por enquanto**. O primeiro protótipo (painel, "Telas · Impresso", última linha) tem 4 faixas verticais à esquerda e o mixer A à direita, mas deixou perguntas: o que vai no ⋯ (Exportar, Trechos e loop, Gerenciar presets?), como abrir "Todos os presets" e como chegar a mais de 4 trechos na linha "Ir para".
-- **PC:** todas as telas feitas (ver Telas do PC). Falta a volta animada da porta (mixer → Biblioteca).
+- **PC:** todas as telas feitas (ver Telas do PC).
 - **Capa:** usar a thumb do YouTube (cortando barras) ou buscar a **capa do álbum** (MusicBrainz / Cover Art Archive) a partir de artista e título, com a thumb como reserva.
 - **Prévia de 30 s:** player embutido do YouTube ou trecho baixado pelo yt-dlp no servidor.
 - Conferir contraste AA de todos os tokens Impresso; decidir se a moldura laranja continua igual à cor da Bateria.

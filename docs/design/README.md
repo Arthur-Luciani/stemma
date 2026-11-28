@@ -149,6 +149,7 @@ Reservado para a fila (#45): um botão "próxima" de 44 entre Tocar/Pausar e Fec
 ## Decisões pendentes
 
 - [x] **Mixer no celular** (decidido na F4a, 2026-10-05): **1f (Modo prática) é a tela inicial do mixer**; "Ajustar" abre **1e (Lanes compactas)**; ao girar para paisagem, **1g**.
+- [ ] **Identidade visual** (#66, #69): exploração em andamento, sem direção escolhida. Rodadas, aprendizados e o prompt da próxima sessão em [exploracao-identidade.md](exploracao-identidade.md).
 
 ## Funcionalidades que o design adicionou ao escopo
 

@@ -175,8 +175,8 @@ Pendente na porta: tocar na capa para pular a animação (proposto, não prototi
 
 ### Em aberto
 
-- **Celular deitado** (console em paisagem, 1g): próximo passo.
-- **PC** (1440×900): depois do celular.
+- **Celular deitado** (console em paisagem, 1g): ficou **de fora por enquanto**. O primeiro protótipo (painel, "Telas · Impresso", última linha) tem 4 faixas verticais à esquerda e o mixer A à direita, mas deixou perguntas: o que vai no ⋯ (Exportar, Trechos e loop, Gerenciar presets?), como abrir "Todos os presets" e como chegar a mais de 4 trechos na linha "Ir para".
+- **PC** (1440×900): em andamento, começando pelo mixer (página "PC · Impresso" do painel).
 - **Capa:** usar a thumb do YouTube (cortando barras) ou buscar a **capa do álbum** (MusicBrainz / Cover Art Archive) a partir de artista e título, com a thumb como reserva.
 - **Prévia de 30 s:** player embutido do YouTube ou trecho baixado pelo yt-dlp no servidor.
 - Conferir contraste AA de todos os tokens Impresso; decidir se a moldura laranja continua igual à cor da Bateria.

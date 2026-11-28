@@ -156,6 +156,15 @@ Navegação da #67 mantida (Biblioteca inicial, Adicionar como ação, sem aba M
 - **Sobre:** diálogo centralizado em duas colunas (ⓘ ou o aviso "v1.9 disponível"): à esquerda versão, novidades, Verificar e Atualizar agora; à direita yt-dlp e espaço em disco.
 - **Adicionar:** **painel de duas colunas** sobre a biblioteca escurecida. Esquerda: busca, Colar link e os resultados (▶ na thumb ouve 30 s sem escolher). Direita: o escolhido com a thumb grande e a prévia, a etiqueta, artista e título editáveis (com "já usado em N músicas" ou "Artista novo"), a fila e **Separar**. Teclado: ↑↓, Espaço, Enter, Esc.
 
+### Celular deitado
+
+844×390, última linha da página "Telas · Impresso". Num PWA não dá para travar a orientação por tela, então **toda tela precisa pelo menos não quebrar** deitada; só a família do mixer tem desenho próprio.
+
+- **Mixer:** ‹ volta para a Biblioteca; **Trechos e loop** e **Mixagem** escritos no topo; o **⋯ fica só com Exportar mixagem e Gerenciar presets**. À esquerda o visor com moldura (tempo, onda com as divisões dos trechos, cursor) e o transporte; à direita os 3 presets + **Todos** (painel lateral com Na Mixagem / Outros e Gerenciar) e **Ir para como lista com rolagem**, com todos os trechos e o atual marcado. As faixas ficam só na Mixagem.
+- **Trechos:** a onda inteira ocupa a largura toda (~790px, o dobro do celular em pé), com a régua dos trechos, a faixa do loop e o cursor; lista de trechos (tocar = loop) e ajuste de A/B com Marcar aqui e ±0,1; transporte compacto no topo. ‹ volta para o mixer e o loop termina.
+- **Mixagem:** 4 faders verticais lado a lado, com pan, volume, M e S; à direita os presets, Salvar como preset, o tempo e o transporte.
+- **Só adaptadas** (Biblioteca, Adicionar, Processando, Repertórios, Sobre): a coluna do celular em pé, centralizada e rolando, com a retícula nas laterais; as gavetas viram painéis.
+
 ### Movimento
 
 Princípios: **corte seco** (curva de saída forte `cubic-bezier(.2,.8,.2,1)`; **sem a curva com mola** prevista na #68), mexer como papel e não como luz, **a moldura deslocada é a assinatura** (botões com moldura afundam sobre ela), quieto enquanto toca, a porta é o único momento grande, "reduzir movimento" vira fade curto.
@@ -190,7 +199,6 @@ Pendente na porta: tocar na capa para pular a animação (proposto, não prototi
 
 ### Em aberto
 
-- **Celular deitado** (console em paisagem, 1g): ficou **de fora por enquanto**. O primeiro protótipo (painel, "Telas · Impresso", última linha) tem 4 faixas verticais à esquerda e o mixer A à direita, mas deixou perguntas: o que vai no ⋯ (Exportar, Trechos e loop, Gerenciar presets?), como abrir "Todos os presets" e como chegar a mais de 4 trechos na linha "Ir para".
 - **PC:** todas as telas feitas (ver Telas do PC).
 - **Capa:** usar a thumb do YouTube (cortando barras) ou buscar a **capa do álbum** (MusicBrainz / Cover Art Archive) a partir de artista e título, com a thumb como reserva.
 - **Prévia de 30 s:** player embutido do YouTube ou trecho baixado pelo yt-dlp no servidor.

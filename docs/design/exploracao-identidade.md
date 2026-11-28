@@ -118,6 +118,7 @@ O celular fica **deitado numa mesinha, com a tela para cima e em retrato**, pert
 A miniatura do YouTube passa a ser **traduzida** para o visual do app: um painel de LED com a cor de cada região da capa.
 
 - **Ícone** (Biblioteca, mixer, barrinha, editor de repertório): 16×16 LEDs quadrados, encostados, com uma trama fina por cima; borda de tinta. **Em cor** quando a música está pronta; **em cinza** enquanto separa, em rascunho ou com falha.
+- **Acender durante a separação:** o ícone cinza vai **ganhando cor pixel a pixel, espalhado** (sempre na mesma ordem para a mesma capa), na proporção do progresso da separação; o pixel recém-aceso brilha um pouco e assenta. Download e preparo do mixer não acendem pixels. Vale na Biblioteca (celular e PC), no Processando, no dock e na fila. Comparado com varredura (linha a linha) e do centro (anéis); o espalhado ganhou.
 - **Painel grande** (na porta): 48×48 LEDs **quadrados** (60×34 em 16:9), com 1px entre eles, cor reforçada e reduzida a 7 níveis por canal; regiões pretas viram LEDs apagados.
 - **Fundo da porta:** a capa em cor, bem desfocada, com pontos grandes que crescem e deslizam.
 - Descartados no caminho: retícula preto e branco (perdia tudo), duotone de tons contínuos ("parece só uma foto"), posterizado de 4 tons (não estilizava o suficiente), cor dominante (a "por região" ganhou).
@@ -142,6 +143,15 @@ Navegação da #67 mantida (Biblioteca inicial, Adicionar como ação, sem aba M
 - **Gerenciar presets:** seções **Na Mixagem** (Original sempre o 1º e não muda; 2 lugares, com ↓ para tirar) e **Outros** (lápis, ↑ para a Mixagem, lixeira com confirmação na linha). **Criar e editar na mesma tela**: nome (até 24 letras) + as 4 faixas com M, **S** e pan + Ouvir com a última música + Salvar. O símbolo de favorito saiu: a seção já diz o lugar.
 - **Repertórios:** a ordem importa (setlist, "Ordem do show"); editor com nome, músicas com × e alça para arrastar, "Adicionar músicas" com busca, chave "Todas | Já no repertório" e **20 por vez com "Mostrar mais"** (para 5000 músicas). Entradas: gaveta Repertório (lápis e Novo repertório) e ⋯ da música → "Adicionar a repertório" (caixas de marcar).
 - **Sobre o Stemma:** vira tela cheia: versão instalada e atualização (novidades, Verificar, Atualizar), yt-dlp (desatualizado → Atualizar) e espaço em disco em barra dividida.
+
+### Telas do PC
+
+1440×900, página "PC · Impresso" do painel, em claro e escuro. Mesma linguagem e mesmas funções; o que muda é caber tudo numa tela.
+
+- **Mixer:** uma tela só. Cabeçalho com o ícone de LED, 3 presets + "Todos · N" (popover) e Personalizado/Salvar; transporte com moldura, tempo com décimos, chip de loop, LUFS e Exportar; as 4 faixas com onda própria, M/S, volume e pan; régua com as marcas dos trechos, cursor arrastável e faixa do loop; coluna **Trechos** à direita (a lista liga o loop; Marcar aqui A/B e ±0,1); rodapé com os atalhos (Espaço, ←→, 1–4, ⇧1–4, P, T, A/B, L).
+- **Biblioteca:** barra lateral com Todas as músicas, **Repertórios** (busca e + Novo) e a barrinha no pé; no topo, busca com "/", Artista ▾ (popover com busca), ordenação e os **estados visíveis com contagem**; tabela com # (ordem do show, só dentro de um repertório), ícone, música e artista (o artista filtra), código, estado, duração, criada e a **ação da linha** (Abrir mixer / Acompanhar / Continuar / Tentar de novo) + ⋯; 8 por página com a paginação **centralizada** embaixo da tabela.
+- **Dock de processamento** no canto inferior direito; a seta abre a **fila** no mesmo canto: a música atual com as etapas e Cancelar, as próximas com Remover, a falha recente com Tentar de novo e "Ver em andamento na lista".
+- **Adicionar:** **painel de duas colunas** sobre a biblioteca escurecida. Esquerda: busca, Colar link e os resultados (▶ na thumb ouve 30 s sem escolher). Direita: o escolhido com a thumb grande e a prévia, a etiqueta, artista e título editáveis (com "já usado em N músicas" ou "Artista novo"), a fila e **Separar**. Teclado: ↑↓, Espaço, Enter, Esc.
 
 ### Movimento
 
@@ -168,7 +178,7 @@ Pendente na porta: tocar na capa para pular a animação (proposto, não prototi
 - **Presets:** criar e editar numa tela própria; **solo passa a ser salvo no preset** (hoje o schema não guarda solo: migration); nome até 24 letras (hoje 40).
 - **Repertórios** com ordem, "Adicionar a repertório" e filtro por **artista**; busca e paginação **no servidor**, também na Biblioteca.
 - **Adicionar:** prévia de 30 s e etiqueta do tipo de vídeo.
-- **Capa em LED:** grades geradas no servidor, corte das barras pretas.
+- **Capa em LED:** grades geradas no servidor, corte das barras pretas; o ícone acende espalhado com o progresso da separação.
 - **Falhou:** atalho "Escolher outro vídeo".
 - **Sobre** em tela cheia.
 - Movimento (#68): tokens e catálogo acima.
@@ -176,7 +186,7 @@ Pendente na porta: tocar na capa para pular a animação (proposto, não prototi
 ### Em aberto
 
 - **Celular deitado** (console em paisagem, 1g): ficou **de fora por enquanto**. O primeiro protótipo (painel, "Telas · Impresso", última linha) tem 4 faixas verticais à esquerda e o mixer A à direita, mas deixou perguntas: o que vai no ⋯ (Exportar, Trechos e loop, Gerenciar presets?), como abrir "Todos os presets" e como chegar a mais de 4 trechos na linha "Ir para".
-- **PC** (1440×900): em andamento, começando pelo mixer (página "PC · Impresso" do painel).
+- **PC** (1440×900): feitos mixer, Biblioteca, fila e Adicionar (ver Telas do PC). Faltam as gavetas virando painéis ou diálogos (presets, repertório, Sobre) e a porta no PC.
 - **Capa:** usar a thumb do YouTube (cortando barras) ou buscar a **capa do álbum** (MusicBrainz / Cover Art Archive) a partir de artista e título, com a thumb como reserva.
 - **Prévia de 30 s:** player embutido do YouTube ou trecho baixado pelo yt-dlp no servidor.
 - Conferir contraste AA de todos os tokens Impresso; decidir se a moldura laranja continua igual à cor da Bateria.

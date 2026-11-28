@@ -151,6 +151,9 @@ Navegação da #67 mantida (Biblioteca inicial, Adicionar como ação, sem aba M
 - **Mixer:** uma tela só. Cabeçalho com o ícone de LED, 3 presets + "Todos · N" (popover) e Personalizado/Salvar; transporte com moldura, tempo com décimos, chip de loop, LUFS e Exportar; as 4 faixas com onda própria, M/S, volume e pan; régua com as marcas dos trechos, cursor arrastável e faixa do loop; coluna **Trechos** à direita (a lista liga o loop; Marcar aqui A/B e ±0,1); rodapé com os atalhos (Espaço, ←→, 1–4, ⇧1–4, P, T, A/B, L).
 - **Biblioteca:** barra lateral com Todas as músicas, **Repertórios** (busca e + Novo) e a barrinha no pé; no topo, busca com "/", Artista ▾ (popover com busca), ordenação e os **estados visíveis com contagem**; tabela com # (ordem do show, só dentro de um repertório), ícone, música e artista (o artista filtra), código, estado, duração, criada e a **ação da linha** (Abrir mixer / Acompanhar / Continuar / Tentar de novo) + ⋯; 8 por página com a paginação **centralizada** embaixo da tabela.
 - **Dock de processamento** no canto inferior direito; a seta abre a **fila** no mesmo canto: a música atual com as etapas e Cancelar, as próximas com Remover, a falha recente com Tentar de novo e "Ver em andamento na lista".
+- **Gerenciar presets:** abre pelo Gerenciar do popover "Todos" e **ocupa a coluna dos Trechos** (‹ Trechos volta). Na Mixagem · 3 de 3 (Original fixo; ✎ e ↓ nos outros), Outros (✎, ↑ apagado quando a Mixagem está cheia, lixeira com confirmação na linha). **Criar e editar usa as próprias faixas do mixer**: o painel só pede o nome (até 24 letras), mostra o resumo das 4 faixas e Salvar/Cancelar; a música segue tocando. "Salvar preset" no cabeçalho abre o mesmo painel quando está Personalizado.
+- **Editor de repertório:** painel lateral de 560px que entra pela direita sobre a tabela (+ Novo ou Editar repertório): nome, **Ordem do show** com ↑ ↓ × e alça de arrastar, duração total, "Adicionar músicas" com busca, chave Todas | Já no repertório, caixas de marcar e 20 por vez; Excluir repertório, Cancelar e Salvar.
+- **Sobre:** diálogo centralizado em duas colunas (ⓘ ou o aviso "v1.9 disponível"): à esquerda versão, novidades, Verificar e Atualizar agora; à direita yt-dlp e espaço em disco.
 - **Adicionar:** **painel de duas colunas** sobre a biblioteca escurecida. Esquerda: busca, Colar link e os resultados (▶ na thumb ouve 30 s sem escolher). Direita: o escolhido com a thumb grande e a prévia, a etiqueta, artista e título editáveis (com "já usado em N músicas" ou "Artista novo"), a fila e **Separar**. Teclado: ↑↓, Espaço, Enter, Esc.
 
 ### Movimento
@@ -160,6 +163,7 @@ Princípios: **corte seco** (curva de saída forte `cubic-bezier(.2,.8,.2,1)`; *
 | Momento | Decisão |
 |---|---|
 | **Abrir música (a porta)** | ~3 s. O **ícone de LED da linha cresce** até o painel grande (0–0,6 s) com o fundo colorido; título (0,55 s) e artista (0,7 s) entram deslizando; capa à vista ~1,6 s; o título sai e o painel **encolhe até o ícone do mixer** (2,35–2,95 s). Volta: o ícone do mixer viaja até a linha (0,75 s) |
+| **Porta no PC** | **2,4 s**, mesmas proporções: o ícone da linha clicada cresce até um painel de 540px à esquerda do centro; título (72px) e artista entram **ao lado** do painel; o painel pousa no ícone de 72px do cabeçalho do mixer. A volta animada fica para depois |
 | Barrinha → mixer | A barrinha se expande até a tela (460 ms) e o ícone viaja até o cabeçalho; o ‹ encolhe de volta (360 ms) |
 | Adicionar | Sobe de baixo como uma folha (380 ms, desacelerando), Biblioteca escurece atrás; desce em 280 ms |
 | Gavetas | Sobem em 200 ms com corte seco + fundo escurecendo; descem em 160 ms |
@@ -186,7 +190,7 @@ Pendente na porta: tocar na capa para pular a animação (proposto, não prototi
 ### Em aberto
 
 - **Celular deitado** (console em paisagem, 1g): ficou **de fora por enquanto**. O primeiro protótipo (painel, "Telas · Impresso", última linha) tem 4 faixas verticais à esquerda e o mixer A à direita, mas deixou perguntas: o que vai no ⋯ (Exportar, Trechos e loop, Gerenciar presets?), como abrir "Todos os presets" e como chegar a mais de 4 trechos na linha "Ir para".
-- **PC** (1440×900): feitos mixer, Biblioteca, fila e Adicionar (ver Telas do PC). Faltam as gavetas virando painéis ou diálogos (presets, repertório, Sobre) e a porta no PC.
+- **PC:** todas as telas feitas (ver Telas do PC). Falta a volta animada da porta (mixer → Biblioteca).
 - **Capa:** usar a thumb do YouTube (cortando barras) ou buscar a **capa do álbum** (MusicBrainz / Cover Art Archive) a partir de artista e título, com a thumb como reserva.
 - **Prévia de 30 s:** player embutido do YouTube ou trecho baixado pelo yt-dlp no servidor.
 - Conferir contraste AA de todos os tokens Impresso; decidir se a moldura laranja continua igual à cor da Bateria.
